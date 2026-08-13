@@ -521,9 +521,8 @@ export class SetupWebViewProvider implements vscode.WebviewViewProvider {
 
       const projectPath = workspaceFolder.uri.fsPath;
 
-      // Check VS Code MCP configuration
-      const config = vscode.workspace.getConfiguration();
-      const mcpConfig = config.get("mcp") as any;
+      // Check the workspace MCP configuration file used by VS Code.
+      const mcpConfig = await mcpManager.getWorkspaceMcpConfig(projectPath);
 
       if (!mcpConfig || !mcpConfig.servers) {
         return {
@@ -776,10 +775,6 @@ export class SetupWebViewProvider implements vscode.WebviewViewProvider {
         return;
       }
 
-      // Check current MCP configuration in workspace settings
-      const config = vscode.workspace.getConfiguration();
-      const currentMcpConfig = config.get("mcp");
-
       // Option 1: Try to open dedicated MCP configuration file (.vscode/mcp.json)
       const mcpConfigPath = vscode.Uri.joinPath(
         workspaceFolder.uri,
@@ -799,7 +794,7 @@ export class SetupWebViewProvider implements vscode.WebviewViewProvider {
 
       // Option 2: If mcp.json doesn't exist, create it with current MCP configuration
       // Get current MCP configuration or create default
-      const mcpConfigToSave = currentMcpConfig || { servers: {} };
+      const mcpConfigToSave = { servers: {} };
 
       // Ensure .vscode directory exists
       const vscodeDir = vscode.Uri.joinPath(workspaceFolder.uri, ".vscode");
