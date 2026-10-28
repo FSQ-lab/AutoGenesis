@@ -74,7 +74,7 @@ def test_console_stdio_initialize_inventory_workflows_identity_canaries_and_eof(
         identity = client.rpc("resources/read", {"uri": "autogenesis://agent-contract/identity"})
         data = json.loads(identity["result"]["contents"][0]["text"])
         assert {key: data[key] for key in contract.identity.to_dict()} == contract.identity.to_dict()
-        wait = client.rpc("tools/call", {"name": "app_wait", "arguments": {"caller": "acceptance", "duration": 0, "step_raw": canary}})
+        wait = client.rpc("tools/call", {"name": "app_wait", "arguments": {"caller": "acceptance", "duration": 0}})
         assert not wait["result"].get("isError", False)
         # SDK validation, unknown dispatch, prompt validation, resource errors,
         # and tool errors must not echo submitted values.
