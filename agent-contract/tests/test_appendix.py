@@ -46,7 +46,7 @@ def test_snapshot_exact_bytes_no_includes_expansion_or_templates(tmp_path, monke
         snapshot.text = "replacement"
 
 
-@pytest.mark.parametrize("raw", [b"", b"a" * 65536, "é".encode() * 32768])
+@pytest.mark.parametrize("raw", [b"", b"a" * 65536, "é".encode() * 32768], ids=["empty", "ascii-64k", "utf8-64k"])
 def test_appendix_byte_boundary_is_inclusive(tmp_path, raw):
     write_appendix(tmp_path, raw)
     assert load_project_appendix(tmp_path).text.encode() == raw
@@ -56,7 +56,7 @@ def test_appendix_byte_boundary_is_inclusive(tmp_path, raw):
     (b"SYNTHETIC_PRIVATE_CANARY\xff", "appendix_not_utf8"),
     (b"a" * 65537, "appendix_too_large"),
     ("é".encode() * 32769, "appendix_too_large"),
-])
+], ids=["invalid-utf8", "ascii-over-limit", "utf8-over-limit"])
 def test_invalid_present_content_is_sanitized(tmp_path, raw, reason, caplog):
     write_appendix(tmp_path, raw)
     with pytest.raises(ContractError) as caught:
