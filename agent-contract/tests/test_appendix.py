@@ -139,5 +139,3 @@ def test_link_swap_between_resolve_and_open_is_rejected(tmp_path, monkeypatch):
     monkeypatch.setattr(implementation, "_open_posix", swapped)
     with pytest.raises(ContractError):
         load_project_appendix(root)
-
-
