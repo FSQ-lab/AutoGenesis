@@ -23,6 +23,11 @@ export interface McpServerConfig {
   isRunning: boolean;
 }
 
+interface WorkspaceMcpConfig {
+  servers: Record<string, any>;
+  [key: string]: unknown;
+}
+
 export class McpServerManager {
   private static instance: McpServerManager;
   private servers = new Map<string, McpServerConfig>();
@@ -194,6 +199,41 @@ export class McpServerManager {
    */
   public getServer(name: string): McpServerConfig | undefined {
     return this.servers.get(name);
+  }
+
+  public async getWorkspaceMcpConfig(
+    projectPath: string
+  ): Promise<WorkspaceMcpConfig> {
+    const mcpConfigPath = path.join(projectPath, ".vscode", "mcp.json");
+    if (!fs.existsSync(mcpConfigPath)) {
+      return { servers: {} };
+    }
+
+    try {
+      const content = await fs.promises.readFile(mcpConfigPath, "utf8");
+      const config = JSON.parse(content) as Partial<WorkspaceMcpConfig>;
+      return {
+        ...config,
+        servers: config.servers || {},
+      };
+    } catch (error) {
+      throw new Error(`Unable to read ${mcpConfigPath}: ${error}`);
+    }
+  }
+
+  private async writeWorkspaceMcpConfig(
+    projectPath: string,
+    mcpConfig: WorkspaceMcpConfig
+  ): Promise<void> {
+    const vscodeDirectory = path.join(projectPath, ".vscode");
+    const mcpConfigPath = path.join(vscodeDirectory, "mcp.json");
+
+    await fs.promises.mkdir(vscodeDirectory, { recursive: true });
+    await fs.promises.writeFile(
+      mcpConfigPath,
+      `${JSON.stringify(mcpConfig, null, 2)}\n`,
+      "utf8"
+    );
   }
 
   /**
@@ -395,11 +435,9 @@ export class McpServerManager {
     // Handle conf.json file creation/update before updating VS Code settings
     await this.ensureConfJsonExists(serverConfig.projectPath, serverConfig);
 
-    const config = vscode.workspace.getConfiguration();
-    const currentMcpConfig = (config.get("mcp") as any) || { servers: {} };
-
-    // Create a new plain object from the configuration to avoid proxy issues
-    const mcpConfig = JSON.parse(JSON.stringify(currentMcpConfig));
+    const mcpConfig = await this.getWorkspaceMcpConfig(
+      serverConfig.projectPath
+    );
 
     if (!mcpConfig.servers) {
       mcpConfig.servers = {};
@@ -524,8 +562,7 @@ export class McpServerManager {
       console.log(`Added SSE server configuration: ${sseServerName}`);
     }
 
-    // Store configuration in workspace settings instead of global settings
-    await config.update("mcp", mcpConfig, vscode.ConfigurationTarget.Workspace);
+    await this.writeWorkspaceMcpConfig(serverConfig.projectPath, mcpConfig);
   }
 
   /**
@@ -533,11 +570,12 @@ export class McpServerManager {
    */ private async removeMcpServerFromSettings(
     serverName: string
   ): Promise<void> {
-    const config = vscode.workspace.getConfiguration();
-    const currentMcpConfig = (config.get("mcp") as any) || { servers: {} };
+    const server = this.servers.get(serverName);
+    if (!server) {
+      return;
+    }
 
-    // Create a new plain object from the configuration to avoid proxy issues
-    const mcpConfig = JSON.parse(JSON.stringify(currentMcpConfig));
+    const mcpConfig = await this.getWorkspaceMcpConfig(server.projectPath);
 
     if (mcpConfig.servers && mcpConfig.servers[serverName]) {
       delete mcpConfig.servers[serverName];
@@ -549,12 +587,7 @@ export class McpServerManager {
         console.log(`Removed SSE server configuration: ${sseServerName}`);
       }
 
-      // Remove configuration from workspace settings instead of global settings
-      await config.update(
-        "mcp",
-        mcpConfig,
-        vscode.ConfigurationTarget.Workspace
-      );
+      await this.writeWorkspaceMcpConfig(server.projectPath, mcpConfig);
     }
   }
 

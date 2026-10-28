@@ -4,7 +4,7 @@ version = "0.1.0"
 description = "Sample BDD test cases using Behave"
 requires-python = ">=3.10"
 dependencies = [
-    "mcp",
+    "mcp>=1.23.0,<2",
     "janus",
     "behave==1.2.6",
     "psutil",
