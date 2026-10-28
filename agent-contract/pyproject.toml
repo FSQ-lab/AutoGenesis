@@ -11,6 +11,9 @@ requires-python = ">=3.10"
 license = "MIT"
 dependencies = ["mcp>=1.23,<2", "jsonschema>=4.20,<5", "pydantic>=2.7,<3"]
 
+[project.urls]
+Repository = "https://github.com/FSQ-lab/AutoGenesis"
+
 [project.optional-dependencies]
 test = ["pytest>=8.3,<9"]
 

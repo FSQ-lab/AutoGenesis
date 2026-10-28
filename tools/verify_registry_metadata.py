@@ -163,19 +163,28 @@ def _verify_descriptors(repo: Path, metadata: dict[str, dict]) -> dict[str, dict
 def _wheel_metadata(wheel: Path) -> tuple[str, str, str, str, tuple[str, ...]]:
     with zipfile.ZipFile(wheel) as archive:
         metadata_name = next(name for name in archive.namelist() if name.endswith(".dist-info/METADATA"))
-        entry_name = next(name for name in archive.namelist() if name.endswith(".dist-info/entry_points.txt"))
+        entry_name = next((name for name in archive.namelist() if name.endswith(".dist-info/entry_points.txt")), None)
         parsed = BytesParser().parsebytes(archive.read(metadata_name))
         return (
             parsed["Name"],
             parsed["Version"],
-            archive.read(entry_name).decode("utf-8"),
+            "" if entry_name is None else archive.read(entry_name).decode("utf-8"),
             "\n".join(parsed.get_all("Requires-Dist", [])),
             tuple(parsed.get_all("Project-URL", [])),
         )
 
 
 def _verify_wheels(wheel_dir: Path, metadata: dict[str, dict]) -> None:
-    contract_version = tomllib.loads((Path(__file__).resolve().parents[1] / "agent-contract/pyproject.toml").read_text())["project"]["version"]
+    contract_project = tomllib.loads((Path(__file__).resolve().parents[1] / "agent-contract/pyproject.toml").read_text())["project"]
+    contract_version = contract_project["version"]
+    contract_wheels = sorted(wheel_dir.glob(f"autogenesis_agent_contract-{contract_version}-*.whl"))
+    if len(contract_wheels) != 1:
+        raise VerificationError("Expected one local Agent Contract wheel")
+    contract_name, built_contract_version, _, _, contract_urls = _wheel_metadata(contract_wheels[0])
+    if contract_name != contract_project["name"] or built_contract_version != contract_version:
+        raise VerificationError("Built Agent Contract identity differs from its Python project")
+    if f"Repository, {REPOSITORY}" not in contract_urls:
+        raise VerificationError("Agent Contract wheel does not contain Registry ownership metadata")
     for key, expected in SERVERS.items():
         package = metadata[key]["packages"][0]
         wheel_name = package["identifier"].replace("-", "_")
@@ -193,16 +202,21 @@ def _verify_wheels(wheel_dir: Path, metadata: dict[str, dict]) -> None:
             raise VerificationError("Built wheel does not contain Registry ownership metadata")
 
 
-def _verify_pypi(metadata: dict[str, dict]) -> None:
-    for document in metadata.values():
-        package = document["packages"][0]
-        url = f"https://pypi.org/pypi/{package['identifier']}/{package['version']}/json"
+def _verify_pypi(repo: Path, metadata: dict[str, dict]) -> None:
+    contract = tomllib.loads((repo / "agent-contract/pyproject.toml").read_text(encoding="utf-8"))["project"]
+    packages = [(contract["name"], contract["version"])]
+    packages.extend(
+        (document["packages"][0]["identifier"], document["packages"][0]["version"])
+        for document in metadata.values()
+    )
+    for identifier, version in packages:
+        url = f"https://pypi.org/pypi/{identifier}/{version}/json"
         try:
             response = json.loads(urllib.request.urlopen(url, timeout=30).read())
         except (OSError, urllib.error.URLError, ValueError):
-            raise VerificationError(f"Published PyPI package is unavailable: {package['identifier']}=={package['version']}") from None
-        if response.get("info", {}).get("version") != package["version"]:
-            raise VerificationError("Published PyPI package version differs from server.json")
+            raise VerificationError(f"Published PyPI package is unavailable: {identifier}=={version}") from None
+        if response.get("info", {}).get("version") != version:
+            raise VerificationError("Published PyPI package version differs from local metadata")
 
 
 def main() -> None:
@@ -217,7 +231,7 @@ def main() -> None:
     if args.wheel_dir is not None:
         _verify_wheels(args.wheel_dir.resolve(strict=True), metadata)
     if args.check_pypi:
-        _verify_pypi(metadata)
+        _verify_pypi(repo, metadata)
     if args.evidence_dir is not None:
         evidence = args.evidence_dir.resolve()
         evidence.mkdir(parents=True, exist_ok=True)
