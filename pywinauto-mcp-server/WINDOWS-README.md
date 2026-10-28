@@ -1,20 +1,20 @@
 # AutoGenesis Windows MCP package
 
-Issue #13 evolves the Windows runtime as **autogenesis-windows-mcp**
-(version 0.2.0), importable as **autogenesis_windows_mcp**, with the console
+Issue #8 evolves the Windows runtime as **autogenesis-windows-mcp**
+(version 0.3.0), importable as **autogenesis_windows_mcp**, with the console
 command **autogenesis-windows-mcp**. Python 3.10+ and Windows are required for
 serving automation tools. Linux CI checks package metadata/imports only.
 
 ## Install in a business project
 
 Build artifacts must contain both the Windows runtime wheel and the merged
-Agent Contract 1.1.0 wheel. From any Windows business directory, without a
+Agent Contract 1.2.0 wheel. From any Windows business directory, without a
 checkout of AutoGenesis:
 
 ```powershell
 python -m venv .venv
-.venv/Scripts/python -m pip install C:/artifacts/autogenesis_agent_contract-1.1.0-py3-none-any.whl C:/artifacts/autogenesis_windows_mcp-0.2.0-py3-none-any.whl
-.venv/Scripts/autogenesis-windows-mcp --config ./apps.json --app notepad
+.venv/Scripts/python -m pip install C:/artifacts/autogenesis_agent_contract-1.2.0-py3-none-any.whl C:/artifacts/autogenesis_windows_mcp-0.3.0-py3-none-any.whl
+.venv/Scripts/autogenesis-windows-mcp --config ./apps.json --app notepad --project-root .
 ```
 
 The installed command defaults to **stdio**. MCP clients must own stdin/stdout;
@@ -26,18 +26,18 @@ the app_close automation tool or terminate the user's application.
 With uv installed, isolated execution from local artifacts is also supported:
 
 ```powershell
-uvx --with C:/artifacts/autogenesis_agent_contract-1.1.0-py3-none-any.whl --from C:/artifacts/autogenesis_windows_mcp-0.2.0-py3-none-any.whl autogenesis-windows-mcp --config ./apps.json --app notepad
+uvx --with C:/artifacts/autogenesis_agent_contract-1.2.0-py3-none-any.whl --from C:/artifacts/autogenesis_windows_mcp-0.3.0-py3-none-any.whl autogenesis-windows-mcp --config ./apps.json --app notepad --project-root .
 ```
 
 After these versions are published to the configured package index:
 
 ```powershell
-uvx --from autogenesis-windows-mcp==0.2.0 autogenesis-windows-mcp --config ./apps.json --app notepad
+uvx --from autogenesis-windows-mcp==0.3.0 autogenesis-windows-mcp --config ./apps.json --app notepad --project-root .
 ```
 
-The runtime depends exactly on autogenesis-agent-contract==1.1.0 and requires
+The runtime depends exactly on autogenesis-agent-contract==1.2.0 and requires
 manifest SHA-256
-80266f59b8ed32c83e374c870817f018361067c0aec6b7ce2b02b8f835850462.
+e655f773ac723cf29610364e60f733121740f4701eccdc144cc5001e1bd67d36.
 Missing, corrupt or incompatible contract assets fail startup.
 
 ## Application profiles
@@ -113,7 +113,7 @@ A client can launch the installed command with an argument array:
   "mcpServers": {
     "autogenesis-windows": {
       "command": "C:/business/.venv/Scripts/autogenesis-windows-mcp.exe",
-      "args": ["--config", "C:/business/apps.json", "--app", "notepad"]
+      "args": ["--config", "C:/business/apps.json", "--app", "notepad", "--project-root", "C:/business"]
     }
   }
 }
@@ -127,9 +127,9 @@ Agent Contract adapter publishes these official prompts:
 - execute_natural_language_task(task_text)
 
 The read-only resource autogenesis://agent-contract/identity reports contract
-identity and appendix metadata. This packaging issue supplies no project
-appendix configuration interface; the canonical adapter is registered with an
-empty appendix. Project-root/bootstrap integration belongs to its owning issue.
+identity and appendix metadata. The startup-only `--project-root` fixes the
+business-project write scope; generated destinations cannot escape it. The
+canonical adapter currently registers an empty project appendix.
 
 The **22 existing Windows tool names and complete input schemas** are frozen in
 tests/fixtures/legacy_tool_schemas.json, including their required fields,
@@ -144,8 +144,11 @@ defaults, array items and types:
 
 Generated replay continues to use Behave and the business project's
 features.environment helpers. Default generation paths are relative to the
-business working directory under behave_demo/features/steps, never inside
-site-packages. Prefer explicit feature_file or step_file for your project.
+business working directory under features/steps, never inside site-packages.
+Preview returns the complete payload, identity, and digest. Confirmation must
+echo that identity and digest with `approved=true`; the runtime rejects stale
+base files, escaping paths and symlinks, then atomically replaces the target.
+Prefer explicit feature_file or step_file paths inside the project root.
 Visual verification retains the Azure OpenAI and local provider paths;
 AZURE_OPENAI_API_KEY and AZURE_OPENAI_ENDPOINT are read from the environment.
 No provider implementation needs credential edits.

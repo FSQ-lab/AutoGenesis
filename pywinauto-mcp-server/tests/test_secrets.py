@@ -6,9 +6,11 @@ from types import SimpleNamespace
 from unittest.mock import Mock
 
 import pytest
+from mcp.server.fastmcp.exceptions import ToolError
 
 from autogenesis_agent_contract import (
-    SecretRef, SecretReferenceError, UnboundSecret, apply_bindings, serialize,
+    SecretRef, SecretReferenceError, UnboundSecret, apply_bindings,
+    prepare_generation_preview, serialize,
 )
 from autogenesis_windows_mcp.utils.element_util import extract_element_info_from_pwa
 from autogenesis_windows_mcp.utils.logger import _SafeDiagnostic, log_tool_call
@@ -136,6 +138,33 @@ def test_unbound_generation_value_requires_explicit_ref(monkeypatch):
         "$secret": "env:AUTOGENESIS_WINDOWS_PASSWORD",
     }
 
+@pytest.mark.windows
+@pytest.mark.skipif(sys.platform != "win32", reason="Windows driver modules")
+@pytest.mark.anyio
+async def test_generation_confirmation_rejects_stale_base(tmp_path, app_config):
+    from autogenesis_windows_mcp.app_session import AppSessionManager
+    from autogenesis_windows_mcp.server import WindowsMCP
+    from autogenesis_windows_mcp.tools.gen_code_tool import register_gen_code_tools
+
+    manager = AppSessionManager(app_config)
+    server = WindowsMCP("stale-generation")
+    register_gen_code_tools(server, manager, tmp_path)
+    destination = tmp_path / "steps.py"
+    destination.write_text("base\n", encoding="utf-8")
+    preview = prepare_generation_preview(tmp_path, destination, "session", "generated\n")
+    manager.pending_write = preview
+    manager.proposed_changes = ["generated"]
+    destination.write_text("changed\n", encoding="utf-8")
+
+    with pytest.raises(ToolError, match="AUTOGENESIS_GENERATION_PREVIEW_STALE"):
+        await server.call_tool("confirm_code_changes", {
+            "preview_id": preview.preview_id,
+            "digest": preview.digest,
+            "approved": True,
+        })
+    assert destination.read_text(encoding="utf-8") == "changed\n"
+
+
 
 @pytest.mark.windows
 @pytest.mark.skipif(sys.platform != "win32", reason="Windows driver modules")
@@ -160,7 +189,7 @@ async def test_real_enter_text_records_unbound_then_bound_ref(tmp_path, app_conf
 
     server = WindowsMCP("secret-ref-generation")
     register_common_tools(server, manager)
-    register_gen_code_tools(server, manager)
+    register_gen_code_tools(server, manager, tmp_path)
     await server.call_tool("enter_text", {
         "caller": "test", "control_framework": "pywinauto", "title": "Password",
         "content": PRIVATE, "control_type": "Edit", "automation_id": "passwordInput",
@@ -176,8 +205,14 @@ async def test_real_enter_text_records_unbound_then_bound_ref(tmp_path, app_conf
     preview_content = preview_result[0] if isinstance(preview_result, tuple) else preview_result
     if isinstance(preview_content, list):
         preview_content = preview_content[0]
-    preview = preview_content.text
-    assert PRIVATE not in preview and "env:AUTOGENESIS_WINDOWS_PASSWORD" in preview
+    preview = json.loads(preview_content.text)["data"]
+    assert PRIVATE not in json.dumps(preview) and "env:AUTOGENESIS_WINDOWS_PASSWORD" in preview["diff_preview"]
     target = manager.step_file_target
-    await server.call_tool("confirm_code_changes", {})
-    assert target and open(target, encoding="utf-8").read() == preview
+    with pytest.raises(ToolError, match="AUTOGENESIS_GENERATION_APPROVAL_REQUIRED"):
+        await server.call_tool("confirm_code_changes", {})
+    await server.call_tool("confirm_code_changes", {
+        "preview_id": preview["preview_id"],
+        "digest": preview["digest"],
+        "approved": True,
+    })
+    assert target and open(target, encoding="utf-8").read() == preview["append_payload"]

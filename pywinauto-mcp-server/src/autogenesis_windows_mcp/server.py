@@ -3,16 +3,16 @@
 import sys
 
 from autogenesis_agent_contract import (
-    ContractIdentity, RuntimeContractRequirement, SecretReferenceError,
-    load_contract, register_mcp, safe_secret_error,
+    ContractIdentity, GenerationCommitError, RuntimeContractRequirement,
+    SecretReferenceError, load_contract, register_mcp, safe_secret_error,
 )
 from mcp.server.fastmcp import FastMCP
 from mcp.server.fastmcp.exceptions import ResourceError, ToolError
 
 
 RUNTIME_CONTRACT = RuntimeContractRequirement(
-    contract_version="1.1.0",
-    manifest_sha256="80266f59b8ed32c83e374c870817f018361067c0aec6b7ce2b02b8f835850462",
+    contract_version="1.2.0",
+    manifest_sha256="e655f773ac723cf29610364e60f733121740f4701eccdc144cc5001e1bd67d36",
 )
 
 
@@ -26,6 +26,8 @@ class WindowsMCP(FastMCP):
             safe = safe_secret_error(error)
             raise ToolError(safe or "Tool request failed; check the tool name, arguments, and application state.") from None
         except SecretReferenceError as error:
+            raise ToolError(str(error)) from None
+        except GenerationCommitError as error:
             raise ToolError(str(error)) from None
         except Exception:
             raise ToolError("Tool request failed; check the tool name, arguments, and application state.") from None
@@ -43,7 +45,7 @@ class WindowsMCP(FastMCP):
             raise ResourceError("Resource request failed; check the resource URI.") from None
 
 
-def create_server(app_config: dict) -> WindowsMCP:
+def create_server(app_config: dict, business_root=None) -> WindowsMCP:
     contract = load_contract(ContractIdentity(
         RUNTIME_CONTRACT.contract_version, RUNTIME_CONTRACT.manifest_sha256, 2,
     ))
@@ -61,6 +63,6 @@ def create_server(app_config: dict) -> WindowsMCP:
     manager = AppSessionManager(app_config)
     register_common_tools(server, manager)
     register_mouse_tools(server, manager)
-    register_gen_code_tools(server, manager)
+    register_gen_code_tools(server, manager, business_root)
     register_verify_tools(server, manager)
     return server

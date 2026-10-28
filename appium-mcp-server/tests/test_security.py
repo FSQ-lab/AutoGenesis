@@ -9,7 +9,7 @@ import pytest
 from mcp.server.fastmcp import FastMCP
 from mcp.server.fastmcp.exceptions import ToolError
 
-from autogenesis_agent_contract import SecretRef, SecretReferenceError, serialize
+from autogenesis_agent_contract import SecretRef, SecretReferenceError, prepare_generation_preview, serialize
 from autogenesis_appium_mcp import server
 from autogenesis_appium_mcp.tools.config_tool import register_config_tools
 from autogenesis_appium_mcp.utils.config_manager import ConfigManager
@@ -26,6 +26,44 @@ def ref(name="AUTOGENESIS_TEST_PASSWORD"):
 def result_payload(result):
     content = result[0] if isinstance(result, tuple) else result
     return json.loads(content[0].text)
+def approval(preview, **overrides):
+    data = preview["data"]
+    return {
+        "preview_id": data["preview_id"],
+        "digest": data["digest"],
+        "approved": True,
+        **overrides,
+    }
+
+
+
+@pytest.mark.anyio
+async def test_generation_destination_cannot_escape_business_project(config_path, tmp_path):
+    runtime = server.Runtime("ios", config_path, business_root=tmp_path)
+    outside = tmp_path.parent / f"{tmp_path.name}-outside" / "steps.py"
+    try:
+        with pytest.raises(ToolError, match="AUTOGENESIS_GENERATION_DESTINATION_INVALID"):
+            await runtime.server.call_tool("before_gen_code", {"step_file": str(outside)})
+        assert not outside.parent.exists()
+    finally:
+        runtime.close()
+
+
+@pytest.mark.anyio
+async def test_confirmation_rejects_stale_base_file(config_path, tmp_path):
+    runtime = server.Runtime("ios", config_path, business_root=tmp_path)
+    destination = tmp_path / "steps.py"
+    destination.write_text("base\n", encoding="utf-8")
+    preview = prepare_generation_preview(tmp_path, destination, "session", "generated\n")
+    runtime.driver.pending_write = preview
+    runtime.driver.proposed_changes = ["generated"]
+    destination.write_text("changed\n", encoding="utf-8")
+    try:
+        with pytest.raises(ToolError, match="AUTOGENESIS_GENERATION_PREVIEW_STALE"):
+            await runtime.server.call_tool("confirm_code_changes", approval({"data": preview.to_dict()}))
+        assert destination.read_text(encoding="utf-8") == "changed\n"
+    finally:
+        runtime.close()
 
 
 def test_config_retains_refs_and_rejects_plaintext_credentials(tmp_path, monkeypatch):
@@ -85,7 +123,7 @@ async def test_secret_ref_executes_records_previews_confirms_and_replays(config_
     from autogenesis_appium_mcp.tools import appium_driver_tool
 
     monkeypatch.setenv("AUTOGENESIS_TEST_PASSWORD", PRIVATE)
-    runtime = server.Runtime("ios", config_path)
+    runtime = server.Runtime("ios", config_path, business_root=tmp_path)
     driver = Mock()
     element = Mock()
     element.get_attribute.side_effect = lambda name: "true" if name == "password" else ""
@@ -116,7 +154,13 @@ async def test_secret_ref_executes_records_previews_confirms_and_replays(config_
         assert "env:AUTOGENESIS_TEST_PASSWORD" in proposed
         assert "[REDACTED]" not in proposed
 
-        await runtime.server.call_tool("confirm_code_changes", {})
+        with pytest.raises(ToolError, match="AUTOGENESIS_GENERATION_APPROVAL_REQUIRED"):
+            await runtime.server.call_tool("confirm_code_changes", {})
+        assert not destination.exists()
+        with pytest.raises(ToolError, match="AUTOGENESIS_GENERATION_PREVIEW_MISMATCH"):
+            await runtime.server.call_tool("confirm_code_changes", approval(preview, digest="0" * 64))
+        assert not destination.exists()
+        await runtime.server.call_tool("confirm_code_changes", approval(preview))
         written = destination.read_text()
         assert PRIVATE not in written and "[REDACTED]" not in written
         append_payload = preview["data"]["append_payload"]
@@ -142,7 +186,7 @@ async def test_secret_ref_executes_records_previews_confirms_and_replays(config_
 async def test_plaintext_secure_input_requires_binding_before_preview(config_path, tmp_path, monkeypatch):
     from autogenesis_appium_mcp.tools import appium_driver_tool
 
-    runtime = server.Runtime("ios", config_path)
+    runtime = server.Runtime("ios", config_path, business_root=tmp_path)
     driver = Mock()
     element = Mock()
     element.get_attribute.side_effect = lambda name: "true" if name == "password" else ""
@@ -172,7 +216,7 @@ async def test_plaintext_secure_input_requires_binding_before_preview(config_pat
         }))
         assert "env:AUTOGENESIS_BOUND_PASSWORD" in preview["data"]["diff_preview"]
         append_payload = preview["data"]["append_payload"]
-        await runtime.server.call_tool("confirm_code_changes", {})
+        await runtime.server.call_tool("confirm_code_changes", approval(preview))
         written = destination.read_text()
         assert PRIVATE not in written
         assert written == append_payload
@@ -185,7 +229,7 @@ async def test_plaintext_secure_input_requires_binding_before_preview(config_pat
 async def test_embedded_plaintext_secret_requires_step_reauthoring(config_path, tmp_path, monkeypatch):
     from autogenesis_appium_mcp.tools import appium_driver_tool
 
-    runtime = server.Runtime("ios", config_path)
+    runtime = server.Runtime("ios", config_path, business_root=tmp_path)
     element = Mock()
     element.get_attribute.side_effect = lambda name: "true" if name == "password" else ""
     wait = Mock()
@@ -317,7 +361,7 @@ async def test_ios_dismiss_alert_structurally_sanitizes_page_source(config_path,
 
 @pytest.mark.anyio
 async def test_blind_text_entry_requires_reauthoring_before_preview(config_path, tmp_path):
-    runtime = server.Runtime("ios", config_path)
+    runtime = server.Runtime("ios", config_path, business_root=tmp_path)
     runtime.driver._driver = Mock()
     try:
         await runtime.server.call_tool("before_gen_code", {"step_file": str(tmp_path / "steps.py")})

@@ -165,6 +165,7 @@ def main(argv=None, *, default_config=None, default_transport="stdio") -> int:
     parser.add_argument("--app", help="Application profile; defaults to the first apps_config entry")
     parser.add_argument("--transport", choices=["stdio"], default=default_transport)
     parser.add_argument("--config", default=default_config, help="Path to UTF-8 application-profile JSON")
+    parser.add_argument("--project-root", help="Existing business-project root; defaults to cwd")
     args = parser.parse_args(argv)
     configure_logging()
     try:
@@ -173,7 +174,7 @@ def main(argv=None, *, default_config=None, default_transport="stdio") -> int:
         load_dotenv(Path.cwd() / ".env", override=False)
         app_config = load_app_config(args.app, args.config)
         with redirect_stdout(_ProtocolStdout(sys.stdout)):
-            server = create_server(app_config)
+            server = create_server(app_config, args.project_root)
             anyio.run(_serve, server, args.transport)
         return 0
     except KeyboardInterrupt:

@@ -12,8 +12,8 @@ import threading
 import anyio
 
 from autogenesis_agent_contract import (
-    ContractError, ContractIdentity, RuntimeContractRequirement, SecretReferenceError,
-    load_contract, register_mcp, safe_secret_error,
+    ContractError, ContractIdentity, GenerationCommitError, RuntimeContractRequirement,
+    SecretReferenceError, load_contract, register_mcp, safe_secret_error,
 )
 from mcp.server.fastmcp import FastMCP
 from mcp.server.fastmcp.exceptions import ToolError
@@ -31,7 +31,7 @@ from .utils.logger import configure_logging
 
 from .stdio import cancellable_stdio
 REQUIREMENT = RuntimeContractRequirement(
-    "1.1.0", "80266f59b8ed32c83e374c870817f018361067c0aec6b7ce2b02b8f835850462",
+    "1.2.0", "e655f773ac723cf29610364e60f733121740f4701eccdc144cc5001e1bd67d36",
 )
 
 
@@ -80,13 +80,16 @@ class AppiumMCP(FastMCP):
             raise ToolError(safe or "AutoGenesis tool request failed") from None
         except SecretReferenceError as error:
             raise ToolError(str(error)) from None
+        except GenerationCommitError as error:
+            raise ToolError(str(error)) from None
         except Exception:
             raise ToolError("AutoGenesis tool request failed") from None
 
 
 class Runtime:
-    def __init__(self, platform, config_path=None):
+    def __init__(self, platform, config_path=None, business_root=None):
         self.config = ConfigManager(config_path)
+        self.business_root = Path(business_root or Path.cwd()).resolve(strict=True)
         self.driver = None
         self._closed = False
         try:
@@ -111,7 +114,7 @@ class Runtime:
             )
             register_mcp(self.server, contract, None, REQUIREMENT)
             register_appium_driver_tools(self.server, self.driver)
-            register_gen_code_tools(self.server, self.driver)
+            register_gen_code_tools(self.server, self.driver, self.business_root)
             register_verify_tools(self.server, self.driver)
             register_config_tools(self.server, self.config)
             {
@@ -144,6 +147,7 @@ def parse_args(argv=None):
     parser.add_argument("--platform", choices=("ios", "android", "mac"), default="ios")
     parser.add_argument("--transport", choices=("stdio",), default="stdio")
     parser.add_argument("--config", help="Explicit JSON configuration; otherwise cwd/conf/appium_conf.json or packaged template")
+    parser.add_argument("--project-root", help="Existing business-project root; defaults to cwd")
     return parser.parse_args(argv)
 
 
@@ -156,7 +160,7 @@ def main(argv=None, *, default_config=None):
         config_path = args.config
         if config_path is None and default_config is not None and Path(default_config).is_file():
             config_path = default_config
-        runtime = Runtime(args.platform, config_path)
+        runtime = Runtime(args.platform, config_path, business_root=args.project_root)
         # FastMCP configures logging too: restore the safe diagnostic boundary afterwards.
         configure_logging()
         runtime.server.run(transport=args.transport)

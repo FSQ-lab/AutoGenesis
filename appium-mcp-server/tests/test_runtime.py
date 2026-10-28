@@ -24,7 +24,7 @@ async def test_versioned_tool_names_and_secret_ref_schemas_without_driver(platfo
         actual = {tool.name: tool.inputSchema for tool in await runtime.server.list_tools()}
         expected = {tool.name: tool.inputSchema for tool in await reference_server(platform).list_tools()}
         assert len(actual) == count and set(actual) == set(expected)
-        changed = {"app_launch", "send_keys", "preview_code_changes", "send_keys_on_macos"}
+        changed = {"app_launch", "send_keys", "preview_code_changes", "confirm_code_changes", "send_keys_on_macos"}
         assert {name: schema for name, schema in actual.items() if name not in changed} == {
             name: schema for name, schema in expected.items() if name not in changed
         }
@@ -33,6 +33,10 @@ async def test_versioned_tool_names_and_secret_ref_schemas_without_driver(platfo
             assert {variant.get("type", "ref") for variant in variants} == {"string", "ref"}
         argument_items = actual["app_launch"]["properties"]["arguments"]["anyOf"][0]["items"]
         assert argument_items == {"type": "string"}
+        confirm = actual["confirm_code_changes"]["properties"]
+        assert confirm["preview_id"]["default"] == ""
+        assert confirm["digest"]["default"] == ""
+        assert confirm["approved"]["default"] is False
         assert runtime.driver.device == platform
         assert runtime.driver._driver is None
         assert runtime.config._observer is None
@@ -43,9 +47,9 @@ async def test_versioned_tool_names_and_secret_ref_schemas_without_driver(platfo
 
 def test_platform_transport_and_config_selection(config_path, tmp_path, monkeypatch):
     defaults = server.parse_args([])
-    assert (defaults.platform, defaults.transport, defaults.config) == ("ios", "stdio", None)
-    selected = server.parse_args(["--platform", "mac", "--transport", "stdio", "--config", str(config_path)])
-    assert (selected.platform, selected.transport, selected.config) == ("mac", "stdio", str(config_path))
+    assert (defaults.platform, defaults.transport, defaults.config, defaults.project_root) == ("ios", "stdio", None, None)
+    selected = server.parse_args(["--platform", "mac", "--transport", "stdio", "--config", str(config_path), "--project-root", str(tmp_path)])
+    assert (selected.platform, selected.transport, selected.config, selected.project_root) == ("mac", "stdio", str(config_path), str(tmp_path))
     monkeypatch.chdir(tmp_path)
     bundled = ConfigManager()
     assert bundled.initial_loaded and bundled._use_template
@@ -71,8 +75,8 @@ def test_main_is_sync_and_always_closes(config_path, monkeypatch):
     runtimes = []
     real_runtime = server.Runtime
 
-    def factory(platform, config):
-        runtime = real_runtime(platform, config)
+    def factory(platform, config, business_root=None):
+        runtime = real_runtime(platform, config, business_root=business_root)
         runtime.server.run = Mock(side_effect=KeyboardInterrupt)
         runtime.driver.session_close = Mock()
         runtimes.append(runtime)
@@ -105,7 +109,7 @@ def test_legacy_config_fallback_and_explicit_override(config_path, tmp_path, mon
     selected = []
 
     class FakeRuntime:
-        def __init__(self, platform, path):
+        def __init__(self, platform, path, business_root=None):
             selected.append(path)
             self.server = Mock()
         def close(self):
@@ -193,8 +197,8 @@ def test_main_transport_failure_closes_watcher(config_path, monkeypatch):
     instances = []
     real = server.Runtime
 
-    def factory(platform, path):
-        runtime = real(platform, path)
+    def factory(platform, path, business_root=None):
+        runtime = real(platform, path, business_root=business_root)
         instances.append(runtime)
         def fail(**kwargs):
             runtime.config.start_watching()

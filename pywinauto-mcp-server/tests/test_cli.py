@@ -21,12 +21,12 @@ def test_sync_main_preserves_app_config_transport_and_source_defaults(monkeypatc
     monkeypatch.setattr(cli, "configure_logging", lambda: None)
     monkeypatch.setattr(cli.sys, "stdout", StdoutStub())
     monkeypatch.setattr(cli, "load_app_config", lambda app, path: calls.append((app, path)) or {"selected": True})
-    monkeypatch.setattr(cli, "create_server", lambda config: calls.append(config) or "server")
+    monkeypatch.setattr(cli, "create_server", lambda config, root=None: calls.append((config, root)) or "server")
     async def serve(server, selected_transport):
         calls.append((server, selected_transport))
     monkeypatch.setattr(cli, "_serve", serve)
-    assert cli.main(["--app", "second", "--config", "apps.json", "--transport", transport]) == 0
-    assert calls == [("second", "apps.json"), {"selected": True}, ("server", transport)]
+    assert cli.main(["--app", "second", "--config", "apps.json", "--transport", transport, "--project-root", "."]) == 0
+    assert calls == [("second", "apps.json"), ({"selected": True}, "."), ("server", transport)]
     calls.clear()
     assert cli.main([], default_config=Path("source.json"), default_transport="stdio") == 0
     assert calls[-1] == ("server", "stdio")
@@ -38,7 +38,7 @@ def test_sync_main_preserves_app_config_transport_and_source_defaults(monkeypatc
 
 def test_invalid_config_never_constructs_server(monkeypatch, tmp_path, caplog):
     monkeypatch.setattr(cli, "configure_logging", lambda: None)
-    monkeypatch.setattr(cli, "create_server", lambda config: pytest.fail("Server started before validating configuration."))
+    monkeypatch.setattr(cli, "create_server", lambda config, root=None: pytest.fail("Server started before validating configuration."))
     assert cli.main(["--config", str(tmp_path / "absent.json")]) == 2
     assert "AUTOGENESIS_CONFIG_INVALID" in caplog.text
 
@@ -65,7 +65,7 @@ def test_shutdown_errors_are_distinguished_from_startup_failures(monkeypatch, ca
     monkeypatch.setattr(cli, "configure_logging", lambda: None)
     monkeypatch.setattr(cli.sys, "stdout", StdoutStub())
     monkeypatch.setattr(cli, "load_app_config", lambda *args: {})
-    monkeypatch.setattr(cli, "create_server", lambda config: object())
+    monkeypatch.setattr(cli, "create_server", lambda config, root=None: object())
     async def serve(*args):
         raise error
     monkeypatch.setattr(cli, "_serve", serve)

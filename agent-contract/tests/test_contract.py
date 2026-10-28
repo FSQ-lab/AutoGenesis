@@ -32,7 +32,7 @@ def test_installed_wheel_release_identity_and_inventory(contract, repo_root):
     assert not Path(autogenesis_agent_contract.__file__).resolve().is_relative_to(
         repo_root / "agent-contract/src"
     ), "Install the built wheel in a fresh venv; do not test editable source."
-    assert metadata.version("autogenesis-agent-contract") == contract.identity.contract_version == "1.1.0"
+    assert metadata.version("autogenesis-agent-contract") == contract.identity.contract_version == "1.2.0"
     assert contract.identity.schema_version == 2
     raw = assets().joinpath("manifest.json").read_bytes()
     manifest = json.loads(raw)
@@ -205,8 +205,8 @@ def test_unsupported_manifest_fields_fail_even_with_matching_candidate_pin(copie
 @pytest.mark.parametrize("identity", [
     ContractIdentity("2.0.0", "0" * 64),
     ContractIdentity("1.1.0", "0" * 64),
-    ContractIdentity("1.1.0", "0" * 64, 3),
-    {"contract_version": "1.1.0"},
+    ContractIdentity("1.2.0", "0" * 64, 3),
+    {"contract_version": "1.2.0"},
 ])
 def test_expected_identity_is_exact(identity):
     with pytest.raises(ContractError) as caught:
@@ -215,7 +215,7 @@ def test_expected_identity_is_exact(identity):
 
 
 def test_expected_schema_is_exact_even_when_version_and_hash_match(contract):
-    expected = ContractIdentity("1.1.0", contract.identity.manifest_sha256, 3)
+    expected = ContractIdentity("1.2.0", contract.identity.manifest_sha256, 3)
     with pytest.raises(ContractError) as caught:
         load_contract(expected)
     assert caught.value.code == CONTRACT_MISMATCH

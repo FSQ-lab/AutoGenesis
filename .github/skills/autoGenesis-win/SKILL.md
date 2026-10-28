@@ -18,6 +18,6 @@ ambiguous selections with the user. Follow the returned canonical policy and
 workflow. Generation requests do not approve writes; follow its preview and
 explicit approval flow. Do not recreate policy or use a legacy prompt fallback.
 
-Canonical sources: autogenesis-agent-contract 1.1.0, assets/workflows/; identity:
+Canonical sources: autogenesis-agent-contract 1.2.0, assets/workflows/; identity:
 autogenesis://agent-contract/identity. Regenerate this projection with
 agent-contract/tools/sync_skills.py; do not edit the projection.

@@ -56,10 +56,10 @@ def main():
     args = parser.parse_args()
     wheel_dir = args.wheel_dir.resolve(strict=True)
     wheels = []
-    for pattern in ("autogenesis_agent_contract-1.1.0-*.whl", "autogenesis_windows_mcp-0.2.0-*.whl"):
+    for pattern in ("autogenesis_agent_contract-1.2.0-*.whl", "autogenesis_windows_mcp-0.3.0-*.whl"):
         candidates = sorted(wheel_dir.glob(pattern))
         if len(candidates) != 1:
-            raise SystemExit("Supply exactly one local contract 1.1.0 wheel and one Windows runtime 0.2.0 wheel.")
+            raise SystemExit("Supply exactly one local contract 1.2.0 wheel and one Windows runtime 0.3.0 wheel.")
         wheels.append(candidates[0])
     args.evidence_dir.mkdir(parents=True, exist_ok=True)
     evidence = args.evidence_dir.resolve(strict=True)

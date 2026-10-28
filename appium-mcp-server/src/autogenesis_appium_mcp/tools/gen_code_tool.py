@@ -2,30 +2,31 @@
 # Licensed under the MIT license.
 
 from autogenesis_agent_contract import (
-    SECRET_REFERENCE_REQUIRED, SecretBindings, SecretReferenceError,
-    apply_bindings, serialize,
+    SECRET_REFERENCE_REQUIRED,
+    SecretBindings,
+    SecretReferenceError,
+    apply_bindings,
+    commit_generation_preview,
+    prepare_generation_preview,
+    validate_generation_destination,
+    serialize,
 )
 import json
-import os
-import re
-import logging
-import sys
-import time
 import uuid
 from pathlib import Path
-from ..utils.logger import log_tool_call
-from ..utils.gen_code import HEADER_AUTO_GEN, STEPS_DIR_DEFAULT, TARGET_STEP_FILE_DEFAULT
-from ..utils.gen_code import gen_code_preview, ensure_step_path_exists, gen_step_file_from_feature_path, parse_steps_dir_from_step_path
+
+from ..utils.gen_code import gen_code_preview, gen_step_file_from_feature_path, parse_steps_dir_from_step_path
+from ..utils.logger import get_mcp_logger, log_tool_call
 from ..utils.response_format import format_tool_response, init_tool_response
-from ..utils.logger import get_mcp_logger
 
 
 
 logger = get_mcp_logger()
 
 
-def register_gen_code_tools(mcp, browser_manager):
+def register_gen_code_tools(mcp, browser_manager, business_root=None):
     """Register generage code tools to MCP server."""    
+    project_root = Path(business_root or Path.cwd()).resolve(strict=True)
     
     @mcp.tool()
     @log_tool_call
@@ -62,8 +63,12 @@ def register_gen_code_tools(mcp, browser_manager):
             elif feature_file:
                 browser_manager.steps_dir, browser_manager.step_file_target = gen_step_file_from_feature_path(feature_file)
             else:
-                browser_manager.steps_dir = STEPS_DIR_DEFAULT
-                browser_manager.step_file_target = TARGET_STEP_FILE_DEFAULT
+                browser_manager.steps_dir = str(project_root / "features" / "steps")
+                browser_manager.step_file_target = str(project_root / "features" / "steps" / "common_steps.py")
+            browser_manager.step_file_target = str(validate_generation_destination(
+                project_root, browser_manager.step_file_target,
+            ))
+            browser_manager.steps_dir = str(Path(browser_manager.step_file_target).parent)
 
             resp["status"] = "success"
             resp["data"] = {
@@ -93,44 +98,50 @@ def register_gen_code_tools(mcp, browser_manager):
             return json.dumps(format_tool_response(resp))
         
         bound_cache = serialize(apply_bindings(browser_manager.gen_code_cache, secret_bindings))
+        browser_manager.pending_write = None
         result = gen_code_preview(browser_manager, bound_cache)
+        append_payload = result.get("append_payload", "")
+        if not append_payload:
+            resp["status"] = "success"
+            resp["data"] = {"message": result.get("diff_preview", "No pending code changes to preview")}
+            return json.dumps(format_tool_response(resp))
+        preview = prepare_generation_preview(
+            project_root,
+            browser_manager.step_file_target,
+            browser_manager.gen_code_id,
+            append_payload,
+        )
+        browser_manager.pending_write = preview
         resp["status"] = "success"
-        resp["data"] = {"diff_preview": result.get('diff_preview'), "append_payload": result.get('append_payload')}
-        
+        resp["data"] = {"diff_preview": result.get("diff_preview"), **preview.to_dict()}
+
         return json.dumps(format_tool_response(resp))
 
     @mcp.tool()
     @log_tool_call
-    async def confirm_code_changes() -> str:
-        """Confirm the previewed code changes"""
+    async def confirm_code_changes(
+        preview_id: str = "",
+        digest: str = "",
+        approved: bool = False,
+    ) -> str:
+        """Atomically commit exactly the complete, current, approved preview."""
         resp = init_tool_response()
-        
-        if not getattr(browser_manager, "pending_write", None):
-            resp["status"] = "success"
-            resp["data"] = {"message": "No pending code changes to confirm"}
-            return json.dumps(format_tool_response(resp))
-        
-        if not ensure_step_path_exists(browser_manager.step_file_target):
-            resp["status"] = "error"
-            resp["error"] = f"Failed to create directory structure for {browser_manager.step_file_target}"
-            return json.dumps(format_tool_response(resp))
-        
-        try:
-            with open(browser_manager.step_file_target, 'a', encoding='utf-8') as f:
-                f.write(browser_manager.pending_write)
-            
-            result = f"Applied {len(browser_manager.proposed_changes)} new steps to {browser_manager.step_file_target}"
-            browser_manager.new_steps_count = len(browser_manager.proposed_changes)
-            resp["status"] = "success"
-            resp["data"] = {"message": result, "new_steps_count": browser_manager.new_steps_count}
-        except Exception as e:
-            result = f"Error applying changes to {browser_manager.step_file_target}: {str(e)}"
-            logger.error("Code generation failed")
-            resp["status"] = "error"
-            resp["error"] = result
-        
-        # Clear the proposed changes
+        preview = getattr(browser_manager, "pending_write", None)
+        count = len(browser_manager.proposed_changes or [])
+        destination = commit_generation_preview(
+            preview,
+            preview_id=preview_id,
+            digest=digest,
+            approved=approved,
+        )
+        browser_manager.new_steps_count = count
         browser_manager.clear_gen_code_cache()
+        resp["status"] = "success"
+        resp["data"] = {
+            "message": "Approved generated code committed atomically",
+            "destination": destination,
+            "new_steps_count": count,
+        }
         return json.dumps(format_tool_response(resp))
 
 
