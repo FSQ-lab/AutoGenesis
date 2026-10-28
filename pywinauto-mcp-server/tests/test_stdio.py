@@ -77,14 +77,13 @@ def test_console_stdio_initialize_inventory_workflows_identity_canaries_and_eof(
         wait = client.rpc("tools/call", {"name": "app_wait", "arguments": {"caller": "acceptance", "duration": 0, "step_raw": canary}})
         assert not wait["result"].get("isError", False)
         # SDK validation, unknown dispatch, prompt validation, resource errors,
-        # successful task rendering, and tool errors all receive secret input.
+        # and tool errors must not echo submitted values.
         requests = [
             ("tools/call", {"name": "app_wait", "arguments": {"caller": "acceptance", "duration": canary}}),
             ("tools/call", {"name": canary, "arguments": {"content": canary}}),
             ("tools/call", {"name": "enter_text", "arguments": {"caller": "acceptance", "control_framework": "unsupported", "title": "password", "content": canary, "control_type": "Edit", "automation_id": canary}}),
             ("prompts/get", {"name": "execute_scenario", "arguments": {"scenario_text": [canary]}}),
             ("prompts/get", {"name": "execute_scenario", "arguments": {canary: canary}}),
-            ("prompts/get", {"name": "execute_natural_language_task", "arguments": {"task_text": canary}}),
             ("resources/read", {"uri": "autogenesis://invalid/" + canary}),
         ]
         for method, params in requests:

@@ -178,5 +178,6 @@ async def test_real_enter_text_records_unbound_then_bound_ref(tmp_path, app_conf
         preview_content = preview_content[0]
     preview = preview_content.text
     assert PRIVATE not in preview and "env:AUTOGENESIS_WINDOWS_PASSWORD" in preview
+    target = manager.step_file_target
     await server.call_tool("confirm_code_changes", {})
-    assert manager.step_file_target and open(manager.step_file_target, encoding="utf-8").read() == preview
+    assert target and open(target, encoding="utf-8").read() == preview
