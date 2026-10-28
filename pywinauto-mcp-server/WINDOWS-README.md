@@ -5,6 +5,8 @@ Issue #8 evolves the Windows runtime as **autogenesis-windows-mcp**
 command **autogenesis-windows-mcp**. Python 3.10+ and Windows are required for
 serving automation tools. Linux CI checks package metadata/imports only.
 
+<!-- mcp-name: io.github.fsq-lab/autogenesis-windows -->
+
 ## Install in a business project
 
 Build artifacts must contain both the Windows runtime wheel and the merged

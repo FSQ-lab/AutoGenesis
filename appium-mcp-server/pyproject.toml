@@ -6,6 +6,7 @@ build-backend = "setuptools.build_meta"
 name = "autogenesis-appium-mcp"
 version = "0.3.0"
 description = "Appium MCP Server for mobile automation testing"
+readme = "README.md"
 authors = [
     {name = "AutoGenesis Team"}
 ]

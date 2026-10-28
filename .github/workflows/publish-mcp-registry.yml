@@ -1,0 +1,134 @@
+name: Publish Python packages and MCP Registry metadata
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build and verify release wheels
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Preserve exact LF bytes
+        run: git config --global core.autocrlf false
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - name: Setup Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: '3.12'
+      - name: Install build and verification dependencies
+        run: python -m pip --disable-pip-version-check install 'build==1.2.2.post1' 'jsonschema>=4.20,<5'
+      - name: Build all public distributions
+        run: |
+          python -m build --wheel --outdir dist agent-contract
+          python -m build --wheel --outdir dist appium-mcp-server
+          python -m build --wheel --outdir dist pywinauto-mcp-server
+      - name: Verify Registry metadata against release wheels
+        run: python tools/verify_registry_metadata.py --wheel-dir dist --evidence-dir registry-evidence
+      - name: Upload Agent Contract wheel
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: pypi-autogenesis-agent-contract
+          path: dist/autogenesis_agent_contract-*.whl
+          if-no-files-found: error
+      - name: Upload Appium runtime wheel
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: pypi-autogenesis-appium-mcp
+          path: dist/autogenesis_appium_mcp-*.whl
+          if-no-files-found: error
+      - name: Upload Windows runtime wheel
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: pypi-autogenesis-windows-mcp
+          path: dist/autogenesis_windows_mcp-*.whl
+          if-no-files-found: error
+
+  publish-pypi:
+    name: Publish ${{ matrix.project }} to PyPI
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - project: autogenesis-agent-contract
+            artifact: pypi-autogenesis-agent-contract
+            environment: pypi-agent-contract
+          - project: autogenesis-appium-mcp
+            artifact: pypi-autogenesis-appium-mcp
+            environment: pypi-appium-mcp
+          - project: autogenesis-windows-mcp
+            artifact: pypi-autogenesis-windows-mcp
+            environment: pypi-windows-mcp
+    environment:
+      name: ${{ matrix.environment }}
+      url: https://pypi.org/p/${{ matrix.project }}
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - name: Download verified release wheel
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: dist
+      - name: Publish through PyPI trusted publishing
+        uses: pypa/gh-action-pypi-publish@7245906fb61fa33a13554f9d5fb856fe61758086 # release/v1
+        with:
+          packages-dir: dist
+
+  publish-registry:
+    name: Publish Appium and Windows Registry records
+    needs: publish-pypi
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    environment: mcp-registry-publish
+    permissions:
+      id-token: write
+      contents: read
+    env:
+      MCP_PUBLISHER_VERSION: v1.8.1
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - name: Setup Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: '3.12'
+      - name: Install Registry verifier dependency
+        run: python -m pip --disable-pip-version-check install 'jsonschema>=4.20,<5'
+      - name: Require all three public PyPI versions
+        run: python tools/verify_registry_metadata.py --check-pypi --evidence-dir registry-release-evidence
+      - name: Install cosign
+        uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+      - name: Download and verify mcp-publisher
+        run: |
+          set -euo pipefail
+          os="$(uname -s | tr '[:upper:]' '[:lower:]')"
+          arch="$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/')"
+          archive="mcp-publisher_${os}_${arch}.tar.gz"
+          base_url="https://github.com/modelcontextprotocol/registry/releases/download/${MCP_PUBLISHER_VERSION}"
+          curl --fail --location --silent --show-error --output "$archive" "$base_url/$archive"
+          curl --fail --location --silent --show-error --output "$archive.sigstore.json" "$base_url/$archive.sigstore.json"
+          cosign verify-blob \
+            --bundle "$archive.sigstore.json" \
+            --certificate-identity "https://github.com/modelcontextprotocol/registry/.github/workflows/release.yml@refs/tags/${MCP_PUBLISHER_VERSION}" \
+            --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \
+            "$archive"
+          tar xzf "$archive" mcp-publisher
+          rm -f "$archive" "$archive.sigstore.json"
+      - name: Authenticate organization namespace
+        run: ./mcp-publisher login github-oidc
+      - name: Publish Appium Registry record
+        working-directory: appium-mcp-server
+        run: ../mcp-publisher publish
+      - name: Publish Windows Registry record
+        working-directory: pywinauto-mcp-server
+        run: ../mcp-publisher publish

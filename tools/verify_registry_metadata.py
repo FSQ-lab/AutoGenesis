@@ -76,7 +76,17 @@ def _metadata(repo: Path, schema: dict) -> dict[str, dict]:
         )
         if errors:
             raise VerificationError(f"{expected['path']}: {errors[0].message}")
-        project = tomllib.loads((repo / expected["project"]).read_text(encoding="utf-8"))["project"]
+        project_path = repo / expected["project"]
+        project = tomllib.loads(project_path.read_text(encoding="utf-8"))["project"]
+        readme = project.get("readme")
+        if not isinstance(readme, str):
+            raise VerificationError("Registry package must declare a PyPI README")
+        try:
+            description = (project_path.parent / readme).read_text(encoding="utf-8")
+        except (OSError, UnicodeError):
+            raise VerificationError("Registry package README is unavailable") from None
+        if f"mcp-name: {document['name']}" not in description:
+            raise VerificationError("PyPI README does not prove MCP Registry package ownership")
         package = document["packages"][0]
         repository = document.get("repository", {})
         if document["$schema"] != SCHEMA_URL or document["name"] != expected["name"]:
@@ -160,7 +170,7 @@ def _verify_descriptors(repo: Path, metadata: dict[str, dict]) -> dict[str, dict
         return descriptors
 
 
-def _wheel_metadata(wheel: Path) -> tuple[str, str, str, str, tuple[str, ...]]:
+def _wheel_metadata(wheel: Path) -> tuple[str, str, str, str, tuple[str, ...], str]:
     with zipfile.ZipFile(wheel) as archive:
         metadata_name = next(name for name in archive.namelist() if name.endswith(".dist-info/METADATA"))
         entry_name = next((name for name in archive.namelist() if name.endswith(".dist-info/entry_points.txt")), None)
@@ -171,6 +181,7 @@ def _wheel_metadata(wheel: Path) -> tuple[str, str, str, str, tuple[str, ...]]:
             "" if entry_name is None else archive.read(entry_name).decode("utf-8"),
             "\n".join(parsed.get_all("Requires-Dist", [])),
             tuple(parsed.get_all("Project-URL", [])),
+            parsed.get_payload(),
         )
 
 
@@ -180,7 +191,7 @@ def _verify_wheels(wheel_dir: Path, metadata: dict[str, dict]) -> None:
     contract_wheels = sorted(wheel_dir.glob(f"autogenesis_agent_contract-{contract_version}-*.whl"))
     if len(contract_wheels) != 1:
         raise VerificationError("Expected one local Agent Contract wheel")
-    contract_name, built_contract_version, _, _, contract_urls = _wheel_metadata(contract_wheels[0])
+    contract_name, built_contract_version, _, _, contract_urls, _ = _wheel_metadata(contract_wheels[0])
     if contract_name != contract_project["name"] or built_contract_version != contract_version:
         raise VerificationError("Built Agent Contract identity differs from its Python project")
     if f"Repository, {REPOSITORY}" not in contract_urls:
@@ -191,7 +202,7 @@ def _verify_wheels(wheel_dir: Path, metadata: dict[str, dict]) -> None:
         wheels = sorted(wheel_dir.glob(f"{wheel_name}-{package['version']}-*.whl"))
         if len(wheels) != 1:
             raise VerificationError(f"Expected one local wheel for {package['identifier']}")
-        name, version, entrypoints, requirements, project_urls = _wheel_metadata(wheels[0])
+        name, version, entrypoints, requirements, project_urls, description = _wheel_metadata(wheels[0])
         if name != package["identifier"] or version != package["version"]:
             raise VerificationError("Built wheel identity differs from server.json")
         if expected["entrypoint"] not in entrypoints:
@@ -200,6 +211,8 @@ def _verify_wheels(wheel_dir: Path, metadata: dict[str, dict]) -> None:
             raise VerificationError("Runtime wheel does not pin the current Agent Contract")
         if f"Repository, {REPOSITORY}" not in project_urls:
             raise VerificationError("Built wheel does not contain Registry ownership metadata")
+        if f"mcp-name: {metadata[key]['name']}" not in description:
+            raise VerificationError("Built wheel lacks its MCP Registry ownership token")
 
 
 def _verify_pypi(repo: Path, metadata: dict[str, dict]) -> None:
@@ -241,7 +254,6 @@ def main() -> None:
                 key: {
                     "name": document["name"],
                     "version": document["version"],
-                    "package": document["packages"][0]["identifier"],
                     "transport": document["packages"][0]["transport"]["type"],
                 }
                 for key, document in metadata.items()
@@ -257,4 +269,7 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except VerificationError as error:
+        raise SystemExit(str(error)) from None
