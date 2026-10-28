@@ -1,3 +1,4 @@
+from ..security import safe_error
 # Copyright (c) Microsoft Corporation.
 # Licensed under the MIT license.
 
@@ -8,10 +9,10 @@ import sys
 import time
 import inspect
 import asyncio
-from utils.element_util import fill_snapshot, find_element_by_kwargs
-from utils.logger import log_tool_call
-from utils.response_format import format_tool_response, init_tool_response
-from utils.gen_code import record_calls
+from ..utils.element_util import fill_snapshot, find_element_by_kwargs
+from ..utils.logger import log_tool_call
+from ..utils.response_format import format_tool_response, init_tool_response
+from ..utils.gen_code import record_calls
 
         
 logger = logging.getLogger(__name__)
@@ -47,8 +48,8 @@ def register_common_tools(mcp, app_manager):
             await fill_snapshot(resp, app_manager, need_snapshot=need_snapshot)
         except Exception as e:
             resp["status"] = "error"
-            resp["error"] = repr(e)
-            logger.error(f"Error launching app: {e}")
+            resp["error"] = safe_error()
+            logger.error('Error launching app: [redacted]')
         return format_tool_response(resp)
     
     
@@ -82,11 +83,11 @@ def register_common_tools(mcp, app_manager):
             resp["data"] = {"path": path, "step_raw": step_raw}
 
             resp["status"] = "success"
-            logger.info(f"Screenshot saved to {path}")
+            logger.info('Screenshot saved to [redacted]')
         except Exception as e:
             resp["status"] = "error"
-            resp["error"] = repr(e)
-            logger.error(f"Error taking app screenshot: {e}")
+            resp["error"] = safe_error()
+            logger.error('Error taking app screenshot: [redacted]')
         return format_tool_response(resp)
 
 
@@ -113,8 +114,8 @@ def register_common_tools(mcp, app_manager):
             resp["status"] = "success"
         except Exception as e:
             resp["status"] = "error"
-            resp["error"] = repr(e)
-            logger.error(f"Error closing app: {repr(e)}")
+            resp["error"] = safe_error()
+            logger.error('Error closing app: [redacted]')
                     
         return format_tool_response(resp)    
 
@@ -194,26 +195,23 @@ def register_common_tools(mcp, app_manager):
                     elif click_count == 2:
                         btn.double_click_input()
                     else:
-                        raise ValueError(f"Unsupported click_count: {click_count}. Supported values are 1 and 2.")
+                        raise ValueError('Unsupported click_count: [redacted]. Supported values are 1 and 2.')
                     await asyncio.sleep(2)
                     resp["status"] = "success"
                 else:
                     resp["status"] = "failed"
-                    resp["error"] = f"[{search_kwargs}] of [{parent_search_kwargs}] not found within {timeout} seconds."
-                    resp["data"]['search_kwargs'] = search_kwargs
-                    logger.error(resp['error'])
+                    resp["error"] = safe_error()
+                    logger.error('Automation operation diagnostic; sensitive details withheld.')
             else:
-                raise NotImplementedError(f"element_click is not implemented for '{control_framework}' control_framework yet.")
+                raise NotImplementedError("element_click is not implemented for '[redacted]' control_framework yet.")
                 
             await fill_snapshot(resp, app_manager, need_snapshot=need_snapshot)
         except Exception as e:
             resp["status"] = "error"
-            resp["error"] = repr(e)
-            import traceback
-            traceback.print_exc()
-            logger.error(f"Error clicking button '{name}': {repr(e)}")
+            resp["error"] = safe_error()
+            logger.error("Error clicking button '[redacted]': [redacted]")
 
-        logger.info(f"native_button_click done")    
+        logger.info('native_button_click done')    
         return format_tool_response(resp)    
     
     
@@ -290,21 +288,18 @@ def register_common_tools(mcp, app_manager):
                     resp["status"] = "success"
                 else:
                     resp["status"] = "failed"
-                    resp["error"] = f"[{search_kwargs}] of [{parent_search_kwargs}] not found within {timeout} seconds."
-                    resp["data"]['search_kwargs'] = search_kwargs
-                    logger.error(resp['error'])
+                    resp["error"] = safe_error()
+                    logger.error('Automation operation diagnostic; sensitive details withheld.')
             else:
-                raise NotImplementedError(f"right_click is not implemented for '{control_framework}' control_framework yet.")
+                raise NotImplementedError("right_click is not implemented for '[redacted]' control_framework yet.")
                 
             await fill_snapshot(resp, app_manager, need_snapshot=need_snapshot)
         except Exception as e:
             resp["status"] = "error"
-            resp["error"] = repr(e)
-            import traceback
-            traceback.print_exc()
-            logger.error(f"Error right clicking control '{name}': {repr(e)}")
+            resp["error"] = safe_error()
+            logger.error("Error right clicking control '[redacted]': [redacted]")
 
-        logger.info(f"native_button_click done")    
+        logger.info('native_button_click done')    
         return format_tool_response(resp)    
 
 
@@ -342,8 +337,8 @@ def register_common_tools(mcp, app_manager):
             resp["status"] = "success"
         except Exception as e:
             resp["status"] = "error"
-            resp["error"] = repr(e)
-            logger.error(f"Error sending keystrokes raw:'{key_sequence_raw}' '{key_sequence_formatted}': {repr(e)}")
+            resp["error"] = safe_error()
+            logger.error("Error sending keystrokes raw:'[redacted]' '[redacted]': [redacted]")
             
         return format_tool_response(resp)
     
@@ -421,17 +416,17 @@ def register_common_tools(mcp, app_manager):
                     resp["status"] = "success"
                 else:
                     resp["status"] = "failed"
-                    resp["error"] = f"[{search_kwargs}] of [{parent_search_kwargs}] not found within {timeout} seconds."
+                    resp["error"] = safe_error()
                     resp["data"]['search_kwargs'] = search_kwargs
-                    logger.error(f"{resp['error']}: search_kwargs={search_kwargs}")
+                    logger.error('[redacted]: search_kwargs=[redacted]')
             else:
-                raise NotImplementedError(f"input_text is not implemented for '{control_framework}' control_framework yet.")
+                raise NotImplementedError("input_text is not implemented for '[redacted]' control_framework yet.")
             
             await fill_snapshot(resp, app_manager, need_snapshot=need_snapshot)
         except Exception as e:
             resp["status"] = "error"
-            resp["error"] = repr(e)
-            logger.error(f"Error inputting text to edit field '{title}': {e}")
+            resp["error"] = safe_error()
+            logger.error("Error inputting text to edit field '[redacted]': [redacted]")
             
         return format_tool_response(resp)
 
@@ -504,19 +499,17 @@ def register_common_tools(mcp, app_manager):
                     resp["status"] = "success"
                 else:
                     resp["status"] = "failed"
-                    resp["error"] = f"[{search_kwargs}] of [{parent_search_kwargs}] not found within {timeout} seconds."
+                    resp["error"] = safe_error()
                     resp["data"]['search_kwargs'] = search_kwargs
-                    logger.error(f"{resp['error']}: search_kwargs={search_kwargs}")
+                    logger.error('[redacted]: search_kwargs=[redacted]')
             else:
-                raise NotImplementedError(f"open_folder is not implemented for '{control_framework}' control_framework yet.")
+                raise NotImplementedError("open_folder is not implemented for '[redacted]' control_framework yet.")
 
             await fill_snapshot(resp, app_manager, need_snapshot=need_snapshot)
         except Exception as e:
             resp["status"] = "error"
-            resp["error"] = repr(e)
-            import traceback
-            traceback.print_exc()
-            logger.error(f"Error clicking button '{name}': {repr(e)}")
+            resp["error"] = safe_error()
+            logger.error("Error clicking button '[redacted]': [redacted]")
 
         return format_tool_response(resp)    
     
@@ -596,16 +589,16 @@ def register_common_tools(mcp, app_manager):
                     resp["status"] = "success"
                 else:
                     resp["status"] = "failed"
-                    resp["error"] = f"[{search_kwargs}] of [{parent_search_kwargs}] not found within {timeout} seconds."
-                    logger.error(f"{resp['error']}: search_kwargs={search_kwargs}")                  
+                    resp["error"] = safe_error()
+                    logger.error('[redacted]: search_kwargs=[redacted]')                  
             else:
-                raise NotImplementedError(f"select_item is not implemented for '{control_framework}' control_framework yet.")
+                raise NotImplementedError("select_item is not implemented for '[redacted]' control_framework yet.")
 
             await fill_snapshot(resp, app_manager, need_snapshot=need_snapshot)
         except Exception as e:
             resp["status"] = "error"
-            resp["error"] = repr(e)
-            logger.error(f"Error finding item: name={name}, control_type={control_type}. error={repr(e)}")
+            resp["error"] = safe_error()
+            logger.error('Error finding item: name=[redacted], control_type=[redacted]. error=[redacted]')
                  
         return format_tool_response(resp)
 
@@ -637,19 +630,19 @@ def register_common_tools(mcp, app_manager):
         resp = init_tool_response()
         try:
             if duration < 0:
-                raise ValueError(f"Duration must be non-negative, got {duration}")
+                raise ValueError('Duration must be non-negative, got [redacted]')
 
             await asyncio.sleep(duration)
             resp["status"] = "success"
             resp["data"] = {"duration": duration, "step_raw": step_raw}
-            logger.info(f"Waited for {duration} seconds")
+            logger.info('Waited for [redacted] seconds')
 
             if need_snapshot:
                 await fill_snapshot(resp, app_manager, need_snapshot=need_snapshot)
         except Exception as e:
             resp["status"] = "error"
-            resp["error"] = repr(e)
-            logger.error(f"Error during wait: {repr(e)}")
+            resp["error"] = safe_error()
+            logger.error('Error during wait: [redacted]')
 
         return format_tool_response(resp)
     

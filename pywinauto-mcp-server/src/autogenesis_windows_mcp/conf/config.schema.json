@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": ["PYWINAUTO_CONFIG"],
+  "properties": {
+    "PYWINAUTO_CONFIG": {
+      "type": "object",
+      "required": ["apps_config"],
+      "properties": {
+        "apps_config": {
+          "type": "object",
+          "minProperties": 1,
+          "propertyNames": {"minLength": 1},
+          "additionalProperties": {"$ref": "#/$defs/profile"}
+        }
+      }
+    }
+  },
+  "$defs": {
+    "profile": {
+      "type": "object",
+      "required": ["exe", "window_title_re"],
+      "properties": {
+        "app_name": {"type": "string"},
+        "exe": {"type": "string", "minLength": 1},
+        "window_title_re": {"type": "string", "minLength": 1},
+        "launch_args": {"type": "array", "items": {"type": "string"}}
+      }
+    }
+  }
+}

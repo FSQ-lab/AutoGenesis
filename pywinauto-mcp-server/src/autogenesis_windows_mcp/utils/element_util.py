@@ -65,8 +65,8 @@ def extract_element_info_from_pwa(element, max_root_depth=10, web_depth=0, limit
         "children": []
     }
     if total_size + asizeof.asizeof(info) > SNAPSHOT_MAX_SIZE:
-        logger.warning(f"Snapshot size exceeded limit of {SNAPSHOT_MAX_SIZE} bytes, stopping further extraction.")
-        logger.warning(f"Current element: {info}\n\n")
+        logger.warning('Snapshot size exceeded limit of [redacted] bytes, stopping further extraction.')
+        logger.warning('Current element: [redacted]\n\n')
         total_size_break = True 
         return None
     
@@ -194,5 +194,5 @@ def get_screenshot_main_window(app_manager):
         img = main_window.capture_as_image()
         return img
     except Exception as e:
-        logger.error(f"Failed to capture screenshot of the main window: {e}")
+        logger.error('Failed to capture screenshot of the main window: [redacted]')
         return None

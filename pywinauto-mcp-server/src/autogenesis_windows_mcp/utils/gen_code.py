@@ -13,12 +13,13 @@ import functools
 import pprint
 import textwrap
 from pathlib import Path
+from ..security import scrub
 
 
 logger = logging.getLogger(__name__)
 
 
-PARENT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+PARENT_DIR = str(Path.cwd())
 FEATURE_DIR = os.path.join(PARENT_DIR, 'behave_demo/features')
 STEPS_DIR_DEFAULT = os.path.join(PARENT_DIR, 'behave_demo/features/steps')
 TARGET_STEP_FILE_DEFAULT = os.path.join(STEPS_DIR_DEFAULT, "common_steps.py")
@@ -99,6 +100,14 @@ def generate_args_data_multi_param(step_info: dict):
 
 
 def generate_step_definition(step_info) -> str:
+    # Redact supplied literal values before Python quoting, keeping fixed code
+    # and parameter names intact even when a credential is a short string.
+    step_info["tool_params"] = {key: scrub(value) for key, value in step_info.get("tool_params", {}).items()}
+    for key in ("step_text_raw", "step_text_parameterized"):
+        if key in step_info:
+            step_info[key] = scrub(step_info[key])
+    if "parameterized_args" in step_info:
+        step_info["parameterized_args"] = {key: scrub(value) for key, value in step_info["parameterized_args"].items()}
     parameterized_args = step_info.get('parameterized_args', {})
     has_params = len(parameterized_args) > 0
     
@@ -132,7 +141,7 @@ def extract_steps_from_cache(gen_code_id, gen_code_cache):
     steps = []
     last_step = None
     call_idx = 1
-    logger.info(f"Extracting cache size: {len(gen_code_cache)}")
+    logger.info('Extracting cache size: [redacted]')
     for item in gen_code_cache:
         if item.get("gen_code_id") != gen_code_id:
             continue
@@ -178,20 +187,20 @@ def extract_step_patterns(step_path):
     step_path = Path(step_path)
     
     if not step_path.exists():
-        logger.warning(f"Step path does not exist: {step_path}")
+        logger.warning('Step path does not exist: [redacted]')
         return patterns
     
     if step_path.is_dir():
         py_files = list(step_path.rglob("*.py"))  
     else:
-        logger.warning(f"Invalid step path: {step_path}")
+        logger.warning('Invalid step path: [redacted]')
         return patterns
     
-    logger.info(f"Found {len(py_files)} Python files to scan")
+    logger.info('Found [redacted] Python files to scan')
     
     for py_file in py_files:
         time_s = time.time()
-        logger.info(f"Reading step file: {py_file}")
+        logger.info('Reading step file: [redacted]')
         try:
             with open(py_file, 'r', encoding='utf-8') as f:
                 for line_num, line in enumerate(f, 1):
@@ -201,11 +210,11 @@ def extract_step_patterns(step_path):
                         for decorator, pattern in matches:
                             patterns.append((decorator.lower(), pattern.lower()))
         except Exception as e:
-            logger.error(f"Error reading file {py_file}: {repr(e)}")
+            logger.error('Error reading file [redacted]: [redacted]')
         
-        logger.info(f"Processed {py_file} in {time.time() - time_s:.3f} seconds")
+        logger.info('Processed [redacted] in [redacted] seconds')
     
-    logger.info(f"Extracted {len(patterns)} step patterns")
+    logger.info('Extracted [redacted] step patterns')
     return patterns
 
 
@@ -221,7 +230,7 @@ def gen_code_preview(app_manager) -> dict:
         app_manager.header_code = HEADER_AUTO_GEN
 
     steps = extract_steps_from_cache(app_manager.gen_code_id, app_manager.gen_code_cache)
-    logger.info(f"Processing {len(steps)} extracted steps")
+    logger.info('Processing [redacted] extracted steps')
 
     new_add_patterns = ()
     for item in steps:
@@ -253,9 +262,8 @@ def gen_code_preview(app_manager) -> dict:
     return {'diff_preview': diff_preview, 'new_steps_code': new_steps_code}
 
 def gen_code_preview_test(gen_code_id, gen_code_cache) -> str:
-    sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-    from app_session import AppSessionManager
-    app_manager = AppSessionManager('edge-beta')
+    from ..app_session import AppSessionManager
+    app_manager = AppSessionManager({})
     app_manager.gen_code_id = gen_code_id
     app_manager.gen_code_cache = gen_code_cache
     app_manager.steps_dir = STEPS_DIR_DEFAULT
@@ -268,11 +276,11 @@ def ensure_step_path_exists(step_file: str) -> bool:
     try:
         parent_dir = step_path.parent
         if not parent_dir.exists():
-            logger.info(f"Creating directory structure: {parent_dir}")
+            logger.info('Creating directory structure: [redacted]')
             parent_dir.mkdir(parents=True, exist_ok=True)
         return True
     except Exception as e:
-        logger.error(f"Error creating directory structure for {step_path}: {str(e)}")
+        logger.error('Error creating directory structure for [redacted]: [redacted]')
         return False
 
 
@@ -280,23 +288,23 @@ def read_step_files(step_path, max_depth=5, current_depth=0):
     existing_code = ""
     
     if current_depth > max_depth:
-        logger.warning(f"Maximum recursion depth reached at {step_path}")
+        logger.warning('Maximum recursion depth reached at [redacted]')
         return existing_code
     
     if not step_path.exists():
-        logger.warning(f"Step path does not exist: {step_path}")
+        logger.warning('Step path does not exist: [redacted]')
         return existing_code
         
     if step_path.is_dir():
         for py_file in step_path.glob("*.py"):
             try:
-                logger.info(f"Reading step file: {py_file}")
+                logger.info('Reading step file: [redacted]')
                 with open(py_file, 'r', encoding='utf-8') as f:
                     file_content = f.read()
                     if file_content:
                         existing_code += file_content + "\n\n"
             except Exception as e:
-                logger.error(f"Error reading file {py_file}: {str(e)}")
+                logger.error('Error reading file [redacted]: [redacted]')
         
         for subdir in step_path.iterdir():
             if subdir.is_dir():
@@ -309,7 +317,7 @@ def read_step_files(step_path, max_depth=5, current_depth=0):
             with open(step_path, 'r', encoding='utf-8') as f:
                 existing_code = f.read()
         except Exception as e:
-            logger.error(f"Error reading file {step_path}: {str(e)}")
+            logger.error('Error reading file [redacted]: [redacted]')
             
     return existing_code
 
@@ -391,7 +399,7 @@ def record_calls(app_manager):
         @functools.wraps(func)
         async def wrapper(*args, **kwargs):
             if not app_manager.start_tool_execution(func.__name__):
-                logger.warning(f"Tool execution blocked: {func.__name__} is already running")
+                logger.warning('Tool execution blocked: [redacted] is already running')
                 return json.dumps({
                     "status": "failed", 
                     "message": "Another tool is currently executing, please wait",
@@ -416,15 +424,13 @@ def record_calls(app_manager):
                     call_info['tool_name'] = func.__name__
                     call_info['tool_params'] = tool_params
                     app_manager.gen_code_cache.append(call_info)
-                    logger.info(f"record_calls: call_info={call_info}")
+                    logger.info('record_calls: call_info=[redacted]')
                 else:
                     pass
  
                 return result
             except Exception as e:
-                import traceback
-                traceback.print_exc()
-                logger.error(f"Error record_calls: {repr(e)}")
+                logger.error('Error record_calls: [redacted]')
                 raise e
             finally:
                 app_manager.finish_tool_execution(func.__name__)

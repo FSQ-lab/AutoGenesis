@@ -1,3 +1,4 @@
+from ..security import safe_error
 # Copyright (c) Microsoft Corporation.
 # Licensed under the MIT license.
 
@@ -9,13 +10,13 @@ import inspect
 import asyncio
 
 from math import hypot
-from utils.element_util import fill_snapshot, find_element_by_kwargs
-from utils.logger import log_tool_call
-from utils.response_format import format_tool_response, init_tool_response
+from ..utils.element_util import fill_snapshot, find_element_by_kwargs
+from ..utils.logger import log_tool_call
+from ..utils.response_format import format_tool_response, init_tool_response
 from pywinauto import Application, mouse
 from collections import namedtuple
 
-from utils.gen_code import record_calls
+from ..utils.gen_code import record_calls
 
 logger = logging.getLogger(__name__)
 
@@ -87,10 +88,10 @@ def register_mouse_tools(mcp, app_manager):
         """
 
         if from_type not in ["element", "pixel"]:
-            raise ValueError(f"Unsupported from_type: {from_type}. Supported types are 'element' and 'pixel'.")
+            raise ValueError("Unsupported from_type: [redacted]. Supported types are 'element' and 'pixel'.")
             
         if drag_type not in ["to_element", "by_offset"]:
-            raise ValueError(f"Unsupported drag_type: {drag_type}. Supported types are 'to_element' and 'by_offset'.")
+            raise ValueError("Unsupported drag_type: [redacted]. Supported types are 'to_element' and 'by_offset'.")
 
         # Validate parameters based on from_type
         if from_type == "element":
@@ -143,23 +144,23 @@ def register_mouse_tools(mcp, app_manager):
                 mouse.release(coords=end_point, button=mouse_button)
                 await asyncio.sleep(2)
             else:
-                raise NotImplementedError(f"mouse_drag_drop is not implemented for '{control_framework}' control_framework yet.")
+                raise NotImplementedError("mouse_drag_drop is not implemented for '[redacted]' control_framework yet.")
 
             await fill_snapshot(resp, app_manager, need_snapshot=need_snapshot)
             resp["status"] = "success"
         except Exception as e:
             resp["status"] = "error"
-            resp["error"] = repr(e)
+            resp["error"] = safe_error()
             if drag_type == "to_element":
                 if from_type == "element":
-                    logging.error(f"Error dragging from '{source_title}' to '{target_title}': {repr(e)}")
+                    logging.error("Error dragging from '[redacted]' to '[redacted]': [redacted]")
                 else:
-                    logging.error(f"Error dragging from pixel ({from_x}, {from_y}) to '{target_title}': {repr(e)}")
+                    logging.error("Error dragging from pixel ([redacted], [redacted]) to '[redacted]': [redacted]")
             else:
                 if from_type == "element":
-                    logging.error(f"Error dragging from '{source_title}' by offset ({x_offset}, {y_offset}): {repr(e)}")
+                    logging.error("Error dragging from '[redacted]' by offset ([redacted], [redacted]): [redacted]")
                 else:
-                    logging.error(f"Error dragging from pixel ({from_x}, {from_y}) by offset ({x_offset}, {y_offset}): {repr(e)}")
+                    logging.error('Error dragging from pixel ([redacted], [redacted]) by offset ([redacted], [redacted]): [redacted]')
             
         return format_tool_response(resp)
 
@@ -231,17 +232,17 @@ def register_mouse_tools(mcp, app_manager):
                     resp["status"] = "success"
                 else:
                     resp["status"] = "failed"
-                    resp["error"] = f"[{search_kwargs}] of [{parent_search_kwargs}] not found within {timeout} seconds."
-                    logger.error(f"{resp['error']}: {search_kwargs}")
+                    resp["error"] = safe_error()
+                    logger.error('[redacted]: [redacted]')
             else:
-                raise NotImplementedError(f"mouse_hover is not implemented for '{control_framework}' control_framework yet.")
+                raise NotImplementedError("mouse_hover is not implemented for '[redacted]' control_framework yet.")
             
             await fill_snapshot(resp, app_manager, need_snapshot=need_snapshot)   
             resp["status"] = "success"
         except Exception as e:
             resp["status"] = "error"
-            resp["error"] = repr(e)
-            logging.error(f"Error hovering over element '{name}': {repr(e)}")
+            resp["error"] = safe_error()
+            logging.error("Error hovering over element '[redacted]': [redacted]")
             
         return format_tool_response(resp)
 
@@ -318,16 +319,16 @@ def register_mouse_tools(mcp, app_manager):
                     resp["status"] = "success"
                 else:
                     resp["status"] = "failed"
-                    resp["error"] = f"[{search_kwargs}] of [{parent_search_kwargs}] not found within {timeout} seconds."
-                    logger.error(f"{resp['error']}: {search_kwargs}")
+                    resp["error"] = safe_error()
+                    logger.error('[redacted]: [redacted]')
             else:
-                raise NotImplementedError(f"mouse_scroll is not implemented for '{control_framework}' control_framework yet.")
+                raise NotImplementedError("mouse_scroll is not implemented for '[redacted]' control_framework yet.")
             
             await fill_snapshot(resp, app_manager, need_snapshot=need_snapshot)   
             resp["status"] = "success"
         except Exception as e:
             resp["status"] = "error"
-            resp["error"] = repr(e)
-            logging.error(f"Error scrolling element '{name}': {repr(e)}")
+            resp["error"] = safe_error()
+            logging.error("Error scrolling element '[redacted]': [redacted]")
         return format_tool_response(resp)
 

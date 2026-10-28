@@ -1,379 +1,216 @@
-# PyWinauto MCP Server - Windows Testing
+# AutoGenesis Windows MCP package
 
-A Windows automation server based on the [Model Context Protocol (MCP)](https://modelcontextprotocol.io) that uses the [pywinauto](https://pywinauto.readthedocs.io/) library to automate Windows applications.
+Issue #5 packages the existing Windows runtime as **autogenesis-windows-mcp**
+(version 0.1.0), importable as **autogenesis_windows_mcp**, with the console
+command **autogenesis-windows-mcp**. Python 3.10+ and Windows are required for
+serving automation tools. Linux CI checks package metadata/imports only.
 
-## Features
+## Install in a business project
 
-- 🤖 AI-assisted test script generation based on MCP protocol
-- 🖥️ Windows desktop application automation support
-- 🎯 Automatic generation of BDD format test code
-- 🔄 Mouse and keyboard interactions
-
-## Quick Start
-
-### Prerequisites
-
-- Python 3.10 or higher
-- Windows operating system
-- [uv](https://docs.astral.sh/uv/) package manager
-- VS Code or Cursor
-
-#### Install uv
+Build artifacts must contain both the Windows runtime wheel and the merged
+Agent Contract 1.0.0 wheel. From any Windows business directory, without a
+checkout of AutoGenesis:
 
 ```powershell
-# Install uv for faster dependency management
-powershell -c "irm https://astral.sh/uv/install.ps1 | iex"
-
-# Or download from https://github.com/astral-sh/uv/releases/latest
+python -m venv .venv
+.venv/Scripts/python -m pip install C:/artifacts/autogenesis_agent_contract-1.0.0-py3-none-any.whl C:/artifacts/autogenesis_windows_mcp-0.1.0-py3-none-any.whl
+.venv/Scripts/autogenesis-windows-mcp --config ./apps.json --app notepad
 ```
 
-### 1. Clone the Repository
+The installed command defaults to **stdio**. MCP clients must own stdin/stdout;
+stdout contains JSON-RPC only. Diagnostics contain metadata on stderr; startup
+does not create log files or write into the installed package. Close client
+stdin or send SIGINT (Ctrl+C) to stop the server. Disconnecting does not invoke
+the app_close automation tool or terminate the user's application.
 
-Open PowerShell and run:
+With uv installed, isolated execution from local artifacts is also supported:
 
-    git clone https://github.com/microsoft/AutoGenesis.git
-    cd AutoGenesis
+```powershell
+uvx --with C:/artifacts/autogenesis_agent_contract-1.0.0-py3-none-any.whl --from C:/artifacts/autogenesis_windows_mcp-0.1.0-py3-none-any.whl autogenesis-windows-mcp --config ./apps.json --app notepad
+```
 
-### 2. Install Dependencies
+After these versions are published to the configured package index:
 
-Navigate to the `pywinauto-mcp-server` directory and install Python dependencies:
+```powershell
+uvx --from autogenesis-windows-mcp==0.1.0 autogenesis-windows-mcp --config ./apps.json --app notepad
+```
 
-    cd pywinauto-mcp-server
-    uv sync
+The runtime depends exactly on autogenesis-agent-contract==1.0.0 and requires
+manifest SHA-256
+302a8d779a3c30c26f8c5d801fcf06852f802eeaf18e677924a1d9a791b93412.
+Missing, corrupt or incompatible contract assets fail startup.
 
-**Dependencies include:**
-- `pywinauto` - Windows UI automation library
-- `mcp` - Model Context Protocol SDK
-- Other necessary utility libraries
+## Application profiles
 
-## Usage
+The schema is **PYWINAUTO_CONFIG.apps_config**, a nonempty object mapping
+profile names to application configurations:
 
-### 3. Configure Application
-
-Application configuration is defined in the `conf/pywinauto_conf.json` file. Configure the application information to be automated here.
-
-Configuration example:
 ```json
 {
   "PYWINAUTO_CONFIG": {
-    "app_name": "Your Application Name",
-    "exe": "C:\\Path\\To\\Your\\App.exe",
-    "window_title_re": "window name",
-    "launch_args": ["--arg1", "--arg2"]
+    "apps_config": {
+      "notepad": {
+        "app_name": "Notepad",
+        "exe": "%WINDIR%/System32/notepad.exe",
+        "window_title_re": ".*Notepad.*",
+        "launch_args": []
+      },
+      "business-app": {
+        "app_name": "Business application",
+        "exe": "$AUTOGENESIS_APP_EXE",
+        "window_title_re": ".*Business Application.*",
+        "launch_args": ["--token", "$AUTOGENESIS_APP_TOKEN"]
+      }
+    }
   }
 }
 ```
 
-Configuration fields:
-- `app_name`: Friendly name for the application (for logging purposes)
-- `exe`: Full path to the application executable file
-- `window_title_re`: Regular expression pattern to match the main window title. This helps the server identify and connect to the correct application window. For example:
-  - `".*Notepad"` - Matches any window title ending with "Notepad"
-  - `"Untitled.*"` - Matches any window title starting with "Untitled"
-  - `"My App"` - Exact match for "My App"
-- `launch_args`: (Optional) List of command-line arguments to pass to the application when launching. For example:
-  - `["--maximized"]` - Launch in maximized mode
-  - `["--safe-mode", "--no-plugins"]` - Launch with multiple arguments
-  - `["file.txt"]` - Open a specific file on launch
+The packaged Notepad template is used when --config is omitted. A public
+example is also in conf/pywinauto_conf.example.json. Copy it to a private business
+configuration and select a profile with --app. Without --app, the first profile
+in JSON insertion order is selected. Unknown profile names fail clearly.
 
-### 4. Start MCP Server
+Each profile requires nonempty string exe and window_title_re fields.
+window_title_re must compile as a regular expression. Optional app_name is a
+string; launch_args is an array of strings and defaults to an empty array.
+Existing additional project/profile fields remain supported. All profiles are
+schema-validated before startup; only the selected profile has environment
+variables expanded. Unused profiles may reference unset variables.
 
-Run the following command to start the MCP server:
+Expansion supports $NAME, dollar-braced NAME, and Windows %NAME% recursively
+through values in dictionaries and lists. Unset variables or empty required
+values fail startup. Environment variables take precedence over a private .env
+file in the current business directory. Keep credentials in environment
+variables or that untracked file; configurations should contain references.
+Profile values, launch arguments, entered text, keystrokes, tool results and
+exception bodies are excluded from diagnostic logs. No MCP config readback tool
+is exposed. Schema and argument errors do not echo supplied values.
 
-    cd pywinauto-mcp-server
-    uv run python simple_server.py --transport sse
+Executable paths and launch arguments are quoted with Windows command-line
+rules and passed to pywinauto's CreateProcess path without a shell.
 
-Default startup mode is SSE (Server-Sent Events).
+## Source execution
 
-### 5. Configure MCP Client
+From the pywinauto-mcp-server directory, with the contract wheel in C:/artifacts:
 
-#### 5.1 VS Code Configuration
-
-Create or edit `.vscode/mcp.json` in your project root:
-
-**Method 1: Using SSE Mode (Server-Sent Events)**
-
-    # Add MCP server configuration to .vscode/mcp.json:
-    # {
-    #   "servers": {
-    #     "auto-genesis-mcp-pywinauto-sse": {
-    #       "url": "http://localhost:8000/sse"
-    #     }
-    #   }
-    # }
-    After configuration, you need to click start to launch
-
-**Method 2: Using stdio Mode (Recommended for Local Development)**
-
-    # Add MCP server configuration to .vscode/mcp.json:
-    # {
-    #   "servers": {
-    #     "auto-genesis-mcp-pywinauto-stdio": {
-    #       "command": "uv",
-    #       "args": [
-    #         "run",
-    #         "--project",
-    #         "c:\\Users\\username\\code\\AutoGenesis\\pywinauto-mcp-server",
-    #         "python",
-    #         "c:\\Users\\username\\code\\AutoGenesis\\pywinauto-mcp-server\\simple_server.py",
-    #         "--transport",
-    #         "stdio"
-    #       ],
-    #       "env": {
-    #         "PYTHONIOENCODING": "utf-8",
-    #         "PYTHONUTF8": "1",
-    #         "LANG": "en_US.UTF-8",
-    #         "LC_ALL": "en_US.UTF-8"
-    #       }
-    #     }
-    #   }
-    # }
-
-**Note:**
-- stdio mode: VS Code automatically starts and manages the MCP server process, suitable for local development
-- SSE mode: Requires manual start of MCP server (`uv run python simple_server.py --transport sse`), suitable for remote servers or multi-client scenarios
-- Please replace the paths with your actual project paths
-
-#### 5.2 Cursor Configuration
-
-Configure MCP server in Cursor settings:
-
-**Method 1: Using SSE Mode (Server-Sent Events)**
-
-    # Add to Cursor MCP configuration:
-    # {
-    #   "mcpServers": {
-    #     "auto-genesis-mcp-pywinauto-sse": {
-    #       "url": "http://localhost:8000/sse"
-    #     }
-    #   }
-    # }
-
-**Method 2: Using stdio Mode**
-
-    # Add to Cursor MCP configuration:
-    # {
-    #   "mcpServers": {
-    #     "auto-genesis-mcp-pywinauto-stdio": {
-    #       "command": "uv",
-    #       "args": [
-    #         "run",
-    #         "--project",
-    #         "c:\\Users\\username\\code\\AutoGenesis\\pywinauto-mcp-server",
-    #         "python",
-    #         "c:\\Users\\username\\code\\AutoGenesis\\pywinauto-mcp-server\\simple_server.py",
-    #         "--transport",
-    #         "stdio"
-    #       ],
-    #       "env": {
-    #         "PYTHONIOENCODING": "utf-8",
-    #         "PYTHONUTF8": "1",
-    #         "LANG": "en_US.UTF-8",
-    #         "LC_ALL": "en_US.UTF-8"
-    #       }
-    #     }
-    #   }
-    # }
-
-**Note:**
-- SSE mode: Need to manually start the server first (`uv run python simple_server.py --transport sse`), then VS Code/Cursor connects via HTTP
-- stdio mode: VS Code/Cursor automatically starts and manages the server process
-- Please replace the paths with your actual project paths
-
-### 6. Use MCP to Generate Test Code
-
-#### 6.1 Write Test Cases
-
-The project already includes a sample test case `behave-demo/features/demo.feature`, you can refer to it to write new test cases suitable for your Windows app.
-
-View example:
-
-```gherkin
-# Reference behave-demo/features/demo.feature
-Feature: Edge Browser Testing
-
-  Scenario: Open Edge browser and visit Bing search
-    Given Launch Edge browser
-    When Navigate to "https://www.bing.com"
-    Then Verify tab title contains "Bing"
+```powershell
+uv sync --find-links C:/artifacts
+uv run --no-sync python simple_server.py --transport stdio --config C:/business/apps.json --app notepad
 ```
 
-#### 6.2 Generate Test Code
+simple_server.py is a thin launcher for the same synchronous main. It retains
+the existing source default of SSE and prefers a local conf/pywinauto_conf.json
+when present. When absent, it uses the packaged template. The ignored local
+configuration is never copied into the wheel. Explicit --transport stdio and
+--transport sse work from either entrypoint. SSE remains available at
+http://localhost:8000/sse:
 
-Use the autoGenesis-win skill to automatically generate test code from your scenarios:
-
-This project includes a pre-configured skill that simplifies the test execution process. Simply provide your scenario name and steps in natural language:
-
-**Quick Example:**
-```
-Use skill autoGenesis-win to execute scenario: Test msn.com website on Edge
-```
-
-The skill will automatically:
-- Locate the scenario from .feature files in behave-demo/features/
-- Parse all scenario steps
-- Execute each step through MCP tool calls
-- Handle retry logic and error recovery
-- Generate BDD test code
-- Save the generated code to your project
-
-**For more examples and usage details, see:** [.github/skills/autoGenesis-win/](.github/skills/autoGenesis-win/)
-
-### 7. Run Generated Test Code
-
-#### 7.1 Run Specific Scenario
-
-Run a specific test scenario by name:
-
-    behave --name "Scenario Name"
-
-#### 7.2 More Options
-
-For more Behave run options and usage, please refer to [Behave Official Documentation](https://behave.readthedocs.io/).
-
-Common command examples:
-
-    # Generate JSON report
-    behave --format json -o reports/results.json
-    
-    # Filter using tags
-    behave --tags=@smoke
-    
-    # Verbose output
-    behave -v
-
-## Project Structure
-
-```
-pywinauto-mcp-server/
-├── simple_server.py       # MCP server main program
-├── app_session.py         # Application session manager
-├── pyproject.toml         # uv/project configuration
-├── requirements.txt       # Dependencies list (legacy)
-├── conf/                  # Configuration directory
-│   └── pywinauto_conf.json
-├── tools/                 # Tool modules
-│   ├── common_tool.py     # Common tools
-│   ├── mouse_tool.py      # Mouse operation tools
-│   ├── gen_code_tool.py   # Code generation tools
-│   └── verify_tool.py     # Verification tools
-├── utils/                 # Utility functions
-├── llm/                   # LLM integration
-├── logs/                  # Logs directory
-└── WINDOWS-README.md      # Documentation (this file)
+```powershell
+uv run --no-sync python simple_server.py --transport sse --config C:/business/apps.json
 ```
 
-## Supported Tools
+## MCP client example
 
-The server provides the following tools to automate Windows applications through the MCP protocol:
+A client can launch the installed command with an argument array:
 
-### 📱 Application Management
-- **app_launch** - Launch the application
-- **app_close** - Close the application
-- **app_screenshot** - Take a screenshot of the application window
+```json
+{
+  "mcpServers": {
+    "autogenesis-windows": {
+      "command": "C:/business/.venv/Scripts/autogenesis-windows-mcp.exe",
+      "args": ["--config", "C:/business/apps.json", "--app", "notepad"]
+    }
+  }
+}
+```
 
-### 🎯 Element Operations
-- **element_click** - Click an element
-- **right_click** - Right-click an element
-- **enter_text** - Enter text into an element
-- **send_keystrokes** - Send keyboard keystrokes
-- **select_item** - Select a list item
-- **open_folder** - Open a folder
+The client initializes with the canonical Core Policy instructions. The merged
+Agent Contract adapter publishes these official prompts:
 
-### 🖱️ Mouse Operations
-- **mouse_drag_drop** - Mouse drag and drop operations
-- **mouse_hover** - Mouse hover
-- **mouse_scroll** - Mouse scroll
+- execute_scenario(scenario_text, feature_file_path?)
+- generate_scenario_test(scenario_text, feature_file_path)
+- execute_natural_language_task(task_text)
 
-### ✅ Verification Tools
-- **verify_element_exists** - Verify element exists
-- **verify_element_not_exist** - Verify element does not exist
-- **verify_checkbox_state** - Verify checkbox state
-- **verify_element_value** - Verify element value
-- **verify_elements_order** - Verify elements order
-- **verify_visual_task** - Visual verification task
+The read-only resource autogenesis://agent-contract/identity reports contract
+identity and appendix metadata. This packaging issue supplies no project
+appendix configuration interface; the canonical adapter is registered with an
+empty appendix. Project-root/bootstrap integration belongs to its owning issue.
 
-### 🔧 Code Generation
-- **before_gen_code** - Initialize code generation session
-- **preview_code_changes** - Preview generated code changes
-- **confirm_code_changes** - Confirm and apply code changes
+The **22 existing Windows tool names and complete input schemas** are frozen in
+tests/fixtures/legacy_tool_schemas.json, including their required fields,
+defaults, array items and types:
 
-## Advanced Configuration
+- app_launch, app_close, app_screenshot, app_wait
+- element_click, right_click, enter_text, send_keystrokes, select_item, open_folder
+- mouse_drag_drop, mouse_hover, mouse_scroll
+- verify_element_exists, verify_element_not_exist, verify_checkbox_state,
+  verify_element_value, verify_elements_order, verify_visual_task
+- before_gen_code, preview_code_changes, confirm_code_changes
 
-### Azure OpenAI Integration (Optional)
+Generated replay continues to use Behave and the business project's
+features.environment helpers. Default generation paths are relative to the
+business working directory under behave_demo/features/steps, never inside
+site-packages. Prefer explicit feature_file or step_file for your project.
+Visual verification retains the Azure OpenAI and local provider paths;
+AZURE_OPENAI_API_KEY and AZURE_OPENAI_ENDPOINT are read from the environment.
+No provider implementation needs credential edits.
 
-#### Configure Azure OpenAI
+## Clean wheel verification
 
-Set environment variables for Azure OpenAI integration:
+From the repository root, build both artifacts and verify them in a clean
+Windows temporary business project:
 
-    $env:AZURE_OPENAI_ENDPOINT = "your-endpoint"
-    $env:AZURE_OPENAI_API_KEY = "your-api-key"
-    $env:AZURE_OPENAI_DEPLOYMENT = "your-deployment-name"
+```powershell
+python -m pip install 'build>=1.2,<2'
+python -m build --wheel --outdir C:/artifacts agent-contract
+python -m build --wheel --outdir C:/artifacts pywinauto-mcp-server
+python pywinauto-mcp-server/scripts/verify_wheel.py --wheel-dir C:/artifacts --mcp-version 1.23.0 --evidence-dir C:/evidence/windows-mcp-1.23
+python pywinauto-mcp-server/scripts/verify_wheel.py --wheel-dir C:/artifacts --mcp-version 1.29.1 --evidence-dir C:/evidence/windows-mcp-1.29
+```
 
-Then configure Azure OpenAI credentials in `llm/chat.py` to enable screenshot analysis functionality.
+Use a new artifacts directory with exactly one wheel per distribution. The
+verifier creates a new venv and business directory, installs both local wheels,
+copies only the acceptance harness and thin source launcher, and runs from that
+business directory with isolated Python imports. It records wheel hashes,
+runner image/version, installed module locations, install log, test report,
+full protocol responses, the 22-tool snapshot, canonical prompts/identity,
+EOF shutdown, SIGINT shutdown, and secret-canary results. Canary-bearing output
+is rejected before protocol evidence is written. On Linux, only metadata,
+package-data and import tests are selected; this is not Windows acceptance.
+Pytest entry-point autoload is disabled, inherited PYTEST_PLUGINS/ADDOPTS are
+cleared, and AnyIO is explicitly loaded. A synthetic installed plugin verifies
+that third-party entry points cannot affect acceptance.
 
-## Troubleshooting
+The SHA-pinned windows-package workflow covers Windows Server 2022 and Ubuntu
+24.04, Python 3.10/3.12 and MCP SDK 1.23.0/1.29.1. Windows UI interaction still
+requires an interactive desktop and a configured real application; hosted CI
+proves installation and protocol behavior without launching user applications.
+Independent code/security review and clean Windows acceptance remain required.
 
-### MCP Server Cannot Start
+## Compatibility limits and rollback
 
-Check Python version and dependencies:
+The transport uses one private FastMCP server handle to supply cancellable
+stdin and sanitized wire errors; both SDK versions have explicit protocol
+coverage. Input schemas and transport flags remain unchanged. Logs are now
+stderr metadata only; MCP_LOG_FILE and AGENT_INDEX no longer create log files.
+Windows pipe readiness and console keyboard readiness are polled asynchronously,
+so SIGINT does not leave a worker blocked on open stdin. EOF also cancels pending
+tool work. The Windows acceptance suite exercises both idle and pending-tool
+SIGINT while the client's stdin pipe remains open.
 
-    python --version
-    uv pip list
+Known credentials and password-control inputs are redacted from previews and
+generated code with [REDACTED] placeholders. Those values require reviewed
+replacement before replay. Ordinary non-sensitive recorded text retains its
+replay value. Full preview/approval binding, scoped atomic generation writes and
+secret-reference replay are owned by issue #8; this packaging work preserves
+the current generation interfaces.
 
-Or try re-syncing:
+Uninstall the runtime from the business venv to roll back:
 
-    uv sync
+```powershell
+.venv/Scripts/python -m pip uninstall autogenesis-windows-mcp
+```
 
-Ensure Python version is 3.10 or higher. Check the log file `logs/mcp_server.log` for detailed error information.
-
-### Cannot Find Element
-
-- Ensure the target application is open and active
-- Some applications may require administrator privileges
-- Use `verify_element_exists` to check if element is available
-- Verify element's title, control_type, and automation_id are correct
-
-### Permission Issues
-
-- Run your MCP client or command line as administrator
-- Some system windows may be protected and cannot be automated
-
-### AI Client Cannot Recognize MCP Tools
-
-- Restart VS Code or Cursor
-- Check if MCP configuration file path is correct
-- Confirm MCP Server has started successfully
-- Verify Python path configuration
-
-### Generated Code Cannot Run
-
-Run tests in verbose mode to see detailed logs:
-
-    behave -v
-
-Check PyWinauto configuration file and ensure:
-1. The target application is installed on your Windows system
-2. The executable path in the configuration is correct
-3. The window title pattern matches your application
-4. Administrator privileges are granted if needed
-
-## Example Use Cases
-
-View examples in the `behave-demo/features/` directory:
-
-- `demo.feature` - Contains complete test scenario examples
-
-## Contributing
-
-Contributions are welcome! Please check [CONTRIBUTING.md](../CONTRIBUTING.md) for details.
-
-## Contact
-
-For questions or suggestions, please contact: fsqgroup@microsoft.com
-
-## License
-
-Please check [LICENSE](LICENSE)
-
-
+Remove the client's server entry separately. Business configurations and
+generated test files remain in the business project.

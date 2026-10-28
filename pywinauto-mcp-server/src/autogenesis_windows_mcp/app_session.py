@@ -7,22 +7,17 @@ import os
 import psutil
 import time
 import logging
-import shutil
-import tempfile
-import uuid
-import json
-from pathlib import Path
-from datetime import datetime
-from pywinauto import Application, Desktop
-from pywinauto.controls.uiawrapper import UIAWrapper
-from playwright.async_api import async_playwright
+import subprocess
+from pywinauto import Application
 from pywinauto.findwindows import ElementNotFoundError
+from .security import remember_config_secrets
 
 
 logger = logging.getLogger(__name__)
             
 class AppSessionManager:
     def __init__(self, app_conf: dict):
+        remember_config_secrets(app_conf)
         self.config = app_conf.copy()
         self.launch_args = self.config.get('launch_args', []).copy()
 
@@ -40,15 +35,15 @@ class AppSessionManager:
 
     def start_tool_execution(self, tool_name):
         if self.is_executing:
-            logger.warning(f"Tool {tool_name} blocked: another tool is executing")
+            logger.warning('Tool [redacted] blocked: another tool is executing')
             return False
         self.is_executing = True
-        logger.info(f"Tool {tool_name} started execution")
+        logger.info('Tool [redacted] started execution')
         return True
 
     def finish_tool_execution(self, tool_name):
         self.is_executing = False
-        logger.info(f"Tool {tool_name} finished execution")
+        logger.info('Tool [redacted] finished execution')
 
     async def _new_launch(self, args: list[str]):
         self.kill_app_process_by_path()
@@ -57,10 +52,10 @@ class AppSessionManager:
         time_s = time.time()
         launch_success = False
 
-        cmd = f"{valid_exe_path}"
-        if args:
-            cmd += " " + " ".join(args)
-        logger.info(f"[AppManager] Launching new {self.app_name}: {cmd}")
+        # Application.start uses Windows CreateProcess, not a shell. Quote each
+        # executable/argument using Windows command-line escaping rules.
+        cmd = subprocess.list2cmdline([valid_exe_path, *args])
+        logger.info('[AppManager] Launching new [redacted]: [redacted]')
         # Start the app application using pywinauto
         Application(backend="uia").start(cmd)
         for i in range(5):
@@ -69,21 +64,21 @@ class AppSessionManager:
                 self._app = Application(backend="uia").connect(title_re=self.config["window_title_re"])
                 main_window = self._app.window(title_re=self.config["window_title_re"], control_type="Window")
                 main_window.wait("exists", timeout=1)
-                logger.info(f"[AppManager] Launching new {self.app_name} using pywinauto: exists done")
+                logger.info('[AppManager] Launching new [redacted] using pywinauto: exists done')
                 main_window.wait("visible", timeout=1)
-                logger.info(f"[AppManager] Launching new {self.app_name} using pywinauto: visible done")
+                logger.info('[AppManager] Launching new [redacted] using pywinauto: visible done')
                 main_window.wait("enabled", timeout=1)
-                logger.info(f"[AppManager] Launching new {self.app_name} using pywinauto: done, cost: {time.time() - time_s:.3f} seconds")
+                logger.info('[AppManager] Launching new [redacted] using pywinauto: done, cost: [redacted] seconds')
                 launch_success = True
                 break
             except Exception as e:
-                logger.error(f"[AppManager] Launching new {self.app_name} the {i} time error: {repr(e)}")
+                logger.error('[AppManager] Launching new [redacted] the [redacted] time error: [redacted]')
         
         if launch_success:
             self._app = Application(backend="uia").connect(title_re=self.config["window_title_re"])
             return
         
-        raise RuntimeError(f"[AppManager] Failed to launch {self.app_name}. Please check the app executable path and arguments.")
+        raise RuntimeError('[AppManager] Failed to launch [redacted]. Please check the app executable path and arguments.')
 
     async def app_launch(
             self, 
@@ -102,11 +97,11 @@ class AppSessionManager:
                 await self._new_launch(args=args)
                 is_new_launch = True
         except ElementNotFoundError as e:
-            logger.error(f"[AppManager] Error connecting to existing app: {repr(e)}")
+            logger.error('[AppManager] Error connecting to existing app: [redacted]')
             await self._new_launch(args=args)
             is_new_launch = True
         except Exception as e:
-            logger.error(f"[AppManager] Error connecting to existing app: {repr(e)}")
+            logger.error('[AppManager] Error connecting to existing app: [redacted]')
             raise e
 
         return is_new_launch
@@ -120,7 +115,7 @@ class AppSessionManager:
                 self._app.kill()
                 self._app = None
             except Exception as e:
-                logger.error(f"[AppManager] Error closing app application: {repr(e)}")
+                logger.error('[AppManager] Error closing app application: [redacted]')
 
         else:
             logger.info("No app session to close.")
@@ -135,13 +130,13 @@ class AppSessionManager:
             try:
                 proc_exe = proc.info["exe"]
                 if proc_exe and os.path.normcase(os.path.normpath(proc_exe)) == exe_path:
-                    logger.info(f"Killing existing app process: PID={proc.pid}, Exe={proc_exe}")
+                    logger.info('Killing existing app process: PID=[redacted], Exe=[redacted]')
                     proc.kill()
                     killed = True
             except (psutil.NoSuchProcess, psutil.AccessDenied):
                 continue
             except Exception as e:
-                logger.error(f"Error checking/killing process {proc.pid} {proc_exe}: {repr(e)}")
+                logger.error('Error checking/killing process [redacted] [redacted]: [redacted]')
                 continue
 
         if killed:
@@ -159,15 +154,15 @@ class AppSessionManager:
         main_window = self._app.window(title_re=self.config["window_title_re"], control_type="Window")
         if not main_window.exists(timeout=1):
             self._app = None
-            logger.error(f"Main window with title '{self.config['window_title_re']}' not found.")
-            raise RuntimeError(f"Main window with title '{self.config['window_title_re']}' not found.")
+            logger.error("Main window with title '[redacted]' not found.")
+            raise RuntimeError("Main window with title '[redacted]' not found.")
         
         return main_window
     
     
     def get_screenshot_window(self):
         if not self._app:
-            logger.error(f"No app application instance found. Please launch the app first.")
+            logger.error('No app application instance found. Please launch the app first.')
             raise RuntimeError("No app application instance found. Please launch the app first.")     
         
         screenshot_window = self._app.window(
