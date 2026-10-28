@@ -1,6 +1,7 @@
 import json
 import os
 import sys
+import time
 import uuid
 from pathlib import Path
 
@@ -104,7 +105,8 @@ def test_eof_cancels_pending_tool_work(console_command, tmp_path, app_config):
     write_evidence("pending-tool-eof.json", {"trigger": "stdin EOF with pending app_wait", "exit_code": exit_code, "secret_scan": "passed"}, canary)
 
 
-def test_sigint_with_open_stdin_terminates_the_real_installed_server(tmp_path, app_config):
+@pytest.mark.parametrize("pending_tool", [False, True])
+def test_sigint_with_open_stdin_terminates_the_real_installed_server(tmp_path, app_config, pending_tool):
     business, config, canary = configured_business(tmp_path, app_config)
     # Schedule a genuine SIGINT in the child event loop. This works on Windows
     # CI without relying on an interactive console or CTRL_C process groups.
@@ -122,9 +124,17 @@ raise SystemExit(cli.main())
 """
     with ProtocolProcess([sys.executable, "-I", "-c", program, "--config", str(config)], business, {"AUTOGENESIS_ACCEPTANCE_API_KEY": canary}) as client:
         assert "result" in client.initialize()
+        if pending_tool:
+            client.send({"id": 1000, "method": "tools/call", "params": {"name": "app_wait", "arguments": {"caller": "acceptance", "duration": 60}}})
+            assert "result" in client.rpc("tools/list")
+        assert not client.process.stdin.closed
+        started = time.monotonic()
         exit_code = client.wait()
+        shutdown_seconds = time.monotonic() - started
+        assert not client.process.stdin.closed
         client.assert_no_secret(canary)
-    write_evidence("sigint.json", {"trigger": "SIGINT with stdin open", "exit_code": exit_code, "protocol_only_stdout": True, "secret_scan": "passed"}, canary)
+    name = "sigint-pending-tool.json" if pending_tool else "sigint.json"
+    write_evidence(name, {"trigger": "SIGINT with stdin open", "stdin_left_open": True, "pending_tool": pending_tool, "exit_code": exit_code, "shutdown_seconds": shutdown_seconds, "protocol_only_stdout": True, "secret_scan": "passed"}, canary)
 
 
 def test_source_entry_script_uses_the_installed_main_over_stdio(tmp_path, app_config):

@@ -46,7 +46,7 @@ def test_built_wheel_contains_every_runtime_module_and_only_public_templates():
     with zipfile.ZipFile(wheels[0]) as wheel:
         names = set(wheel.namelist())
         required = {
-            "__init__.py", "__main__.py", "cli.py", "server.py", "config.py", "security.py", "app_session.py",
+            "__init__.py", "__main__.py", "cli.py", "server.py", "config.py", "security.py", "app_session.py", "_windows_stdin.py",
             "tools/__init__.py", "tools/common_tool.py", "tools/mouse_tool.py", "tools/verify_tool.py", "tools/gen_code_tool.py",
             "utils/__init__.py", "utils/logger.py", "utils/response_format.py", "utils/element_util.py", "utils/gen_code.py",
             "llm/__init__.py", "llm/chat.py", "llm/prompt.py", "conf/config.schema.json", "conf/pywinauto_conf.json",

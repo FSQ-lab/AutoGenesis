@@ -28,6 +28,25 @@ def sanitized(text, environment):
     return re.sub(r"(https?://)[^/@\s]+:[^/@\s]+@", r"\1[REDACTED]@", text)
 
 
+def acceptance_environment(environment):
+    result = dict(environment)
+    for key in ("PYTEST_ADDOPTS", "PYTEST_PLUGINS"):
+        result.pop(key, None)
+    result["PYTEST_DISABLE_PLUGIN_AUTOLOAD"] = "1"
+    return result
+
+
+def run_acceptance_tests(python, tests, *, cwd, env, junit=None):
+    arguments = [
+        str(python), "-I", "-m", "pytest", "-p", "anyio.pytest_plugin",
+        "--import-mode=importlib", str(tests), "-o", "addopts=--strict-markers",
+        "-o", "markers=windows: requires the real Windows automation dependencies", "-ra",
+    ]
+    if junit is not None:
+        arguments.extend(["--junitxml", str(junit)])
+    return subprocess.run(arguments, cwd=cwd, env=acceptance_environment(env), capture_output=True, text=True, encoding="utf-8", errors="replace")
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--wheel-dir", required=True, type=Path)
@@ -44,9 +63,9 @@ def main():
     args.evidence_dir.mkdir(parents=True, exist_ok=True)
     evidence = args.evidence_dir.resolve(strict=True)
     package_root = Path(__file__).resolve().parents[1]
-    environment = os.environ.copy()
+    environment = acceptance_environment(os.environ)
     for key in list(environment):
-        if key in {"PYTHONPATH", "PYTHONHOME", "PYTEST_ADDOPTS", "PYTEST_PLUGINS"} or key.startswith("PIP_"):
+        if key in {"PYTHONPATH", "PYTHONHOME"} or key.startswith("PIP_"):
             environment.pop(key, None)
     environment.update({
         "PIP_CONFIG_FILE": os.devnull,
@@ -71,6 +90,8 @@ def main():
         # Only acceptance code and the real thin source launcher are copied.
         # Runtime and canonical assets must resolve exclusively from wheels.
         shutil.copytree(package_root / "tests", business / "tests", ignore=shutil.ignore_patterns("__pycache__", ".pytest_cache"))
+        (business / "scripts").mkdir()
+        shutil.copy2(Path(__file__), business / "scripts/verify_wheel.py")
         source = root / "source-run"
         source.mkdir()
         shutil.copy2(package_root / "simple_server.py", source / "simple_server.py")
@@ -105,18 +126,18 @@ print(json.dumps({
             "runner_image": os.environ.get("ImageOS"),
             "runner_image_version": os.environ.get("ImageVersion"),
             "verification_scope": "Windows package/protocol" if os.name == "nt" else "metadata/import only",
+            "pytest_plugin_autoload": False,
+            "pytest_explicit_plugins": ["anyio.pytest_plugin"],
             "wheels": [{"name": wheel.name, "sha256": hashlib.sha256(wheel.read_bytes()).hexdigest()} for wheel in wheels],
         })
         atomic_write(evidence, "environment.json", sanitized(json.dumps(identity, indent=2) + chr(10), environment))
         selected = business / "tests" if os.name == "nt" else business / "tests/test_package.py"
         junit = root / "pytest.xml"
         try:
-            run([
-                str(python), "-I", "-m", "pytest", "--import-mode=importlib", str(selected),
-                "-o", "addopts=--strict-markers",
-                "-o", "markers=windows: requires the real Windows automation dependencies",
-                "--junitxml", str(junit), "-ra",
-            ], business, "verification.log")
+            completed = run_acceptance_tests(python, selected, cwd=business, env=environment, junit=junit)
+            atomic_write(evidence, "verification.log", sanitized(completed.stdout + completed.stderr, environment))
+            if completed.returncode:
+                raise SystemExit("Clean-wheel verification failed; consult the sanitized evidence log.")
         finally:
             if junit.exists():
                 atomic_write(evidence, "pytest.xml", sanitized(junit.read_text(encoding="utf-8"), environment))

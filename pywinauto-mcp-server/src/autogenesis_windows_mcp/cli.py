@@ -59,18 +59,22 @@ class _Stdin:
         self.pending = b""
         self.closed = anyio.Event()
         self.fd = sys.stdin.fileno()
+        self.windows = None
         if sys.platform == "win32":
-            import msvcrt
-            msvcrt.setmode(self.fd, os.O_BINARY)
+            from ._windows_stdin import WindowsStdin
+            self.windows = WindowsStdin(self.fd)
 
     def __aiter__(self):
         return self
 
     async def __anext__(self):
-        # os.read avoids holding BufferedReader's lock in an abandoned worker,
-        # which otherwise can deadlock/fail interpreter finalization on SIGINT.
         while bytes([10]) not in self.pending:
-            chunk = await anyio.to_thread.run_sync(os.read, self.fd, 4096, abandon_on_cancel=True)
+            if self.windows is not None:
+                chunk = await self.windows.read(4096)
+            else:
+                # POSIX keeps the existing raw reader; Windows never starts a
+                # worker blocked in ReadFile on an open, idle stdin pipe.
+                chunk = await anyio.to_thread.run_sync(os.read, self.fd, 4096, abandon_on_cancel=True)
             if not chunk:
                 if not self.pending:
                     self.closed.set()

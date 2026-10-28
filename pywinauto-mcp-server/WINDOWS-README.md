@@ -156,7 +156,7 @@ Visual verification retains the Azure OpenAI and local provider paths;
 AZURE_OPENAI_API_KEY and AZURE_OPENAI_ENDPOINT are read from the environment.
 No provider implementation needs credential edits.
 
-## Integration Lead verification (not executed by the implementer)
+## Clean wheel verification
 
 From the repository root, build both artifacts and verify them in a clean
 Windows temporary business project:
@@ -171,13 +171,16 @@ python pywinauto-mcp-server/scripts/verify_wheel.py --wheel-dir C:/artifacts --m
 
 Use a new artifacts directory with exactly one wheel per distribution. The
 verifier creates a new venv and business directory, installs both local wheels,
-copies only acceptance tests and the thin source launcher, and runs from that
+copies only the acceptance harness and thin source launcher, and runs from that
 business directory with isolated Python imports. It records wheel hashes,
 runner image/version, installed module locations, install log, test report,
 full protocol responses, the 22-tool snapshot, canonical prompts/identity,
 EOF shutdown, SIGINT shutdown, and secret-canary results. Canary-bearing output
 is rejected before protocol evidence is written. On Linux, only metadata,
 package-data and import tests are selected; this is not Windows acceptance.
+Pytest entry-point autoload is disabled, inherited PYTEST_PLUGINS/ADDOPTS are
+cleared, and AnyIO is explicitly loaded. A synthetic installed plugin verifies
+that third-party entry points cannot affect acceptance.
 
 The SHA-pinned windows-package workflow covers Windows Server 2022 and Ubuntu
 24.04, Python 3.10/3.12 and MCP SDK 1.23.0/1.29.1. Windows UI interaction still
@@ -191,6 +194,10 @@ The transport uses one private FastMCP server handle to supply cancellable
 stdin and sanitized wire errors; both SDK versions have explicit protocol
 coverage. Input schemas and transport flags remain unchanged. Logs are now
 stderr metadata only; MCP_LOG_FILE and AGENT_INDEX no longer create log files.
+Windows pipe readiness and console keyboard readiness are polled asynchronously,
+so SIGINT does not leave a worker blocked on open stdin. EOF also cancels pending
+tool work. The Windows acceptance suite exercises both idle and pending-tool
+SIGINT while the client's stdin pipe remains open.
 
 Known credentials and password-control inputs are redacted from previews and
 generated code with [REDACTED] placeholders. Those values require reviewed
