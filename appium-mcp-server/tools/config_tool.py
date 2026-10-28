@@ -1,5 +1,7 @@
 # tools/config_tool.py
 
+from typing import Optional
+
 from utils.logger import get_mcp_logger
 
 logger = get_mcp_logger()
@@ -51,7 +53,7 @@ def register_config_tools(mcp, config_manager):
             }
 
     @mcp.tool()
-    def get_current_config(platform: str = None) -> dict:
+    def get_current_config(platform: Optional[str] = None) -> dict:
         """
         Get the current configuration.
 

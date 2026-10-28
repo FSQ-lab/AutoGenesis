@@ -82,12 +82,11 @@ def register_common_tools(mcp, app_manager):
             resp["data"] = {"path": path, "step_raw": step_raw}
 
             resp["status"] = "success"
-            print(f"Screenshot saved to {path}")
+            logger.info(f"Screenshot saved to {path}")
         except Exception as e:
             resp["status"] = "error"
             resp["error"] = repr(e)
             logger.error(f"Error taking app screenshot: {e}")
-            print(f"Error taking screenshot: {e}")
         return format_tool_response(resp)
 
 
