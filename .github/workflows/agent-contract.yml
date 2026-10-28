@@ -1,0 +1,69 @@
+name: Agent Contract
+
+on:
+  pull_request:
+    branches: [main, feature/agent-integration]
+    paths:
+      - 'agent-contract/**'
+      - '.github/skills/autoGenesis-run/SKILL.md'
+      - '.github/skills/autoGenesis-win/SKILL.md'
+      - '.github/workflows/agent-contract.yml'
+  push:
+    branches: [feature/agent-integration]
+    paths:
+      - 'agent-contract/**'
+      - '.github/skills/autoGenesis-run/SKILL.md'
+      - '.github/skills/autoGenesis-win/SKILL.md'
+      - '.github/workflows/agent-contract.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: agent-contract-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  contract:
+    name: ${{ matrix.os }} / Python ${{ matrix.python }} / MCP ${{ matrix.mcp }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, windows-2022]
+        python: ['3.10', '3.12']
+        mcp: ['1.23.0', '1.29.1']
+    steps:
+      - name: Preserve exact LF asset bytes on every runner
+        run: git config --global core.autocrlf false
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - name: Setup Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Check release and generated Skills
+        run: |
+          python agent-contract/tools/freeze_assets.py
+          python agent-contract/tools/sync_skills.py --check
+      - name: Install wheel builder
+        run: python -m pip --disable-pip-version-check install 'build>=1.2,<2'
+      - name: Build contract wheel
+        run: python -m build --wheel --outdir '${{ runner.temp }}/contract-wheel' agent-contract
+      - name: Verify installed wheel in a fresh business project
+        run: >-
+          python agent-contract/tools/verify_wheel.py
+          --wheel-dir '${{ runner.temp }}/contract-wheel'
+          --mcp-version '${{ matrix.mcp }}'
+          --evidence-dir '${{ runner.temp }}/contract-evidence'
+      - name: Upload wheel and protocol evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: agent-contract-${{ matrix.os }}-py${{ matrix.python }}-mcp${{ matrix.mcp }}
+          path: |
+            ${{ runner.temp }}/contract-wheel
+            ${{ runner.temp }}/contract-evidence
+          if-no-files-found: warn

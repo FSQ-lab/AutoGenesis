@@ -1,0 +1,25 @@
+[build-system]
+requires = ["setuptools>=77,<81", "wheel>=0.45,<1"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "autogenesis-agent-contract"
+version = "1.0.0"
+description = "Versioned AutoGenesis policy, workflows, and MCP prompt projections"
+readme = "README.md"
+requires-python = ">=3.10"
+license = "MIT"
+dependencies = ["mcp>=1.23,<2", "jsonschema>=4.20,<5"]
+
+[project.optional-dependencies]
+test = ["pytest>=8.3,<9"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+autogenesis_agent_contract = ["py.typed", "assets/*.json", "assets/*.md", "assets/workflows/*.md", "assets/skills/*/SKILL.md", "assets/schemas/*.json"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "--strict-markers"
