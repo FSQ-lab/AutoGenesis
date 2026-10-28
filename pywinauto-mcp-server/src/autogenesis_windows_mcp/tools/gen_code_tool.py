@@ -1,4 +1,8 @@
-from ..security import safe_error
+from autogenesis_agent_contract import (
+    SECRET_REFERENCE_REQUIRED, SecretBindings, SecretReferenceError,
+    apply_bindings, serialize,
+)
+from ..safe_output import safe_error
 # Copyright (c) Microsoft Corporation.
 # Licensed under the MIT license.
 
@@ -74,12 +78,15 @@ def register_gen_code_tools(mcp, app_manager):
     
     @mcp.tool()
     @log_tool_call
-    async def preview_code_changes() -> str:
+    async def preview_code_changes(secret_bindings: SecretBindings | None = None) -> str:
         """Preview generated test code changes and confirm before applying"""
+        if app_manager.recording_warnings:
+            raise SecretReferenceError(SECRET_REFERENCE_REQUIRED, app_manager.recording_warnings[0])
         if not app_manager.gen_code_id or not app_manager.gen_code_cache:
             return "No pending code changes to preview"
         
-        result = gen_code_preview(app_manager)
+        bound_cache = serialize(apply_bindings(app_manager.gen_code_cache, secret_bindings))
+        result = gen_code_preview(app_manager, bound_cache)
     
         return result.get('diff_preview')
 
@@ -88,7 +95,7 @@ def register_gen_code_tools(mcp, app_manager):
     @log_tool_call
     async def confirm_code_changes() -> str:
         """Confirm the previewed code changes"""
-        if not hasattr(app_manager, 'proposed_changes') or not app_manager.proposed_changes:
+        if not getattr(app_manager, 'pending_write', None):
             return "No pending code changes to confirm"
         
         if not ensure_step_path_exists(app_manager.step_file_target):
@@ -96,10 +103,7 @@ def register_gen_code_tools(mcp, app_manager):
         
         try:
             with open(app_manager.step_file_target, 'a', encoding='utf-8') as f:
-                if hasattr(app_manager, 'header_code') and app_manager.header_code:
-                    f.write(app_manager.header_code + "\n")
-                for item in app_manager.proposed_changes:
-                    f.write(item + "\n")
+                f.write(app_manager.pending_write)
             
             result = f"Applied {len(app_manager.proposed_changes)} new steps to {app_manager.step_file_target}"
             app_manager.new_steps_count = len(app_manager.proposed_changes)

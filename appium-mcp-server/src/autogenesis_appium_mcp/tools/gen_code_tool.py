@@ -1,6 +1,10 @@
 # Copyright (c) Microsoft Corporation.
 # Licensed under the MIT license.
 
+from autogenesis_agent_contract import (
+    SECRET_REFERENCE_REQUIRED, SecretBindings, SecretReferenceError,
+    apply_bindings, serialize,
+)
 import json
 import os
 import re
@@ -14,7 +18,7 @@ from ..utils.gen_code import HEADER_AUTO_GEN, STEPS_DIR_DEFAULT, TARGET_STEP_FIL
 from ..utils.gen_code import gen_code_preview, ensure_step_path_exists, gen_step_file_from_feature_path, parse_steps_dir_from_step_path
 from ..utils.response_format import format_tool_response, init_tool_response
 from ..utils.logger import get_mcp_logger
-from ..utils.redaction import redact
+
 
 
 logger = get_mcp_logger()
@@ -77,18 +81,21 @@ def register_gen_code_tools(mcp, browser_manager):
     
     @mcp.tool()
     @log_tool_call
-    async def preview_code_changes() -> str:
+    async def preview_code_changes(secret_bindings: SecretBindings | None = None) -> str:
         """Preview generated test code changes and confirm before applying"""
         resp = init_tool_response()
         
+        if browser_manager.recording_warnings:
+            raise SecretReferenceError(SECRET_REFERENCE_REQUIRED, browser_manager.recording_warnings[0])
         if not browser_manager.gen_code_id or not browser_manager.gen_code_cache:
             resp["status"] = "success"
             resp["data"] = {"message": "No pending code changes to preview"}
             return json.dumps(format_tool_response(resp))
         
-        result = gen_code_preview(browser_manager)
+        bound_cache = serialize(apply_bindings(browser_manager.gen_code_cache, secret_bindings))
+        result = gen_code_preview(browser_manager, bound_cache)
         resp["status"] = "success"
-        resp["data"] = {"diff_preview": result.get('diff_preview')}
+        resp["data"] = {"diff_preview": result.get('diff_preview'), "append_payload": result.get('append_payload')}
         
         return json.dumps(format_tool_response(resp))
 
@@ -98,7 +105,7 @@ def register_gen_code_tools(mcp, browser_manager):
         """Confirm the previewed code changes"""
         resp = init_tool_response()
         
-        if not hasattr(browser_manager, 'proposed_changes') or not browser_manager.proposed_changes:
+        if not getattr(browser_manager, "pending_write", None):
             resp["status"] = "success"
             resp["data"] = {"message": "No pending code changes to confirm"}
             return json.dumps(format_tool_response(resp))
@@ -110,10 +117,7 @@ def register_gen_code_tools(mcp, browser_manager):
         
         try:
             with open(browser_manager.step_file_target, 'a', encoding='utf-8') as f:
-                if hasattr(browser_manager, 'header_code') and browser_manager.header_code:
-                    f.write(redact(browser_manager.header_code) + "\n")
-                for item in redact(browser_manager.proposed_changes):
-                    f.write(item + "\n")
+                f.write(browser_manager.pending_write)
             
             result = f"Applied {len(browser_manager.proposed_changes)} new steps to {browser_manager.step_file_target}"
             browser_manager.new_steps_count = len(browser_manager.proposed_changes)

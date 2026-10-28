@@ -122,9 +122,9 @@ def test_stdio_initialize_tools_prompts_identity_config_and_eof(platform, count,
     # Deliberately unreachable: any eager session creation breaks acceptance.
     profile = {
         "platformName": platform,
-        "server_url": "http://user:" + PRIVATE + "@127.0.0.1:9/?token=" + PRIVATE,
-        "bstack:options": {"accessKey": "$" + "{APPIUM_WIRE_ACCESS_KEY}"},
-        "nested": [{"text": PRIVATE}], PRIVATE: PRIVATE,
+        "server_url": "http://127.0.0.1:9/",
+        "bstack:options": {"accessKey": "${APPIUM_WIRE_ACCESS_KEY}"},
+        "nested": [{"password": "${APPIUM_WIRE_ACCESS_KEY}"}],
     }
     config = tmp_path / "appium.json"
     config.write_text(json.dumps({"APPIUM_DRIVER_CONFIGS": {platform: profile}}))

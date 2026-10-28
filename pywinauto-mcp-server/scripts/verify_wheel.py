@@ -52,13 +52,14 @@ def main():
     parser.add_argument("--wheel-dir", required=True, type=Path)
     parser.add_argument("--mcp-version", required=True, choices=["1.23.0", "1.29.1"])
     parser.add_argument("--evidence-dir", required=True, type=Path)
+    parser.add_argument("--index-url", help="Optional package index for clean dependency resolution")
     args = parser.parse_args()
     wheel_dir = args.wheel_dir.resolve(strict=True)
     wheels = []
-    for pattern in ("autogenesis_agent_contract-1.0.0-*.whl", "autogenesis_windows_mcp-0.1.0-*.whl"):
+    for pattern in ("autogenesis_agent_contract-1.1.0-*.whl", "autogenesis_windows_mcp-0.2.0-*.whl"):
         candidates = sorted(wheel_dir.glob(pattern))
         if len(candidates) != 1:
-            raise SystemExit("Supply exactly one local contract 1.0.0 wheel and one Windows runtime 0.1.0 wheel.")
+            raise SystemExit("Supply exactly one local contract 1.1.0 wheel and one Windows runtime 0.2.0 wheel.")
         wheels.append(candidates[0])
     args.evidence_dir.mkdir(parents=True, exist_ok=True)
     evidence = args.evidence_dir.resolve(strict=True)
@@ -98,11 +99,16 @@ def main():
         environment["AUTOGENESIS_SOURCE_SCRIPT"] = str(source / "simple_server.py")
         venv.create(root / "venv", with_pip=True)
         python = root / "venv" / ("Scripts/python.exe" if os.name == "nt" else "bin/python")
-        run([
+        install = [
             str(python), "-I", "-m", "pip", "--disable-pip-version-check", "install",
-            "--index-url", "https://pypi.org/simple", *map(str, wheels),
-            "mcp==" + args.mcp_version, "pytest>=8.3,<9", "packaging>=24,<27",
-        ], business, "install.log")
+        ]
+        if args.index_url:
+            install.extend(["--index-url", args.index_url])
+        install.extend([
+            *map(str, wheels), "mcp==" + args.mcp_version,
+            "pytest>=8.3,<9", "packaging>=24,<27",
+        ])
+        run(install, business, "install.log")
         identity_program = """
 import json
 import platform

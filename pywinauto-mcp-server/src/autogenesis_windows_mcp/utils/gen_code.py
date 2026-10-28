@@ -13,7 +13,7 @@ import functools
 import pprint
 import textwrap
 from pathlib import Path
-from ..security import scrub
+from autogenesis_agent_contract import UnboundSecret, mark_control_argument_secret, record_arguments
 
 
 logger = logging.getLogger(__name__)
@@ -100,14 +100,6 @@ def generate_args_data_multi_param(step_info: dict):
 
 
 def generate_step_definition(step_info) -> str:
-    # Redact supplied literal values before Python quoting, keeping fixed code
-    # and parameter names intact even when a credential is a short string.
-    step_info["tool_params"] = {key: scrub(value) for key, value in step_info.get("tool_params", {}).items()}
-    for key in ("step_text_raw", "step_text_parameterized"):
-        if key in step_info:
-            step_info[key] = scrub(step_info[key])
-    if "parameterized_args" in step_info:
-        step_info["parameterized_args"] = {key: scrub(value) for key, value in step_info["parameterized_args"].items()}
     parameterized_args = step_info.get('parameterized_args', {})
     has_params = len(parameterized_args) > 0
     
@@ -218,7 +210,7 @@ def extract_step_patterns(step_path):
     return patterns
 
 
-def gen_code_preview(app_manager) -> dict:
+def gen_code_preview(app_manager, cache=None) -> dict:
     new_steps_code = []
     existing_code = ""
     
@@ -229,7 +221,7 @@ def gen_code_preview(app_manager) -> dict:
     if not step_file_target_path.exists() or os.path.getsize(step_file_target_path) == 0:
         app_manager.header_code = HEADER_AUTO_GEN
 
-    steps = extract_steps_from_cache(app_manager.gen_code_id, app_manager.gen_code_cache)
+    steps = extract_steps_from_cache(app_manager.gen_code_id, app_manager.gen_code_cache if cache is None else cache)
     logger.info('Processing [redacted] extracted steps')
 
     new_add_patterns = ()
@@ -247,19 +239,19 @@ def gen_code_preview(app_manager) -> dict:
 
     app_manager.proposed_changes = new_steps_code
     app_manager.new_steps_count = len(new_steps_code)
-    
     if not new_steps_code:
-        return {'diff_preview': "No new code changes to apply - all steps already exist", 'new_steps_code': []}
-    
-    max_show_size = 5
-    new_steps_code_show = new_steps_code[:max_show_size]  # Show only first 5 lines for preview
-
-    diff_preview = "+++ New Code to Add +++\n"
-    diff_preview += "".join(new_steps_code_show)
-    if len(new_steps_code) > max_show_size:
-        diff_preview += f"\n... and {len(new_steps_code) - max_show_size} more steps\n"
-    
-    return {'diff_preview': diff_preview, 'new_steps_code': new_steps_code}
+        app_manager.pending_write = None
+        return {'diff_preview': "No new code changes to apply - all steps already exist", 'new_steps_code': [], 'append_payload': ''}
+    parts = []
+    if app_manager.header_code:
+        parts.append(app_manager.header_code + "\n")
+    parts.extend(item + "\n" for item in new_steps_code)
+    app_manager.pending_write = "".join(parts)
+    return {
+        'diff_preview': app_manager.pending_write,
+        'new_steps_code': new_steps_code,
+        'append_payload': app_manager.pending_write,
+    }
 
 def gen_code_preview_test(gen_code_id, gen_code_cache) -> str:
     from ..app_session import AppSessionManager
@@ -387,7 +379,8 @@ def gen_step_file_from_feature_path(feature_file: str):
     if is_feature_file:
         step_file_name = rel_path.stem + ".py"
     elif rel_path.stem:
-        step_file_name = rel_path.stem + "\common_step.py"
+        step_file_dir = step_file_dir / rel_path.stem
+        step_file_name = "common_step.py"
     step_file_path = step_file_dir / step_file_name
     os.makedirs(step_file_dir, exist_ok=True)
   
@@ -411,18 +404,42 @@ def record_calls(app_manager):
                 json_result = json.loads(result)
                 if json_result.get("status") != "success":
                     return result
+                if app_manager.gen_code_id and func.__name__ == "send_keystrokes":
+                    warning = "reauthor.send_keystrokes"
+                    if warning not in app_manager.recording_warnings:
+                        app_manager.recording_warnings.append(warning)
+                    app_manager.pending_write = None
+                    app_manager.proposed_changes = None
+                    return result
                 call_info = {}
-                tool_params = log_params(func, *args, **kwargs)
+                bound_arguments = inspect.signature(func).bind_partial(*args, **kwargs).arguments
+                mark_control_argument_secret(bound_arguments, "content")
+                tool_params = record_arguments(func, args, kwargs)
+                reauthor = []
+                for parameter, recorded in tool_params.items():
+                    secret = bound_arguments.get(parameter)
+                    if isinstance(recorded, UnboundSecret) and isinstance(secret, str) and secret:
+                        for field in ("step", "step_raw", "scenario"):
+                            value = tool_params.get(field)
+                            if isinstance(value, str) and secret in value:
+                                reauthor.append(UnboundSecret(**{
+                                    "$secret": f"unbound:reauthor.{func.__name__}.{field}"
+                                }))
                 if app_manager.gen_code_id and (tool_params.get('step_raw', '') or tool_params.get('step', '')):
                     tool_params['caller'] = 'behave-automation'
                     call_info['scenario'] = tool_params.pop('scenario', '')
-                    # call_info['step'] = tool_params.pop('step', '')
-                    step_raw = tool_params.pop('step_raw', '').strip()
-                    step_ai = tool_params.pop('step', '').strip()
-                    call_info['step'] = step_raw if step_raw else step_ai
+                    step_raw = tool_params.pop('step_raw', '')
+                    step_ai = tool_params.pop('step', '')
+                    if reauthor:
+                        call_info['secret_requirements'] = reauthor
+                        call_info['step'] = "Secret-bearing step requires re-authoring"
+                    else:
+                        call_info['step'] = step_raw.strip() if step_raw.strip() else step_ai.strip()
                     call_info['gen_code_id'] = app_manager.gen_code_id
                     call_info['tool_name'] = func.__name__
                     call_info['tool_params'] = tool_params
+                    app_manager.pending_write = None
+                    app_manager.proposed_changes = None
                     app_manager.gen_code_cache.append(call_info)
                     logger.info('record_calls: call_info=[redacted]')
                 else:

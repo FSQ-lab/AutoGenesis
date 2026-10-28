@@ -4,12 +4,12 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "autogenesis-agent-contract"
-version = "1.0.0"
+version = "1.1.0"
 description = "Versioned AutoGenesis policy, workflows, and MCP prompt projections"
 readme = "README.md"
 requires-python = ">=3.10"
 license = "MIT"
-dependencies = ["mcp>=1.23,<2", "jsonschema>=4.20,<5"]
+dependencies = ["mcp>=1.23,<2", "jsonschema>=4.20,<5", "pydantic>=2.7,<3"]
 
 [project.optional-dependencies]
 test = ["pytest>=8.3,<9"]

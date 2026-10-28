@@ -16,15 +16,23 @@ from conftest import reference_server
 
 @pytest.mark.anyio
 @pytest.mark.parametrize("platform,count", [("ios", 31), ("android", 30), ("mac", 35)])
-async def test_exact_legacy_names_and_input_schemas_without_driver(platform, count, config_path, monkeypatch):
+async def test_versioned_tool_names_and_secret_ref_schemas_without_driver(platform, count, config_path, monkeypatch):
     forbidden = Mock(side_effect=AssertionError("Discovery attempted a device session"))
     monkeypatch.setattr("autogenesis_appium_mcp.driver_session.webdriver.Remote", forbidden)
     runtime = server.Runtime(platform, config_path)
     try:
         actual = {tool.name: tool.inputSchema for tool in await runtime.server.list_tools()}
         expected = {tool.name: tool.inputSchema for tool in await reference_server(platform).list_tools()}
-        assert len(actual) == count
-        assert actual == expected
+        assert len(actual) == count and set(actual) == set(expected)
+        changed = {"app_launch", "send_keys", "preview_code_changes", "send_keys_on_macos"}
+        assert {name: schema for name, schema in actual.items() if name not in changed} == {
+            name: schema for name, schema in expected.items() if name not in changed
+        }
+        for name in ({"send_keys"} | ({"send_keys_on_macos"} if platform == "mac" else set())):
+            variants = actual[name]["properties"]["text"]["anyOf"]
+            assert {variant.get("type", "ref") for variant in variants} == {"string", "ref"}
+        argument_items = actual["app_launch"]["properties"]["arguments"]["anyOf"][0]["items"]
+        assert argument_items == {"type": "string"}
         assert runtime.driver.device == platform
         assert runtime.driver._driver is None
         assert runtime.config._observer is None
@@ -36,8 +44,8 @@ async def test_exact_legacy_names_and_input_schemas_without_driver(platform, cou
 def test_platform_transport_and_config_selection(config_path, tmp_path, monkeypatch):
     defaults = server.parse_args([])
     assert (defaults.platform, defaults.transport, defaults.config) == ("ios", "stdio", None)
-    selected = server.parse_args(["--platform", "mac", "--transport", "sse", "--config", str(config_path)])
-    assert (selected.platform, selected.transport, selected.config) == ("mac", "sse", str(config_path))
+    selected = server.parse_args(["--platform", "mac", "--transport", "stdio", "--config", str(config_path)])
+    assert (selected.platform, selected.transport, selected.config) == ("mac", "stdio", str(config_path))
     monkeypatch.chdir(tmp_path)
     bundled = ConfigManager()
     assert bundled.initial_loaded and bundled._use_template

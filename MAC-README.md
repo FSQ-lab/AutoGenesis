@@ -12,7 +12,7 @@ Obtain the built runtime and Agent Contract wheels from the Integration Lead.
 No AutoGenesis checkout is needed. In an activated virtual environment:
 
 ```bash
-python -m pip install /absolute/wheels/autogenesis_agent_contract-1.0.0-py3-none-any.whl /absolute/wheels/autogenesis_appium_mcp-0.1.0-py3-none-any.whl
+python -m pip install /absolute/wheels/autogenesis_agent_contract-1.1.0-py3-none-any.whl /absolute/wheels/autogenesis_appium_mcp-0.2.0-py3-none-any.whl
 python -c "from importlib.resources import files; from pathlib import Path; Path('appium.json').write_bytes(files('autogenesis_appium_mcp').joinpath('conf/appium_conf.template.json').read_bytes())"
 autogenesis-appium-mcp --platform mac --config /absolute/business/appium.json
 ```
@@ -25,17 +25,17 @@ stdout is reserved for MCP; diagnostics use stderr.
 With uvx and local artifacts:
 
 ```bash
-uvx --from /absolute/wheels/autogenesis_appium_mcp-0.1.0-py3-none-any.whl --with /absolute/wheels/autogenesis_agent_contract-1.0.0-py3-none-any.whl autogenesis-appium-mcp --platform mac --config /absolute/business/appium.json
+uvx --from /absolute/wheels/autogenesis_appium_mcp-0.2.0-py3-none-any.whl --with /absolute/wheels/autogenesis_agent_contract-1.1.0-py3-none-any.whl autogenesis-appium-mcp --platform mac --config /absolute/business/appium.json
 ```
 
 Once both packages are published to the configured index:
 
 ```bash
-uvx --from autogenesis-appium-mcp==0.1.0 autogenesis-appium-mcp --platform mac --config /absolute/business/appium.json
+uvx --from autogenesis-appium-mcp==0.2.0 autogenesis-appium-mcp --platform mac --config /absolute/business/appium.json
 ```
 
-Agent Contract is pinned to **1.0.0**, manifest SHA-256
-`302a8d779a3c30c26f8c5d801fcf06852f802eeaf18e677924a1d9a791b93412`.
+Agent Contract is pinned to **1.1.0**, manifest SHA-256
+`80266f59b8ed32c83e374c870817f018361067c0aec6b7ce2b02b8f835850462`.
 A mismatched or corrupt contract prevents startup.
 
 ## Configure Mac2
@@ -74,19 +74,18 @@ Selection order is `--config`, business `conf/appium_conf.json`, then the bundle
 local-server template. Installed package files are never modified. Business config
 files hot reload after edits or atomic replacement; invalid edits retain the last
 valid snapshot. Settings apply to the next session. `reload_config` reloads the
-file; `get_current_config` masks values recursively. Whole-string
-`${VARIABLE}` references resolve environment variables; missing variables reject
-the config. Keep secrets in the environment. Optional Azure visual verification
-uses `AZURE_OPENAI_API_KEY` and `AZURE_OPENAI_ENDPOINT`.
+file; `get_current_config` returns literals and SecretRefs without resolving them.
+Whole-string `${VARIABLE}` references remain valid even when the variable is not
+present at discovery time; the selected operation fails safely if resolution is
+still unavailable at execution. Optional Azure visual verification reads its
+credentials only when constructing the provider client.
 
-Redaction retains at most 256 recent credential/password values and 64 KiB of
-UTF-8 value bytes for later snapshots and generated previews. Least recently
-used values are evicted; oversized values are not retained. Identified fields
-and the current tool response remain protected, but an evicted value appearing
-later in unrelated free text cannot be recognized. Free-text matches require
-whole values or non-alphanumeric boundaries; controlled status values stay intact.
-Recorded passwords are masked in replay previews and files. Replace masked
-replay inputs with environment-variable references before running the replay.
+Credential capabilities must use lossless references such as
+`{"$secret":"env:BROWSERSTACK_ACCESS_KEY"}` in MCP tool arguments or
+`${BROWSERSTACK_ACCESS_KEY}` in JSON configuration. Plaintext credential fields
+are rejected. Generated steps retain the reference and resolve it only during
+execution; they never persist plaintext or `[REDACTED]` placeholders.
+
 
 ## Configure an MCP client
 
@@ -107,7 +106,7 @@ For a command on PATH, `.vscode/mcp.json` can contain:
 Cursor uses the same command/arguments under `mcpServers`. Use an absolute command
 path for a virtual environment, or `uvx` with the artifact arguments above.
 stdin closure or process termination stops watchers and releases driver resources.
-Explicit `--transport sse` preserves the legacy local SSE option.
+The installed and source entrypoints expose stdio only.
 
 Canonical workflows are prompts `execute_scenario`, `generate_scenario_test`,
 and `execute_natural_language_task`. Identity is available at
@@ -121,7 +120,7 @@ step paths retain their existing behavior.
 From the AutoGenesis repository root, in an activated development environment:
 
 ```bash
-python -m pip install /absolute/wheels/autogenesis_agent_contract-1.0.0-py3-none-any.whl -e ./appium-mcp-server
+python -m pip install /absolute/wheels/autogenesis_agent_contract-1.1.0-py3-none-any.whl -e ./appium-mcp-server
 python appium-mcp-server/simple_server.py --platform mac --config /absolute/business/appium.json
 ```
 

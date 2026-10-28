@@ -15,7 +15,7 @@ class StdoutStub:
         pass
 
 
-@pytest.mark.parametrize("transport", ["stdio", "sse"])
+@pytest.mark.parametrize("transport", ["stdio"])
 def test_sync_main_preserves_app_config_transport_and_source_defaults(monkeypatch, transport):
     calls = []
     monkeypatch.setattr(cli, "configure_logging", lambda: None)
@@ -28,8 +28,8 @@ def test_sync_main_preserves_app_config_transport_and_source_defaults(monkeypatc
     assert cli.main(["--app", "second", "--config", "apps.json", "--transport", transport]) == 0
     assert calls == [("second", "apps.json"), {"selected": True}, ("server", transport)]
     calls.clear()
-    assert cli.main([], default_config=Path("source.json"), default_transport="sse") == 0
-    assert calls[-1] == ("server", "sse")
+    assert cli.main([], default_config=Path("source.json"), default_transport="stdio") == 0
+    assert calls[-1] == ("server", "stdio")
     assert calls[0] == (None, Path("source.json"))
     calls.clear()
     assert cli.main([]) == 0

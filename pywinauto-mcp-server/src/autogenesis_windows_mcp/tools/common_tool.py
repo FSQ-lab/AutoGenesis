@@ -1,4 +1,5 @@
-from ..security import safe_error
+from autogenesis_agent_contract import SecretInput, require_sensitive_target
+from ..safe_output import safe_error
 # Copyright (c) Microsoft Corporation.
 # Licensed under the MIT license.
 
@@ -308,8 +309,8 @@ def register_common_tools(mcp, app_manager):
     @record_calls(app_manager)
     async def send_keystrokes(
         caller: str, 
-        key_sequence_raw: str, 
-        key_sequence_formatted: str, 
+        key_sequence_raw: str,
+        key_sequence_formatted: str,
         step_raw: str = '', 
         step: str = '', 
         scenario: str = '', 
@@ -350,7 +351,7 @@ def register_common_tools(mcp, app_manager):
         caller: str, 
         control_framework: str,        
         title: str, 
-        content:str, 
+        content: SecretInput,
         control_type: str, 
         automation_id: str, 
         control_idx: int = 1,
@@ -392,6 +393,7 @@ def register_common_tools(mcp, app_manager):
         """
 
         resp = init_tool_response()
+        require_sensitive_target("content", title, control_type, automation_id, class_name)
         try:
             if control_framework == "pywinauto":
                 element, exists, search_kwargs, parent_search_kwargs = await find_element_by_kwargs(

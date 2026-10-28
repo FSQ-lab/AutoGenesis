@@ -1,6 +1,7 @@
 # Copyright (c) Microsoft Corporation.
 # Licensed under the MIT license.
 
+from autogenesis_agent_contract import UnboundSecret, record_arguments
 import copy
 import json
 import re
@@ -13,7 +14,7 @@ import functools
 import pprint
 import textwrap
 from pathlib import Path
-from .redaction import redact
+
 
 
 logger = logging.getLogger(__name__)
@@ -276,7 +277,7 @@ def extract_step_patterns(step_path):
     return patterns
 
 
-def gen_code_preview(browser_manager) -> dict:
+def gen_code_preview(browser_manager, cache=None) -> dict:
     new_steps_code = []
     existing_code = ""
     
@@ -285,7 +286,7 @@ def gen_code_preview(browser_manager) -> dict:
     existing_patterns = extract_step_patterns(step_file)
     step_file_target_path = Path(browser_manager.step_file_target)
     
-    steps = extract_steps_from_cache(browser_manager.gen_code_id, redact(browser_manager.gen_code_cache, parse_strings=False))
+    steps = extract_steps_from_cache(browser_manager.gen_code_id, browser_manager.gen_code_cache if cache is None else cache)
     logger.info("Operation diagnostic; private details omitted")
 
     # 先处理所有步骤，生成步骤定义，这样才能设置 need_package_import
@@ -317,22 +318,22 @@ def gen_code_preview(browser_manager) -> dict:
             new_steps_code.append(step_code)
             new_add_patterns += ((step_type, step_text.lower()),)
 
-    new_steps_code = redact(new_steps_code)
+    # Persist exactly the bytes shown by preview; confirmation writes this one payload.
     browser_manager.proposed_changes = new_steps_code
     browser_manager.new_steps_count = len(new_steps_code)
-    
     if not new_steps_code:
-        return {'diff_preview': "No new code changes to apply - all steps already exist", 'new_steps_code': []}
-    
-    max_show_size = 5
-    new_steps_code_show = new_steps_code[:max_show_size]
-
-    diff_preview = "+++ New Code to Add +++\n"
-    diff_preview += "".join(new_steps_code_show)
-    if len(new_steps_code) > max_show_size:
-        diff_preview += f"\n... and {len(new_steps_code) - max_show_size} more steps\n"
-    
-    return {'diff_preview': diff_preview, 'new_steps_code': new_steps_code}
+        browser_manager.pending_write = None
+        return {'diff_preview': "No new code changes to apply - all steps already exist", 'new_steps_code': [], 'append_payload': ''}
+    parts = []
+    if browser_manager.header_code:
+        parts.append(browser_manager.header_code + "\n")
+    parts.extend(item + "\n" for item in new_steps_code)
+    browser_manager.pending_write = "".join(parts)
+    return {
+        'diff_preview': browser_manager.pending_write,
+        'new_steps_code': new_steps_code,
+        'append_payload': browser_manager.pending_write,
+    }
 
 
 def ensure_step_path_exists(step_file: str) -> bool:
@@ -453,7 +454,8 @@ def gen_step_file_from_feature_path(feature_file: str):
     if is_feature_file:
         step_file_name = rel_path.stem + ".py"
     elif rel_path.stem:
-        step_file_name = rel_path.stem + "\\common_step.py"
+        step_file_dir = step_file_dir / rel_path.stem
+        step_file_name = "common_step.py"
     step_file_path = step_file_dir / step_file_name
     os.makedirs(step_file_dir, exist_ok=True)
   
@@ -496,8 +498,26 @@ def record_calls(browser_manager):
                 if json_result.get("status") != "success":
                     return result  
                 
+                if browser_manager.gen_code_id and func.__name__ in {"directly_send_keys"}:
+                    warning = f"reauthor.{func.__name__}"
+                    if warning not in browser_manager.recording_warnings:
+                        browser_manager.recording_warnings.append(warning)
+                    browser_manager.pending_write = None
+                    browser_manager.proposed_changes = None
+                    return result
                 call_info = {}
-                tool_params = log_params(func, *args, **kwargs)
+                tool_params = record_arguments(func, args, kwargs)
+                resolved_arguments = inspect.signature(func).bind_partial(*args, **kwargs).arguments
+                reauthor = []
+                for parameter, recorded in tool_params.items():
+                    secret = resolved_arguments.get(parameter)
+                    if isinstance(recorded, UnboundSecret) and isinstance(secret, str) and secret:
+                        for field in ("step", "step_raw", "scenario"):
+                            value = tool_params.get(field)
+                            if isinstance(value, str) and secret in value:
+                                reauthor.append(UnboundSecret(**{
+                                    "$secret": f"unbound:reauthor.{func.__name__}.{field}"
+                                }))
                 if tool_params.get('caller') == MCP_SERVER_INTERNAL_CALL:
                     logger.info("Operation diagnostic; private details omitted")
                     return result  # 返回原始的 result
@@ -505,13 +525,19 @@ def record_calls(browser_manager):
                 if browser_manager.gen_code_id and (tool_params.get('step_raw', '') or tool_params.get('step', '')):
                     tool_params['caller'] = 'behave-automation'
                     call_info['scenario'] = tool_params.pop('scenario', '')
-                    step_raw = tool_params.pop('step_raw', '').strip()
-                    step_ai = tool_params.pop('step', '').strip()
-                    call_info['step'] = step_raw if step_raw else step_ai
+                    step_raw = tool_params.pop('step_raw', '')
+                    step_ai = tool_params.pop('step', '')
+                    if reauthor:
+                        call_info['secret_requirements'] = reauthor
+                        call_info['step'] = "Secret-bearing step requires re-authoring"
+                    else:
+                        call_info['step'] = step_raw.strip() if step_raw.strip() else step_ai.strip()
                     call_info['gen_code_id'] = browser_manager.gen_code_id
                     call_info['tool_name'] = func.__name__
                     call_info['tool_params'] = tool_params
-                    browser_manager.gen_code_cache.append(redact(call_info, parse_strings=False))
+                    browser_manager.pending_write = None
+                    browser_manager.proposed_changes = None
+                    browser_manager.gen_code_cache.append(call_info)
                     logger.info("Operation diagnostic; private details omitted")
                 else:
                     # logger.info(f"record_calls: No gen_code_id or step info, skipping record for tool_name={func.__name__}")

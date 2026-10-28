@@ -11,7 +11,7 @@ No AutoGenesis checkout is needed. Until packages are published, obtain both
 built wheels from the Integration Lead. In an activated Python virtual environment:
 
 ```bash
-python -m pip install /absolute/wheels/autogenesis_agent_contract-1.0.0-py3-none-any.whl /absolute/wheels/autogenesis_appium_mcp-0.1.0-py3-none-any.whl
+python -m pip install /absolute/wheels/autogenesis_agent_contract-1.1.0-py3-none-any.whl /absolute/wheels/autogenesis_appium_mcp-0.2.0-py3-none-any.whl
 python -c "from importlib.resources import files; from pathlib import Path; Path('appium.json').write_bytes(files('autogenesis_appium_mcp').joinpath('conf/appium_conf.template.json').read_bytes())"
 autogenesis-appium-mcp --platform android --config /absolute/business/appium.json
 ```
@@ -24,17 +24,17 @@ MCP client; diagnostics use stderr.
 With uv/uvx, launch directly from the same local artifacts:
 
 ```bash
-uvx --from /absolute/wheels/autogenesis_appium_mcp-0.1.0-py3-none-any.whl --with /absolute/wheels/autogenesis_agent_contract-1.0.0-py3-none-any.whl autogenesis-appium-mcp --platform android --config /absolute/business/appium.json
+uvx --from /absolute/wheels/autogenesis_appium_mcp-0.2.0-py3-none-any.whl --with /absolute/wheels/autogenesis_agent_contract-1.1.0-py3-none-any.whl autogenesis-appium-mcp --platform android --config /absolute/business/appium.json
 ```
 
 After both distributions are published to the configured index:
 
 ```bash
-uvx --from autogenesis-appium-mcp==0.1.0 autogenesis-appium-mcp --platform ios --config /absolute/business/appium.json
+uvx --from autogenesis-appium-mcp==0.2.0 autogenesis-appium-mcp --platform ios --config /absolute/business/appium.json
 ```
 
-The runtime pins Agent Contract **1.0.0**, manifest SHA-256
-`302a8d779a3c30c26f8c5d801fcf06852f802eeaf18e677924a1d9a791b93412`.
+The runtime pins Agent Contract **1.1.0**, manifest SHA-256
+`80266f59b8ed32c83e374c870817f018361067c0aec6b7ce2b02b8f835850462`.
 Mismatched or corrupt contract assets prevent startup.
 
 ## Configuration and devices
@@ -74,19 +74,17 @@ use environment references for credentials:
 }
 ```
 
-Set those variables in the server's environment through the client or secret
-manager. Only a whole string `${VARIABLE}` resolves; missing variables reject
-that config. Keep credentials out of tracked configuration and URLs. Optional
-Azure visual verification reads `AZURE_OPENAI_API_KEY` and `AZURE_OPENAI_ENDPOINT`.
+Set those variables in the server environment through the client or secret
+manager. Whole-string `${VARIABLE}` values remain references until execution;
+missing values fail the selected operation without rejecting discovery. Keep
+credentials out of tracked configuration and URLs. Optional Azure visual
+verification resolves its API key only when constructing the provider client.
 
-Redaction retains at most 256 recent credential/password values and 64 KiB of
-UTF-8 value bytes for later snapshots and generated previews. Least recently
-used values are evicted; oversized values are not retained. Identified fields
-and the current tool response remain protected, but an evicted value appearing
-later in unrelated free text cannot be recognized. Free-text matches require
-whole values or non-alphanumeric boundaries; controlled status values stay intact.
-Recorded passwords are masked in replay previews and files. Replace masked
-replay inputs with environment-variable references before running the replay.
+Credential capabilities must use `${NAME}` references in JSON configuration.
+Coding Agents may pass `{"$secret":"env:NAME"}` to secret-aware text tools.
+Generated steps retain that reference and resolve it only during execution;
+plaintext credentials and `[REDACTED]` placeholders are never persisted.
+
 
 ## MCP client setup
 
@@ -107,7 +105,7 @@ For an installed command on PATH, `.vscode/mcp.json` can use:
 Cursor uses the same command/arguments under `mcpServers`. An absolute command
 path in a virtual environment also works. A uvx client uses `command: "uvx"`
 with the artifact arguments above. stdin closure or process termination stops
-watchers and releases drivers. Explicit `--transport sse` retains legacy local SSE.
+watchers and releases drivers. The installed and source entrypoints expose stdio only.
 
 The server publishes fixed instructions, prompts `execute_scenario`,
 `generate_scenario_test`, and `execute_natural_language_task`, and the read-only
@@ -121,7 +119,7 @@ feature/step paths retain their behavior.
 From the AutoGenesis repository root, in an activated development environment:
 
 ```bash
-python -m pip install /absolute/wheels/autogenesis_agent_contract-1.0.0-py3-none-any.whl -e ./appium-mcp-server
+python -m pip install /absolute/wheels/autogenesis_agent_contract-1.1.0-py3-none-any.whl -e ./appium-mcp-server
 python appium-mcp-server/simple_server.py --platform android --config /absolute/business/appium.json
 ```
 

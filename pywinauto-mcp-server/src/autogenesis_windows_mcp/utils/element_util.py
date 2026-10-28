@@ -1,6 +1,7 @@
 # Copyright (c) Microsoft Corporation.
 # Licensed under the MIT license.
 
+from autogenesis_agent_contract import REDACTED, execution_plaintext, mark_secret, sensitive_control
 import time
 import logging
 from pympler import asizeof
@@ -51,11 +52,20 @@ def extract_element_info_from_pwa(element, max_root_depth=10, web_depth=0, limit
     global total_size_break
     
     rect = element.rectangle()
+    title = element.window_text()
+    control_type = element.element_info.control_type
+    automation_id = element.element_info.automation_id
+    class_name = element.element_info.class_name
+    secure = sensitive_control(title, control_type, automation_id, class_name)
+    output_title = title
+    if isinstance(title, str) and title and (secure or title in execution_plaintext()):
+        mark_secret(title)
+        output_title = REDACTED
     info = {
-        "title": element.window_text(),
-        "control_type": element.element_info.control_type,
-        "automation_id": element.element_info.automation_id,
-        "class_name": element.element_info.class_name,
+        "title": output_title,
+        "control_type": control_type,
+        "automation_id": automation_id,
+        "class_name": class_name,
         "rectangle": {
             "left": rect.left,
             "top": rect.top,
@@ -74,8 +84,12 @@ def extract_element_info_from_pwa(element, max_root_depth=10, web_depth=0, limit
     runtime_ids.append(element.element_info.runtime_id)
 
     try:
-        info["value"] = element.get_value(),
-    except Exception as e:
+        value = element.get_value()
+        if isinstance(value, str) and (secure or value in execution_plaintext()):
+            mark_secret(value)
+            value = REDACTED
+        info["value"] = value
+    except Exception:
         pass
 
     try:

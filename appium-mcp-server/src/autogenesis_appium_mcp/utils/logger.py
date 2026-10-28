@@ -2,15 +2,16 @@
 # Licensed under the MIT license.
 """Payload-free logs. stdout belongs exclusively to the MCP transport."""
 
+from autogenesis_agent_contract import SecretReferenceError, sanitize_result, tool_execution
 import json
-import inspect
+from mcp.server.fastmcp.exceptions import ToolError
 import logging
 import os
 from pathlib import Path
 import sys
 from functools import wraps
 
-from .redaction import redact, redact_text, remember_environment, tool_redaction
+
 
 
 class SafeFormatter(logging.Formatter):
@@ -18,12 +19,11 @@ class SafeFormatter(logging.Formatter):
         # Exception tracebacks can contain arbitrary third-party response bodies.
         if record.args or record.exc_info or not record.name.startswith("autogenesis_appium_mcp"):
             return f"{record.levelname}: Runtime dependency diagnostic"
-        message = redact_text(record.getMessage())
-        return f"{record.levelname}: {message}"
+        return f"{record.levelname}: {record.getMessage()}"
 
 
 def configure_logging():
-    remember_environment()
+    # Secrets are never interpolated into runtime diagnostics.
     root = logging.getLogger()
     for handler in root.handlers[:]:
         root.removeHandler(handler)
@@ -51,18 +51,23 @@ logger = get_mcp_logger()
 def log_tool_call(func):
     @wraps(func)
     async def wrapper(*args, **kwargs):
-        arguments = inspect.signature(func).bind_partial(*args, **kwargs).arguments
-        with tool_redaction(arguments):
+        with tool_execution(func, args, kwargs) as (resolved_args, resolved_kwargs):
             logger.info("Tool call started")
             try:
-                result = await func(*args, **kwargs)
-                if isinstance(result, str):
+                result = await func(*resolved_args, **resolved_kwargs)
+                string_result = isinstance(result, str)
+                for _ in range(2):
+                    if not isinstance(result, str):
+                        break
                     try:
                         result = json.loads(result)
                     except ValueError:
-                        pass
+                        break
                 logger.info("Tool call completed")
-                return redact(result)
+                sanitized = sanitize_result(result)
+                return json.dumps(sanitized, ensure_ascii=False) if string_result and not isinstance(sanitized, str) else sanitized
+            except SecretReferenceError as error:
+                raise ToolError(str(error)) from None
             except Exception:
                 logger.error("Tool call failed")
                 raise RuntimeError("AutoGenesis tool execution failed") from None

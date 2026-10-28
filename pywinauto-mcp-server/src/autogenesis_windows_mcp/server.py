@@ -3,15 +3,16 @@
 import sys
 
 from autogenesis_agent_contract import (
-    ContractIdentity, RuntimeContractRequirement, load_contract, register_mcp,
+    ContractIdentity, RuntimeContractRequirement, SecretReferenceError,
+    load_contract, register_mcp, safe_secret_error,
 )
 from mcp.server.fastmcp import FastMCP
 from mcp.server.fastmcp.exceptions import ResourceError, ToolError
-from .security import scrub
+
 
 RUNTIME_CONTRACT = RuntimeContractRequirement(
-    contract_version="1.0.0",
-    manifest_sha256="302a8d779a3c30c26f8c5d801fcf06852f802eeaf18e677924a1d9a791b93412",
+    contract_version="1.1.0",
+    manifest_sha256="80266f59b8ed32c83e374c870817f018361067c0aec6b7ce2b02b8f835850462",
 )
 
 
@@ -21,12 +22,17 @@ class WindowsMCP(FastMCP):
     async def call_tool(self, name, arguments):
         try:
             return await super().call_tool(name, arguments)
+        except ToolError as error:
+            safe = safe_secret_error(error)
+            raise ToolError(safe or "Tool request failed; check the tool name, arguments, and application state.") from None
+        except SecretReferenceError as error:
+            raise ToolError(str(error)) from None
         except Exception:
             raise ToolError("Tool request failed; check the tool name, arguments, and application state.") from None
 
     async def get_prompt(self, name, arguments=None):
         try:
-            return await super().get_prompt(name, scrub(arguments))
+            return await super().get_prompt(name, arguments)
         except Exception:
             raise ValueError("Prompt request failed; check the canonical workflow and arguments.") from None
 
@@ -38,10 +44,8 @@ class WindowsMCP(FastMCP):
 
 
 def create_server(app_config: dict) -> WindowsMCP:
-    # Validate the immutable contract before importing platform drivers. Never
-    # fall back to duplicated prompts or serve a partially registered server.
     contract = load_contract(ContractIdentity(
-        RUNTIME_CONTRACT.contract_version, RUNTIME_CONTRACT.manifest_sha256,
+        RUNTIME_CONTRACT.contract_version, RUNTIME_CONTRACT.manifest_sha256, 2,
     ))
     server = WindowsMCP("pywinauto-mcp-server", instructions=contract.instructions, log_level="INFO")
     register_mcp(server, contract, None, RUNTIME_CONTRACT)

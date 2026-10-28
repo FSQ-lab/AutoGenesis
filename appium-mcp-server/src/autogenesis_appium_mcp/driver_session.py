@@ -3,6 +3,7 @@
 
 # tools/browser_manager.py
 
+from autogenesis_agent_contract import contains_credential_url, resolve, sanitize_result
 import time
 import logging
 import subprocess
@@ -28,6 +29,8 @@ class DriverSessionManager:
         self.gen_code_id = None
         self.gen_code_cache = []
         self.proposed_changes = None  # Store proposed code changes
+        self.pending_write = None
+        self.recording_warnings = []
         self.header_code = ""
         self._driver = None
         self.server_url = self.config["server_url"]
@@ -94,11 +97,14 @@ class DriverSessionManager:
                 self._driver = None  # Reset the driver to create a new one
 
         try:
-            server_url = self.server_url
+            runtime_config = resolve(self.config)
+            server_url = runtime_config["server_url"]
+            if contains_credential_url(server_url):
+                raise ValueError("AUTOGENESIS_SECRET_REFERENCE_REQUIRED: server_url")
             logger.info("Operation diagnostic; private details omitted")
-            
-            # Create a copy of config to modify
-            config_copy = self.config.copy()
+
+            # Resolved plaintext remains local to session creation only.
+            config_copy = runtime_config.copy()
             
             # Add or override arguments if provided
             if arguments is not None:
@@ -116,8 +122,14 @@ class DriverSessionManager:
                 options = UiAutomator2Options().load_capabilities(config_copy)
             else:
                 raise ValueError(f"Unsupported device type: {self.device}")
-
             self._driver = webdriver.Remote(server_url, options=options)
+            # Remote clients may retain returned capabilities; keep only safe
+            # literals and reference requirements in the long-lived object.
+            capabilities = getattr(self._driver, "capabilities", None)
+            if isinstance(capabilities, dict):
+                safe_capabilities = sanitize_result(capabilities)
+                capabilities.clear()
+                capabilities.update(safe_capabilities)
             logger.info("Driver session created successfully")
 
             # Try to activate app, but don't fail if method is not implemented
@@ -140,12 +152,12 @@ class DriverSessionManager:
             raise
 
     def app_package(self):
-        """Get from config first (reliable), then from capabilities (fallback)"""
-        # Priority 1: From config (100% reliable)
+        """Get from config first (reliable), then from capabilities (fallback)."""
+        runtime_config = resolve(self.config)
         if self.device in ["ios", "mac"]:
-            package = self.config.get("bundleId")
+            package = runtime_config.get("bundleId")
         elif self.device == "android":
-            package = self.config.get("appPackage")
+            package = runtime_config.get("appPackage")
         else:
             package = None
 
@@ -195,7 +207,8 @@ class DriverSessionManager:
         driver, self._driver = self._driver, None
         if driver is None:
             return
-        package = self.config.get("bundleId") if self.device == "mac" else None
+        bundle_id = self.config.get("bundleId") if self.device == "mac" else None
+        package = bundle_id if isinstance(bundle_id, str) else None
 
         def quit_driver():
             try:
@@ -236,6 +249,8 @@ class DriverSessionManager:
     def clear_gen_code_cache(self):
         self.gen_code_cache.clear()
         self.gen_code_id = None
+        self.pending_write = None
+        self.recording_warnings.clear()
         self.proposed_changes = None
         self.header_code = ""
 

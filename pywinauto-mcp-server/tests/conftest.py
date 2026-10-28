@@ -5,11 +5,6 @@ from pathlib import Path
 import pytest
 
 
-@pytest.fixture(autouse=True)
-def isolated_secret_registry(monkeypatch):
-    from autogenesis_windows_mcp import security
-    monkeypatch.setattr(security, "_secrets", set())
-
 
 @pytest.fixture
 def anyio_backend():

@@ -11,18 +11,10 @@ def anyio_backend():
 
 
 @pytest.fixture(autouse=True)
-def isolated_redaction_registry(monkeypatch):
-    from autogenesis_appium_mcp.utils import redaction
+def isolated_runtime_diagnostics(monkeypatch):
     from autogenesis_appium_mcp import server
-    # Real diagnostic configuration is exercised in the subprocess wire tests.
+    # Real diagnostic configuration is exercised in subprocess wire tests.
     monkeypatch.setattr(server, "configure_logging", lambda: None)
-    with redaction._lock:
-        previous = redaction._values.copy()
-        redaction._values.clear()
-    yield
-    with redaction._lock:
-        redaction._values.clear()
-        redaction._values.update(previous)
 
 
 @pytest.fixture

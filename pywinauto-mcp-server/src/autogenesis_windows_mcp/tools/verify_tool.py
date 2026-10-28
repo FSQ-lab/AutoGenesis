@@ -1,4 +1,4 @@
-from ..security import safe_error
+from ..safe_output import safe_error
 # Copyright (c) Microsoft Corporation.
 # Licensed under the MIT license.
 

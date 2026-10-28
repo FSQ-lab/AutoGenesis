@@ -3,7 +3,7 @@
 
 import xml.etree.ElementTree as ET
 from collections import defaultdict
-from .redaction import sanitize_page_source
+from .page_source import sanitize_page_source
 
 
 def is_element_visible(element):

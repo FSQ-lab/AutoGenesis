@@ -12,10 +12,11 @@ import threading
 import anyio
 
 from autogenesis_agent_contract import (
-    ContractError, ContractIdentity, RuntimeContractRequirement, load_contract, register_mcp,
+    ContractError, ContractIdentity, RuntimeContractRequirement, SecretReferenceError,
+    load_contract, register_mcp, safe_secret_error,
 )
 from mcp.server.fastmcp import FastMCP
-from mcp.types import TextContent
+from mcp.server.fastmcp.exceptions import ToolError
 
 from .driver_session import DriverSessionManager
 from .tools.appium_driver_tool import register_appium_driver_tools
@@ -27,26 +28,21 @@ from .tools.mac_driver_tool import register_mac_driver_tools
 from .tools.verify_tools import register_verify_tools
 from .utils.config_manager import ConfigManager, ConfigurationError
 from .utils.logger import configure_logging
-from .utils.redaction import redact
-from .stdio import cancellable_stdio
 
+from .stdio import cancellable_stdio
 REQUIREMENT = RuntimeContractRequirement(
-    "1.0.0", "302a8d779a3c30c26f8c5d801fcf06852f802eeaf18e677924a1d9a791b93412",
+    "1.1.0", "80266f59b8ed32c83e374c870817f018361067c0aec6b7ce2b02b8f835850462",
 )
 
 
-def _tool_result(value):
-    if isinstance(value, TextContent):
-        return value.model_copy(update={"text": redact(value.text)})
-    if isinstance(value, (tuple, list)):
-        return type(value)(_tool_result(child) for child in value)
-    return redact(value)
 
 
 class AppiumMCP(FastMCP):
     def run(self, transport="stdio", mount_path=None):
-        if transport != "stdio" or os.name != "posix":
-            return super().run(transport=transport, mount_path=mount_path)
+        if transport != "stdio":
+            raise ValueError("AUTOGENESIS_TRANSPORT_UNSUPPORTED: stdio is required")
+        if os.name != "posix":
+            return super().run(transport="stdio", mount_path=mount_path)
         anyio.run(self._run_stdio_until_stopped)
 
     async def _run_stdio_until_stopped(self):
@@ -75,12 +71,17 @@ class AppiumMCP(FastMCP):
             await self._mcp_server.run(read, write, self._mcp_server.create_initialization_options())
 
     async def call_tool(self, name, arguments):
-        # Rejected names/schemas must not register data as a secret. The tool
-        # decorator runs only after SDK validation and before tool execution.
+        # Rejected names/schemas never enter execution scope. Binding errors are
+        # stable and payload-free so a Coding Agent can repair the plan.
         try:
-            return _tool_result(await super().call_tool(name, arguments))
+            return await super().call_tool(name, arguments)
+        except ToolError as error:
+            safe = safe_secret_error(error)
+            raise ToolError(safe or "AutoGenesis tool request failed") from None
+        except SecretReferenceError as error:
+            raise ToolError(str(error)) from None
         except Exception:
-            raise ValueError("AutoGenesis tool request failed") from None
+            raise ToolError("AutoGenesis tool request failed") from None
 
 
 class Runtime:
@@ -93,7 +94,7 @@ class Runtime:
                 raise ConfigurationError("Selected platform configuration is unavailable")
             self.driver = DriverSessionManager(platform, self.config.get_config())
             self.config.on_config_change = self.driver.update_config
-            contract = load_contract(ContractIdentity(REQUIREMENT.contract_version, REQUIREMENT.manifest_sha256))
+            contract = load_contract(ContractIdentity(REQUIREMENT.contract_version, REQUIREMENT.manifest_sha256, 2))
 
             @asynccontextmanager
             async def lifespan(server):
@@ -141,7 +142,7 @@ class RuntimeArgumentParser(argparse.ArgumentParser):
 def parse_args(argv=None):
     parser = RuntimeArgumentParser(description="AutoGenesis Appium MCP runtime")
     parser.add_argument("--platform", choices=("ios", "android", "mac"), default="ios")
-    parser.add_argument("--transport", choices=("stdio", "sse"), default="stdio")
+    parser.add_argument("--transport", choices=("stdio",), default="stdio")
     parser.add_argument("--config", help="Explicit JSON configuration; otherwise cwd/conf/appium_conf.json or packaged template")
     return parser.parse_args(argv)
 

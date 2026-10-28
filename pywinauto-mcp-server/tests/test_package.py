@@ -18,7 +18,7 @@ def test_distribution_entrypoint_and_exact_contract_dependency():
     requirements = [Requirement(item) for item in dist.requires]
     contract = [item for item in requirements if item.name == "autogenesis-agent-contract"]
     assert len(contract) == 1
-    assert str(contract[0].specifier) == "==1.0.0"
+    assert str(contract[0].specifier) == "==1.1.0"
     console = [item for item in dist.entry_points if item.group == "console_scripts"]
     assert [(item.name, item.value) for item in console] == [
         ("autogenesis-windows-mcp", "autogenesis_windows_mcp.cli:main"),
@@ -28,7 +28,7 @@ def test_distribution_entrypoint_and_exact_contract_dependency():
 
 
 def test_imports_and_configuration_assets_are_self_contained():
-    for module in ("", ".cli", ".config", ".server", ".security", ".llm.chat", ".utils.gen_code"):
+    for module in ("", ".cli", ".config", ".server", ".safe_output", ".llm.chat", ".utils.gen_code"):
         importlib.import_module("autogenesis_windows_mcp" + module)
     package = files("autogenesis_windows_mcp")
     schema = json.loads(package.joinpath("conf/config.schema.json").read_text(encoding="utf-8"))
@@ -41,12 +41,12 @@ def test_built_wheel_contains_every_runtime_module_and_only_public_templates():
     wheel_dir = os.environ.get("AUTOGENESIS_WHEEL_DIR")
     if not wheel_dir:
         pytest.skip("Set AUTOGENESIS_WHEEL_DIR to inspect built artifacts.")
-    wheels = list(Path(wheel_dir).glob("autogenesis_windows_mcp-0.1.0-*.whl"))
+    wheels = list(Path(wheel_dir).glob("autogenesis_windows_mcp-0.2.0-*.whl"))
     assert len(wheels) == 1
     with zipfile.ZipFile(wheels[0]) as wheel:
         names = set(wheel.namelist())
         required = {
-            "__init__.py", "__main__.py", "cli.py", "server.py", "config.py", "security.py", "app_session.py", "_windows_stdin.py",
+            "__init__.py", "__main__.py", "cli.py", "server.py", "config.py", "safe_output.py", "app_session.py",
             "tools/__init__.py", "tools/common_tool.py", "tools/mouse_tool.py", "tools/verify_tool.py", "tools/gen_code_tool.py",
             "utils/__init__.py", "utils/logger.py", "utils/response_format.py", "utils/element_util.py", "utils/gen_code.py",
             "llm/__init__.py", "llm/chat.py", "llm/prompt.py", "conf/config.schema.json", "conf/pywinauto_conf.json",

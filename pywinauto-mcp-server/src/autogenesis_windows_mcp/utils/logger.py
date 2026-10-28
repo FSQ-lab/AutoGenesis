@@ -2,25 +2,25 @@
 # Licensed under the MIT license.
 """Metadata-only logging; no package-directory writes or exception tracebacks."""
 
-import inspect
+from autogenesis_agent_contract import SecretReferenceError, sanitize_result, tool_execution
+import json
+from mcp.server.fastmcp.exceptions import ToolError
 import logging
 import sys
 import time
 from functools import wraps
 
-from ..security import remember_tool_inputs, scrub, scrub_tool_result, safe_error
+
 
 logger = logging.getLogger(__name__)
 
 
 class _SafeDiagnostic(logging.Filter):
     def filter(self, record):
-        if record.name.startswith("autogenesis_windows_mcp"):
-            record.msg = scrub(record.getMessage())
+        if record.args or record.exc_info or not record.name.startswith("autogenesis_windows_mcp"):
+            record.msg = "Runtime diagnostic withheld."
         else:
-            # Third-party SDK/HTTP/driver diagnostics can contain request bodies,
-            # headers or validation values. They are never diagnostic evidence.
-            record.msg = "Dependency diagnostic withheld."
+            record.msg = record.getMessage()
         record.args = ()
         record.exc_info = None
         record.exc_text = None
@@ -42,19 +42,28 @@ def configure_logging():
 
 
 def log_tool_call(func):
-    signature = inspect.signature(func)
+
 
     @wraps(func)
     async def wrapper(*args, **kwargs):
-        remember_tool_inputs(signature.bind_partial(*args, **kwargs).arguments)
-        started = time.monotonic()
-        logger.info("Tool started: %s", func.__name__)
-        try:
-            result = await func(*args, **kwargs)
-            logger.info("Tool finished: %s (%.3fs)", func.__name__, time.monotonic() - started)
-            return scrub_tool_result(result)
-        except Exception:
-            logger.error("Tool failed: %s", func.__name__)
-            raise RuntimeError(safe_error()) from None
+        with tool_execution(func, args, kwargs) as (resolved_args, resolved_kwargs):
+            started = time.monotonic()
+            logger.info("Tool started")
+            try:
+                result = await func(*resolved_args, **resolved_kwargs)
+                string_result = isinstance(result, str)
+                if isinstance(result, str):
+                    try:
+                        result = json.loads(result)
+                    except ValueError:
+                        pass
+                logger.info("Tool finished")
+                sanitized = sanitize_result(result)
+                return json.dumps(sanitized, ensure_ascii=False) if string_result and not isinstance(sanitized, str) else sanitized
+            except SecretReferenceError as error:
+                raise ToolError(str(error)) from None
+            except Exception:
+                logger.error("Tool failed")
+                raise RuntimeError("Automation operation failed; sensitive details withheld.") from None
 
     return wrapper

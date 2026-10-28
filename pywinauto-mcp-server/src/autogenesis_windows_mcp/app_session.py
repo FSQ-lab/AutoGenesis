@@ -3,6 +3,7 @@
 
 # tools/app_manager.py
 
+from autogenesis_agent_contract import resolve
 import os
 import psutil
 import time
@@ -10,14 +11,14 @@ import logging
 import subprocess
 from pywinauto import Application
 from pywinauto.findwindows import ElementNotFoundError
-from .security import remember_config_secrets
+
 
 
 logger = logging.getLogger(__name__)
             
 class AppSessionManager:
     def __init__(self, app_conf: dict):
-        remember_config_secrets(app_conf)
+        # Retain literals and SecretRefs only; resolve plaintext per operation.
         self.config = app_conf.copy()
         self.launch_args = self.config.get('launch_args', []).copy()
 
@@ -27,11 +28,16 @@ class AppSessionManager:
         self.gen_code_id = None
         self.gen_code_cache = []
         self.proposed_changes = None  # Store proposed code changes
+        self.pending_write = None
+        self.recording_warnings = []
         self.header_code = ""
         self.steps_dir = None  # Directory for step files
         self.step_file_target = None  # Target step file for code generation
 
         self.is_executing = False
+
+    def runtime_config(self) -> dict:
+        return resolve(self.config)
 
     def start_tool_execution(self, tool_name):
         if self.is_executing:
@@ -48,7 +54,8 @@ class AppSessionManager:
     async def _new_launch(self, args: list[str]):
         self.kill_app_process_by_path()
 
-        valid_exe_path = self.config["exe"]
+        config = self.runtime_config()
+        valid_exe_path = config["exe"]
         time_s = time.time()
         launch_success = False
 
@@ -61,8 +68,8 @@ class AppSessionManager:
         for i in range(5):
             time.sleep(2)
             try:
-                self._app = Application(backend="uia").connect(title_re=self.config["window_title_re"])
-                main_window = self._app.window(title_re=self.config["window_title_re"], control_type="Window")
+                self._app = Application(backend="uia").connect(title_re=config["window_title_re"])
+                main_window = self._app.window(title_re=config["window_title_re"], control_type="Window")
                 main_window.wait("exists", timeout=1)
                 logger.info('[AppManager] Launching new [redacted] using pywinauto: exists done')
                 main_window.wait("visible", timeout=1)
@@ -75,7 +82,7 @@ class AppSessionManager:
                 logger.error('[AppManager] Launching new [redacted] the [redacted] time error: [redacted]')
         
         if launch_success:
-            self._app = Application(backend="uia").connect(title_re=self.config["window_title_re"])
+            self._app = Application(backend="uia").connect(title_re=config["window_title_re"])
             return
         
         raise RuntimeError('[AppManager] Failed to launch [redacted]. Please check the app executable path and arguments.')
@@ -88,11 +95,11 @@ class AppSessionManager:
         if kill_existing == 1:
             await self.app_close()
 
-        args = self.launch_args.copy()
+        args = resolve(self.launch_args.copy())
         is_new_launch = False
         try:
             if self._app:
-                self._app = Application(backend="uia").connect(title_re=self.config["window_title_re"])
+                self._app = Application(backend="uia").connect(title_re=self.runtime_config()["window_title_re"])
             else:
                 await self._new_launch(args=args)
                 is_new_launch = True
@@ -123,7 +130,7 @@ class AppSessionManager:
         self.kill_app_process_by_path()
 
     def kill_app_process_by_path(self):
-        exe_path = os.path.normcase(os.path.normpath(self.config["exe"]))
+        exe_path = os.path.normcase(os.path.normpath(self.runtime_config()["exe"]))
         killed = False
 
         for proc in psutil.process_iter(["pid", "name", "exe"]):
@@ -151,7 +158,7 @@ class AppSessionManager:
         if not self._app:
             await self.app_launch()     
            
-        main_window = self._app.window(title_re=self.config["window_title_re"], control_type="Window")
+        main_window = self._app.window(title_re=self.runtime_config()["window_title_re"], control_type="Window")
         if not main_window.exists(timeout=1):
             self._app = None
             logger.error("Main window with title '[redacted]' not found.")
@@ -196,6 +203,8 @@ class AppSessionManager:
         self.gen_code_cache.clear()
         self.gen_code_id = None
         self.proposed_changes = None
+        self.pending_write = None
+        self.recording_warnings.clear()
         self.header_code = ""
         self.steps_dir = None
         self.step_file_target = None

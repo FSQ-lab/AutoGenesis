@@ -1,7 +1,7 @@
 # AutoGenesis Agent Contract
 
-Canonical Python distribution `autogenesis-agent-contract`, contract `1.0.0`,
-manifest schema `1`, Python >=3.10, MCP SDK >=1.23,<2. Requirement and frozen
+Canonical Python distribution `autogenesis-agent-contract`, contract `1.1.0`,
+manifest schema `2`, Python >=3.10, MCP SDK >=1.23,<2. Requirement and frozen
 interface: [issue #2](https://github.com/FSQ-lab/AutoGenesis/issues/2) and
 [approved freeze](https://github.com/FSQ-lab/AutoGenesis/issues/2#issuecomment-6462101884).
 
@@ -9,15 +9,15 @@ interface: [issue #2](https://github.com/FSQ-lab/AutoGenesis/issues/2) and
 
 ```python
 from autogenesis_agent_contract import (
-    ContractIdentity, RuntimeContractRequirement, load_contract,
+    ContractIdentity, RuntimeContractRequirement, SecretRef, load_contract,
     load_project_appendix, register_mcp,
 )
 from mcp.server.fastmcp import FastMCP
 
 # These pins belong to the runtime release, independently of the installed wheel.
 required = RuntimeContractRequirement(
-    contract_version="1.0.0",
-    manifest_sha256="302a8d779a3c30c26f8c5d801fcf06852f802eeaf18e677924a1d9a791b93412",
+    contract_version="1.1.0",
+    manifest_sha256="80266f59b8ed32c83e374c870817f018361067c0aec6b7ce2b02b8f835850462",
 )
 contract = load_contract(ContractIdentity(required.contract_version, required.manifest_sha256))
 appendix = load_project_appendix("/absolute/business-project")
@@ -28,7 +28,7 @@ register_mcp(server, contract, appendix, required)
 - `load_contract(expected_identity: ContractIdentity | None = None) -> AgentContract`
   verifies the pinned manifest and every asset before returning an immutable snapshot.
 - `AgentContract.identity -> ContractIdentity` has `contract_version`,
-  `manifest_sha256`, and `schema_version` (default `1`); `to_dict()` returns metadata.
+  `manifest_sha256`, and `schema_version` (current `2`); `to_dict()` returns metadata.
 - `AgentContract.instructions -> str` contains the identity and fixed Core Policy.
 - `AgentContract.render(workflow_id: str, arguments: Mapping[str, str],
   appendix: ProjectAppendix | None = None) -> str` always emits identity, Core
@@ -49,6 +49,11 @@ register_mcp(server, contract, appendix, required)
   entries may remain after an injected insertion failure. They never return
   canonical prompt content or identity JSON. Initialize instructions already
   belong to the constructed server, so serving a failed instance is unsupported.
+- `SecretRef` serializes as `{"$secret": "env:NAME"}`. Runtimes retain this
+  reference through recording, preview, confirmation, and generated code, and
+  resolve plaintext only inside the current tool execution.
+- `UnboundSecret` serializes as `{"$secret": "unbound:BINDING"}` and blocks
+  preview until a Coding Agent supplies an explicit environment-backed binding.
 - `load_project_appendix(project_root) -> ProjectAppendix | None` accepts an
   explicit absolute project directory, with no `..` components. Only
   `.autogenesis/instructions.md` is read. Missing means `None`; invalid present
@@ -149,8 +154,8 @@ consumers must stop where required runtime enforcement is unavailable.
 ## Generated sources
 
 Only change official assets while authoring a new unreleased contract version.
-Published `1.0.0` bytes are immutable; later changes require a new version, schema
-review as appropriate, independent review, and consumer pin updates.
+Published `1.0.0` bytes remain immutable. Contract `1.1.0` adds the versioned
+SecretRef schema; later changes require a new version, schema review as appropriate,
 
 ```bash
 python3 agent-contract/tools/freeze_assets.py --write

@@ -105,3 +105,38 @@ async def test_idle_console_is_cancellable():
         await WindowsStdin(-1, api=Console()).read(4096)
         pytest.fail("An idle console was treated as EOF.")
     assert scope.cancel_called
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize("api", [Pipe(), Console()])
+async def test_explicit_close_releases_an_inflight_idle_read(api):
+    if isinstance(api, Pipe):
+        api.available = lambda: 0
+    reader = WindowsStdin(-1, api=api)
+    completed = anyio.Event()
+    result = []
+
+    async def consume():
+        result.append(await reader.read(4096))
+        completed.set()
+
+    async with anyio.create_task_group() as tasks:
+        tasks.start_soon(consume)
+        await anyio.sleep(0.03)
+        reader.close()
+        with anyio.fail_after(0.5):
+            await completed.wait()
+        tasks.cancel_scope.cancel()
+    assert result == [b""]
+
+
+@pytest.mark.anyio
+async def test_protocol_stdin_close_marks_eof_without_closing_interpreter_handle():
+    stdin = object.__new__(_Stdin)
+    stdin.pending = b""
+    stdin.closed = anyio.Event()
+    stdin.windows = WindowsStdin(-1, api=Pipe())
+    stdin.close()
+    assert stdin.closed.is_set()
+    with pytest.raises(StopAsyncIteration):
+        await anext(stdin)

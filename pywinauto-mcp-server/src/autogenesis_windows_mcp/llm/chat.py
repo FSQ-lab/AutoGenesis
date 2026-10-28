@@ -1,6 +1,7 @@
 # Copyright (c) Microsoft Corporation.
 # Licensed under the MIT license.
 
+from autogenesis_agent_contract import SecretRef, SecretReferenceError, resolve
 from langchain_openai import AzureChatOpenAI
 from langchain_core.messages import HumanMessage
 from ..llm.prompt import img_task_prompt, ImgTaskResponse
@@ -38,7 +39,7 @@ class LLMClient:
         self.max_tokens = DEFAULT_MAX_TOKENS
         self.max_retries = DEFAULT_MAX_RETRIES
         self.timeout = DEFAULT_TIMEOUT
-        self.api_key = os.getenv(AZURE_OPENAI_API_KEY_ENV)
+        self.api_key_ref = SecretRef(**{"$secret": f"env:{AZURE_OPENAI_API_KEY_ENV}"})
         self.azure_endpoint = os.getenv(AZURE_OPENAI_ENDPOINT_ENV)
         self.local_lm_endpoint = DEFAULT_LOCAL_LM_ENDPOINT
 
@@ -57,9 +58,10 @@ class LLMClient:
             if len(items) < 2:
                 raise ValueError("Azure model name must be in the format 'azure <deployment_name> <api_version>'")
 
-            if not self.api_key:
-                raise ValueError(f"{AZURE_OPENAI_API_KEY_ENV} environment variable is not set")
-
+            try:
+                api_key = resolve(self.api_key_ref)
+            except SecretReferenceError as error:
+                raise ValueError(f"{AZURE_OPENAI_API_KEY_ENV} environment variable is not set") from error
             if not self.azure_endpoint:
                 raise ValueError(f"{AZURE_OPENAI_ENDPOINT_ENV} environment variable is not set")
 
@@ -68,7 +70,7 @@ class LLMClient:
                 api_version=items[2],
                 azure_endpoint=self.azure_endpoint,
                 temperature=self.temperature,
-                api_key=self.api_key,
+                api_key=api_key,
                 max_tokens=self.max_tokens,
                 max_retries=self.max_retries,
                 timeout=self.timeout,
@@ -127,7 +129,7 @@ class LLMClient:
         return compressed_buffer.getvalue()
 
     def evaluate_task(self, task_info: str, image_data: bytes = None) -> ImgTaskResponse:
-        if self.api_key and self.azure_endpoint:
+        if os.getenv(AZURE_OPENAI_API_KEY_ENV) and self.azure_endpoint:
             return self.evaluate_task_with_azure(task_info, image_data)
         elif self.local_lm_endpoint:
             return self.evaluate_task_with_local_lm(task_info, image_data)
@@ -214,7 +216,7 @@ class LLMClient:
             return False
 
     def azure_gpt_available(self) -> bool:
-        return self.api_key is not None and self.azure_endpoint is not None
+        return bool(os.getenv(AZURE_OPENAI_API_KEY_ENV) and self.azure_endpoint)
 
 
 def is_ai_enabled() -> bool:

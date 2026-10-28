@@ -1,19 +1,19 @@
 # AutoGenesis Windows MCP package
 
-Issue #5 packages the existing Windows runtime as **autogenesis-windows-mcp**
-(version 0.1.0), importable as **autogenesis_windows_mcp**, with the console
+Issue #13 evolves the Windows runtime as **autogenesis-windows-mcp**
+(version 0.2.0), importable as **autogenesis_windows_mcp**, with the console
 command **autogenesis-windows-mcp**. Python 3.10+ and Windows are required for
 serving automation tools. Linux CI checks package metadata/imports only.
 
 ## Install in a business project
 
 Build artifacts must contain both the Windows runtime wheel and the merged
-Agent Contract 1.0.0 wheel. From any Windows business directory, without a
+Agent Contract 1.1.0 wheel. From any Windows business directory, without a
 checkout of AutoGenesis:
 
 ```powershell
 python -m venv .venv
-.venv/Scripts/python -m pip install C:/artifacts/autogenesis_agent_contract-1.0.0-py3-none-any.whl C:/artifacts/autogenesis_windows_mcp-0.1.0-py3-none-any.whl
+.venv/Scripts/python -m pip install C:/artifacts/autogenesis_agent_contract-1.1.0-py3-none-any.whl C:/artifacts/autogenesis_windows_mcp-0.2.0-py3-none-any.whl
 .venv/Scripts/autogenesis-windows-mcp --config ./apps.json --app notepad
 ```
 
@@ -26,18 +26,18 @@ the app_close automation tool or terminate the user's application.
 With uv installed, isolated execution from local artifacts is also supported:
 
 ```powershell
-uvx --with C:/artifacts/autogenesis_agent_contract-1.0.0-py3-none-any.whl --from C:/artifacts/autogenesis_windows_mcp-0.1.0-py3-none-any.whl autogenesis-windows-mcp --config ./apps.json --app notepad
+uvx --with C:/artifacts/autogenesis_agent_contract-1.1.0-py3-none-any.whl --from C:/artifacts/autogenesis_windows_mcp-0.2.0-py3-none-any.whl autogenesis-windows-mcp --config ./apps.json --app notepad
 ```
 
 After these versions are published to the configured package index:
 
 ```powershell
-uvx --from autogenesis-windows-mcp==0.1.0 autogenesis-windows-mcp --config ./apps.json --app notepad
+uvx --from autogenesis-windows-mcp==0.2.0 autogenesis-windows-mcp --config ./apps.json --app notepad
 ```
 
-The runtime depends exactly on autogenesis-agent-contract==1.0.0 and requires
+The runtime depends exactly on autogenesis-agent-contract==1.1.0 and requires
 manifest SHA-256
-302a8d779a3c30c26f8c5d801fcf06852f802eeaf18e677924a1d9a791b93412.
+80266f59b8ed32c83e374c870817f018361067c0aec6b7ce2b02b8f835850462.
 Missing, corrupt or incompatible contract assets fail startup.
 
 ## Application profiles
@@ -99,16 +99,10 @@ uv sync --find-links C:/artifacts
 uv run --no-sync python simple_server.py --transport stdio --config C:/business/apps.json --app notepad
 ```
 
-simple_server.py is a thin launcher for the same synchronous main. It retains
-the existing source default of SSE and prefers a local conf/pywinauto_conf.json
-when present. When absent, it uses the packaged template. The ignored local
-configuration is never copied into the wheel. Explicit --transport stdio and
---transport sse work from either entrypoint. SSE remains available at
-http://localhost:8000/sse:
-
-```powershell
-uv run --no-sync python simple_server.py --transport sse --config C:/business/apps.json
-```
+simple_server.py is a thin launcher for the same synchronous stdio main and
+prefers a local conf/pywinauto_conf.json when present. When absent, it uses the
+packaged template. The ignored local configuration is never copied into the
+wheel. Remote HTTP/SSE transport is intentionally not exposed by this runtime.
 
 ## MCP client example
 
@@ -191,20 +185,18 @@ Independent code/security review and clean Windows acceptance remain required.
 ## Compatibility limits and rollback
 
 The transport uses one private FastMCP server handle to supply cancellable
-stdin and sanitized wire errors; both SDK versions have explicit protocol
-coverage. Input schemas and transport flags remain unchanged. Logs are now
-stderr metadata only; MCP_LOG_FILE and AGENT_INDEX no longer create log files.
-Windows pipe readiness and console keyboard readiness are polled asynchronously,
-so SIGINT does not leave a worker blocked on open stdin. EOF also cancels pending
-tool work. The Windows acceptance suite exercises both idle and pending-tool
-SIGINT while the client's stdin pipe remains open.
+stdin and sanitized wire errors; both supported SDK versions have explicit
+protocol coverage. Windows pipes use readiness polling and read only reported
+available bytes, so SIGINT/EOF cancellation leaves no blocked reader worker.
 
-Known credentials and password-control inputs are redacted from previews and
-generated code with [REDACTED] placeholders. Those values require reviewed
-replacement before replay. Ordinary non-sensitive recorded text retains its
-replay value. Full preview/approval binding, scoped atomic generation writes and
-secret-reference replay are owned by issue #8; this packaging work preserves
-the current generation interfaces.
+Credential configuration must use `${NAME}`, `$NAME`, or `%NAME%` references;
+plaintext credential fields are rejected. Coding Agents may pass
+`{"$secret":"env:NAME"}` to secret-aware text tools. Recording, preview,
+confirmation, and generated files retain that reference and resolve it only at
+execution. Plaintext secure-control input becomes an unbound requirement, and
+preview fails until the Coding Agent supplies an explicit SecretRef binding.
+Generated code contains literals and references only—never plaintext credentials
+or executable `[REDACTED]` placeholders.
 
 Uninstall the runtime from the business venv to roll back:
 

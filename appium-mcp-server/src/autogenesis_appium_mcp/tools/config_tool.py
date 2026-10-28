@@ -1,7 +1,8 @@
 """Secret-free configuration tools; input signatures are the legacy contract."""
 
+from autogenesis_agent_contract import public_view
 from typing import Optional
-from ..utils.redaction import config_view
+
 
 
 def register_config_tools(mcp, config_manager):
@@ -41,6 +42,6 @@ def register_config_tools(mcp, config_manager):
             config = config_manager.get_platform_config(platform)
             if config is None:
                 return {"success": False, "message": "Platform is not configured"}
-            return {"success": True, "platform": platform, "config": config_view(config)}
+            return {"success": True, "platform": platform, "config": public_view(config)}
         config = config_manager.get_config()
-        return {"success": True, "platforms": sorted(config), "config": config_view(config)}
+        return {"success": True, "platforms": sorted(config), "config": public_view(config)}

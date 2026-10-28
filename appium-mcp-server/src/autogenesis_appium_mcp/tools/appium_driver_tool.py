@@ -1,6 +1,7 @@
 # Copyright (c) Microsoft Corporation.
 # Licensed under the MIT license.
 
+from autogenesis_agent_contract import SecretInput, SecretReferenceError
 from typing import Optional
 from appium.webdriver.common.appiumby import AppiumBy
 from selenium.webdriver.support.ui import WebDriverWait
@@ -15,6 +16,7 @@ import json
 from ..utils.logger import log_tool_call
 from ..utils.response_format import format_tool_response, init_tool_response, handle_page_source
 from ..utils.gen_code import record_calls
+from ..utils.page_source import mark_element_input_secret
 from ..utils.element_util import simplify_page_source
 from ..utils.logger import get_mcp_logger
 
@@ -68,7 +70,7 @@ def register_appium_driver_tools(mcp, driver_manager):
     @mcp.tool()
     @log_tool_call
     @record_calls(driver_manager)
-    async def app_launch(caller: str = "", step: str = "", scenario: str = "", arguments: Optional[list] = None, page_source_file: str = "", summary_only: bool = False) -> str:
+    async def app_launch(caller: str = "", step: str = "", scenario: str = "", arguments: Optional[list[str]] = None, page_source_file: str = "", summary_only: bool = False) -> str:
         """Launch app
 
         Args:
@@ -249,7 +251,7 @@ def register_appium_driver_tools(mcp, driver_manager):
         caller: str,
         locator_value: str,
         locator_strategy: str,
-        text: str,
+        text: SecretInput,
         step: str = "",
         scenario: str = "",
         step_raw: str = "",
@@ -274,10 +276,13 @@ def register_appium_driver_tools(mcp, driver_manager):
             locator = get_appium_locator(locator_strategy, locator_value)
             element = WebDriverWait(driver, 5).until(EC.element_to_be_clickable(locator))
             element.click()
+            mark_element_input_secret(element, text, "text")
             # Clear existing text first
             element.clear()
             element.send_keys(text)
             resp["status"] = "success"
+        except SecretReferenceError:
+            raise
         except Exception as e:
             logger.error("Operation diagnostic; private details omitted")
             resp["status"] = "error"

@@ -13,5 +13,5 @@ if __name__ == "__main__":
     local_config = root / "conf" / "pywinauto_conf.json"
     raise SystemExit(main(
         default_config=local_config if local_config.is_file() else None,
-        default_transport="sse",
+        default_transport="stdio",
     ))

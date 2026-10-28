@@ -1,6 +1,7 @@
 # Copyright (c) Microsoft Corporation.
 # Licensed under the MIT license.
 
+from autogenesis_agent_contract import mark_secret
 from appium.webdriver.common.appiumby import AppiumBy
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
@@ -46,9 +47,10 @@ def register_ios_driver_tools(mcp, driver_manager):
             alert = driver.switch_to.alert
             if alert:
                 alert.dismiss()
-            resp["status"] = "success"
             page_source = driver_manager._driver.page_source
-            resp["data"] = {"page_source": page_source}
+            from ..utils.page_source import sanitize_page_source
+            resp["data"] = {"page_source": sanitize_page_source(page_source)}
+            resp["status"] = "success"
         except Exception as e:
             resp["error"] = repr(e)
             logger.error("Operation diagnostic; private details omitted")
@@ -70,6 +72,8 @@ def register_ios_driver_tools(mcp, driver_manager):
         """
         resp = init_tool_response()
         try:
+            # Blind entry has no target metadata; plaintext is never recordable.
+            mark_secret(text)
             driver = driver_manager._driver
             driver.execute_script('mobile: type', {'text': text})
             resp["status"] = "success"

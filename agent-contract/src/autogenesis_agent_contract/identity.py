@@ -20,7 +20,7 @@ def _validate(version: str, digest: str) -> None:
 class ContractIdentity:
     contract_version: str
     manifest_sha256: str
-    schema_version: int = 1
+    schema_version: int = 2
 
     def __post_init__(self) -> None:
         _validate(self.contract_version, self.manifest_sha256)

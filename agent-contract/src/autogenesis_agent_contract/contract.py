@@ -169,7 +169,8 @@ def load_contract(expected_identity: ContractIdentity | None = None) -> AgentCon
         manifest_schema = _json(assets["schemas/manifest.schema.json"])
         argument_schemas = _json(assets["schemas/arguments.schema.json"])
         identity_schema = _json(assets["schemas/identity.schema.json"])
-        for schema in (manifest_schema, argument_schemas, identity_schema):
+        secret_reference_schema = _json(assets["schemas/secret-reference.schema.json"])
+        for schema in (manifest_schema, argument_schemas, identity_schema, secret_reference_schema):
             Draft202012Validator.check_schema(schema)
         Draft202012Validator(manifest_schema).validate(manifest)
         definitions = argument_schemas["$defs"]

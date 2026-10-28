@@ -2,7 +2,7 @@
 # Licensed under the MIT license.
 
 import json
-from ..security import scrub
+
 from datetime import datetime
 from typing import Any, Dict, Optional, Union, Literal
 
@@ -30,7 +30,7 @@ def format_tool_response(
 
     response["data"] = response_dict.get("data", {})
     
-    return json.dumps(scrub(response), ensure_ascii=False)
+    return json.dumps(response, ensure_ascii=False)
 
 def parse_tool_response(response_json: str) -> Dict[str, Any]:
     try:

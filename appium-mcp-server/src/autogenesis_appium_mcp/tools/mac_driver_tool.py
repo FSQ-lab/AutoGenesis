@@ -1,6 +1,7 @@
 # Copyright (c) Microsoft Corporation.
 # Licensed under the MIT license.
 
+from autogenesis_agent_contract import SecretInput, SecretReferenceError, mark_secret
 import asyncio
 import logging
 import time
@@ -21,6 +22,7 @@ from ..utils.logger import log_tool_call
 from ..utils.response_format import format_tool_response, init_tool_response, handle_page_source
 from ..utils.gen_code import record_calls
 from ..utils.logger import get_mcp_logger
+from ..utils.page_source import mark_element_input_secret
 from ..tools.appium_driver_tool import get_appium_locator
 
 
@@ -223,7 +225,7 @@ def register_mac_driver_tools(mcp, driver_manager):
     @log_tool_call
     @record_calls(driver_manager)
     async def send_keys_on_macos(
-        caller: str, locator_value: str, locator_strategy: str, text: str, step: str = "", scenario: str = "", step_raw: str = "", page_source_file: str = "", summary_only: bool = False
+        caller: str, locator_value: str, locator_strategy: str, text: SecretInput, step: str = "", scenario: str = "", step_raw: str = "", page_source_file: str = "", summary_only: bool = False
     ) -> str:
         """enter text in element by macos script
         Args:
@@ -245,6 +247,7 @@ def register_mac_driver_tools(mcp, driver_manager):
             element = WebDriverWait(driver, 5).until(EC.element_to_be_clickable(locator))
             element.click()
             # Clear existing text first
+            mark_element_input_secret(element, text, "text")
             element.clear()
             element.send_keys(text)
             current_text = element.get_attribute("value")
@@ -252,6 +255,8 @@ def register_mac_driver_tools(mcp, driver_manager):
                 # If value is None or empty, use os-level input
                 driver.execute_script("macos: keys", {"keys": list(text)})
             resp["status"] = "success"
+        except SecretReferenceError:
+            raise
         except Exception as e:
             logger.error("Operation diagnostic; private details omitted")
             resp["status"] = "error"
@@ -273,20 +278,15 @@ def register_mac_driver_tools(mcp, driver_manager):
     @log_tool_call
     @record_calls(driver_manager)
     async def directly_send_keys(caller: str, text: str, step: str = "", scenario: str = "", step_raw: str = "", page_source_file: str = "", summary_only: bool = False) -> str:
-        """Send keys directly to the focused element
+        """Send keys directly to the focused element.
 
-        Args:
-            text: text to send
-            step: step name
-            step_raw: raw original step text
-            scenario: scenario name
-            page_source_file: optional, save page source to this file path instead of embedding inline
-            summary_only: optional, if true return agent-friendly summary instead of full page source
+        Plaintext is executable for compatibility but is never recordable;
+        generated replay must use locator-based SecretRef input instead.
         """
         resp = init_tool_response()
         try:
+            mark_secret(text)
             driver = driver_manager._driver
-            # Use macos script to send keys directly
             time.sleep(2)
             driver.execute_script("macos: keys", {"keys": list(text)})
             resp["status"] = "success"

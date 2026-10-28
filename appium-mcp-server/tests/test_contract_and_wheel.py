@@ -12,15 +12,15 @@ from autogenesis_agent_contract import ContractError, RuntimeContractRequirement
 
 from autogenesis_appium_mcp import server
 
-VERSION = "1.0.0"
-DIGEST = "302a8d779a3c30c26f8c5d801fcf06852f802eeaf18e677924a1d9a791b93412"
+VERSION = "1.1.0"
+DIGEST = "80266f59b8ed32c83e374c870817f018361067c0aec6b7ce2b02b8f835850462"
 PROMPTS = {"execute_scenario", "generate_scenario_test", "execute_natural_language_task"}
 URI = "autogenesis://agent-contract/identity"
 
 
 def test_installed_console_and_exact_contract_requirement():
     distribution = metadata.distribution("autogenesis-appium-mcp")
-    assert distribution.version == "0.1.0"
+    assert distribution.version == "0.2.0"
     entrypoints = [item for item in distribution.entry_points if item.group == "console_scripts"]
     assert [(item.name, item.value) for item in entrypoints] == [
         ("autogenesis-appium-mcp", "autogenesis_appium_mcp.server:main"),
@@ -28,7 +28,7 @@ def test_installed_console_and_exact_contract_requirement():
     assert entrypoints[0].load() is server.main
     assert not inspect.iscoroutinefunction(server.main)
     dependencies = [item.lower().replace(" ", "") for item in distribution.requires]
-    assert "autogenesis-agent-contract==1.0.0" in dependencies
+    assert "autogenesis-agent-contract==1.1.0" in dependencies
     assert not any(item.startswith("browserstack-sdk") for item in dependencies)
     assert server.REQUIREMENT == RuntimeContractRequirement(VERSION, DIGEST)
     manifest = resources.files("autogenesis_agent_contract").joinpath("assets/manifest.json").read_bytes()
@@ -46,7 +46,7 @@ def test_wheel_is_self_contained_and_installed_outside_checkout():
             "tools/__init__.py", "tools/appium_driver_tool.py", "tools/android_driver_tool.py",
             "tools/ios_driver_tool.py", "tools/mac_driver_tool.py", "tools/config_tool.py",
             "tools/gen_code_tool.py", "tools/verify_tools.py", "utils/config_manager.py",
-            "utils/logger.py", "utils/redaction.py", "utils/gen_code.py", "utils/response_format.py",
+            "utils/logger.py", "utils/page_source.py", "utils/gen_code.py", "utils/response_format.py",
             "utils/element_util.py", "llm/chat.py", "llm/prompt.py",
         }
         assert {prefix + item for item in required} <= names

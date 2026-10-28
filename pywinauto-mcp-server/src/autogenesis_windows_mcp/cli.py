@@ -1,5 +1,6 @@
 """Synchronous console entrypoint shared by the wheel and source launcher."""
 
+from autogenesis_agent_contract import safe_secret_error
 import argparse
 import logging
 import io
@@ -85,6 +86,11 @@ class _Stdin:
         line, _, self.pending = self.pending.partition(bytes([10]))
         return (line + bytes([10])).decode("utf-8")
 
+    def close(self):
+        if self.windows is not None:
+            self.windows.close()
+        self.closed.set()
+
 
 class _ProtocolWriter:
     """SDK wire-model errors also precede the FastMCP tool/prompt boundary."""
@@ -95,14 +101,23 @@ class _ProtocolWriter:
         binary = os.fdopen(os.dup(sys.stdout.buffer.fileno()), "wb", buffering=0)
         self.text_stream = io.TextIOWrapper(binary, encoding="utf-8", newline="", write_through=True)
         self.stream = anyio.wrap_file(self.text_stream)
-
     async def write(self, text):
         message = json.loads(text)
         if "error" in message:
-            message["error"] = {"code": message["error"]["code"], "message": "MCP request failed; check the method and parameters."}
+            message["error"] = {
+                "code": message["error"]["code"],
+                "message": "MCP request failed; check the method and parameters.",
+            }
         result = message.get("result")
         if isinstance(result, dict) and result.get("isError"):
-            result["content"] = [{"type": "text", "text": "Tool request failed; check the tool name, arguments, and application state."}]
+            current = " ".join(
+                item.get("text", "") for item in result.get("content", []) if isinstance(item, dict)
+            )
+            safe = safe_secret_error(current)
+            result["content"] = [{
+                "type": "text",
+                "text": safe or "Tool request failed; check the tool name, arguments, and application state.",
+            }]
             result.pop("structuredContent", None)
         await self.stream.write(json.dumps(message, ensure_ascii=False) + chr(10))
 
@@ -114,19 +129,15 @@ class _ProtocolWriter:
 
 
 async def _serve(server, transport):
-    if transport == "sse":
-        await server.run_sse_async()
-        return
     from mcp.server.stdio import stdio_server
 
-    # FastMCP exposes no input-stream parameter. This small transport seam uses
-    # the same SDK stdio implementation/initialization as run_stdio_async, with
-    # a cancellable stdin reader. Covered on both supported SDK CI versions.
     writer = _ProtocolWriter()
     stdin = _Stdin()
+
     async def cancel_on_eof(scope):
         await stdin.closed.wait()
         scope.cancel()
+
     try:
         async with anyio.create_task_group() as lifecycle:
             lifecycle.start_soon(cancel_on_eof, lifecycle.cancel_scope)
@@ -138,6 +149,7 @@ async def _serve(server, transport):
             finally:
                 lifecycle.cancel_scope.cancel()
     finally:
+        stdin.close()
         writer.close()
 
 
@@ -151,7 +163,7 @@ def _client_disconnected(error):
 def main(argv=None, *, default_config=None, default_transport="stdio") -> int:
     parser = _Parser(description="AutoGenesis Windows MCP runtime")
     parser.add_argument("--app", help="Application profile; defaults to the first apps_config entry")
-    parser.add_argument("--transport", choices=["stdio", "sse"], default=default_transport)
+    parser.add_argument("--transport", choices=["stdio"], default=default_transport)
     parser.add_argument("--config", default=default_config, help="Path to UTF-8 application-profile JSON")
     args = parser.parse_args(argv)
     configure_logging()

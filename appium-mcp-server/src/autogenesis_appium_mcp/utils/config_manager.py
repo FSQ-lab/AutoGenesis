@@ -1,39 +1,21 @@
 """Configuration snapshots and directory watching, including atomic replacements."""
 
+from autogenesis_agent_contract import SecretRef, protect_config
 from copy import deepcopy
 from importlib.resources import files
 import json
-import os
 from pathlib import Path
-import re
 import threading
 from watchdog.events import FileSystemEventHandler
 from watchdog.observers import Observer
 
 from .logger import get_mcp_logger
-from .redaction import remember_configuration
 
 logger = get_mcp_logger()
-_ENV_REFERENCE = re.compile(r"^[$][{]([A-Za-z_][A-Za-z0-9_]*)[}]$")
-
-
 class ConfigurationError(ValueError):
     pass
 
 
-def resolve_environment(value):
-    if isinstance(value, dict):
-        return {key: resolve_environment(child) for key, child in value.items()}
-    if isinstance(value, list):
-        return [resolve_environment(child) for child in value]
-    if isinstance(value, str):
-        match = _ENV_REFERENCE.fullmatch(value)
-        if match:
-            resolved = os.environ.get(match[1])
-            if not resolved:
-                raise ConfigurationError("Required configuration environment variable is missing")
-            return resolved
-    return value
 
 
 class ConfigFileHandler(FileSystemEventHandler):
@@ -94,17 +76,19 @@ class ConfigManager:
                 return False
             try:
                 raw = json.loads(Path(self.config_path).read_text(encoding="utf-8"))
-                config = resolve_environment(raw)["APPIUM_DRIVER_CONFIGS"]
+                config = protect_config(raw["APPIUM_DRIVER_CONFIGS"])
                 if not isinstance(config, dict) or not config or set(config) - {"ios", "android", "mac"}:
                     raise ConfigurationError("Invalid platform configuration")
                 for platform, profile in config.items():
-                    if not isinstance(profile, dict) or not isinstance(profile.get("server_url"), str) or not profile["server_url"]:
+                    server_url = profile.get("server_url") if isinstance(profile, dict) else None
+                    if not isinstance(profile, dict) or not (
+                        isinstance(server_url, SecretRef) or isinstance(server_url, str) and server_url
+                    ):
                         raise ConfigurationError("Invalid platform configuration")
                 with self._lock:
                     # Reject removal of an already selected platform before publishing a snapshot.
                     if self.on_config_change and self.on_config_change(deepcopy(config)) is False:
                         return False
-                    remember_configuration(config)
                     self._config = config
                 return True
             except Exception:

@@ -70,23 +70,30 @@ class WindowsStdin:
         self.api = _WindowsAPI(fd) if api is None else api
         self.console_eof = False
         self.ignore_keycode = False
+        self.closed = False
+
+    def close(self):
+        self.closed = True
 
     async def read(self, size):
+        if self.closed:
+            return b""
         if self.api.kind == "file":
             return self.api.read(size)
         if self.api.kind == "console":
             return await self._console_line()
-        while True:
+        while not self.closed:
             count = self.api.available()
             if count is None:
                 return b""
             if count:
                 return self.api.read(min(size, count))
             await anyio.sleep(0.01)
+        return b""
 
     async def _console_line(self):
         characters = []
-        while not self.console_eof:
+        while not self.console_eof and not self.closed:
             if not self.api.key_ready():
                 await anyio.sleep(0.01)
                 continue

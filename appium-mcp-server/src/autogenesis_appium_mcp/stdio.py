@@ -1,9 +1,11 @@
 """Cancellable POSIX stdio handles for the SDK's public stdio transport adapter."""
 
 from contextlib import asynccontextmanager
+import json
 import os
 import sys
 
+from autogenesis_agent_contract import safe_secret_error
 import anyio
 from mcp.server.stdio import stdio_server
 
@@ -45,6 +47,24 @@ class Stdout:
         self.fd = fd
 
     async def write(self, text):
+        message = json.loads(text)
+        if "error" in message:
+            message["error"] = {
+                "code": message["error"]["code"],
+                "message": "MCP request failed; check the method and parameters.",
+            }
+        result = message.get("result")
+        if isinstance(result, dict) and result.get("isError"):
+            current = " ".join(
+                item.get("text", "") for item in result.get("content", []) if isinstance(item, dict)
+            )
+            safe = safe_secret_error(current)
+            result["content"] = [{
+                "type": "text",
+                "text": safe or "Tool request failed; check the tool name, arguments, and application state.",
+            }]
+            result.pop("structuredContent", None)
+        text = json.dumps(message, ensure_ascii=False, separators=(",", ":")) + "\n"
         remaining = memoryview(text.encode("utf-8"))
         while remaining:
             await anyio.wait_writable(self.fd)
