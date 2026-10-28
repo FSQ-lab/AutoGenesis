@@ -173,7 +173,10 @@ async def test_real_enter_text_records_unbound_then_bound_ref(tmp_path, app_conf
     preview_result = await server.call_tool("preview_code_changes", {
         "secret_bindings": {"enter_text.content": {"$secret": "env:AUTOGENESIS_WINDOWS_PASSWORD"}},
     })
-    preview = preview_result[0].text if isinstance(preview_result, tuple) else preview_result[0].text
+    preview_content = preview_result[0] if isinstance(preview_result, tuple) else preview_result
+    if isinstance(preview_content, list):
+        preview_content = preview_content[0]
+    preview = preview_content.text
     assert PRIVATE not in preview and "env:AUTOGENESIS_WINDOWS_PASSWORD" in preview
     await server.call_tool("confirm_code_changes", {})
     assert manager.step_file_target and open(manager.step_file_target, encoding="utf-8").read() == preview

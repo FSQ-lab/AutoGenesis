@@ -46,7 +46,19 @@ def test_console_stdio_initialize_inventory_workflows_identity_canaries_and_eof(
         assert initialized["result"]["instructions"] == contract.instructions
         assert {"tools", "prompts", "resources"}.issubset(initialized["result"]["capabilities"])
         tools = client.rpc("tools/list")["result"]["tools"]
-        assert {tool["name"]: tool["inputSchema"] for tool in tools} == expected
+        actual = {tool["name"]: tool["inputSchema"] for tool in tools}
+        changed = {"enter_text", "preview_code_changes"}
+        assert set(actual) == set(expected)
+        assert {name: schema for name, schema in actual.items() if name not in changed} == {
+            name: schema for name, schema in expected.items() if name not in changed
+        }
+        enter_text = actual["enter_text"]
+        assert "SecretRef" in enter_text["$defs"]
+        assert {"type": "string"} in enter_text["properties"]["content"]["anyOf"]
+        assert {"$ref": "#/$defs/SecretRef"} in enter_text["properties"]["content"]["anyOf"]
+        preview = actual["preview_code_changes"]
+        assert {"SecretBindings", "SecretRef"}.issubset(preview["$defs"])
+        assert preview["properties"]["secret_bindings"]["default"] is None
         assert len(tools) == 22
         prompts = client.rpc("prompts/list")["result"]["prompts"]
         assert {prompt["name"] for prompt in prompts} == {"execute_scenario", "generate_scenario_test", "execute_natural_language_task"}
