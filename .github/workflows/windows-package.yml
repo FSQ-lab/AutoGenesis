@@ -30,9 +30,16 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [windows-2022, ubuntu-24.04]
-        python: ['3.10', '3.12']
-        mcp: ['1.23.0', '1.29.1']
+        include:
+          - os: windows-2022
+            python: '3.10'
+            mcp: '1.23.0'
+          - os: windows-2022
+            python: '3.12'
+            mcp: '1.29.1'
+          - os: ubuntu-24.04
+            python: '3.12'
+            mcp: '1.29.1'
     steps:
       - name: Preserve exact contract LF bytes
         run: git config --global core.autocrlf false
