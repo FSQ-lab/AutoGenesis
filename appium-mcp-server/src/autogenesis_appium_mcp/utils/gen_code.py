@@ -13,12 +13,13 @@ import functools
 import pprint
 import textwrap
 from pathlib import Path
+from .redaction import redact
 
 
 logger = logging.getLogger(__name__)
 
 
-PARENT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+PARENT_DIR = os.getcwd()  # Generated artifacts belong to the business project.
 FEATURE_DIR = os.path.join(PARENT_DIR, 'behave_demo/features')
 STEPS_DIR_DEFAULT = os.path.join(PARENT_DIR, 'behave_demo/features/steps')
 TARGET_STEP_FILE_DEFAULT = os.path.join(STEPS_DIR_DEFAULT, "common_steps.py")
@@ -123,7 +124,7 @@ def generate_args_data_multi_param(step_info: dict):
     if is_package_replaced and package_value:
         tool_params = modified_params
         step_info['need_package_import'] = True
-        print(f"Debug: Package replaced for {tool_name}, setting need_package_import=True")  # 调试信息
+        logger.debug("Code generation diagnostic")
 
     if not need_parameterize(step_info, len(parameterized_args)) and not is_package_replaced:
         args_str = pprint.pformat(tool_params, indent=0)
@@ -194,7 +195,7 @@ def extract_steps_from_cache(gen_code_id, gen_code_cache):
     steps = []
     last_step = None
     call_idx = 1
-    logger.info(f"Extracting cache size: {len(gen_code_cache)}")
+    logger.info("Operation diagnostic; private details omitted")
     for item in gen_code_cache:
         if item.get("gen_code_id") != gen_code_id:
             continue
@@ -242,7 +243,7 @@ def extract_step_patterns(step_path):
     step_path = Path(step_path)
     
     if not step_path.exists():
-        logger.warning(f"Step path does not exist: {step_path}")
+        logger.warning("Operation diagnostic; private details omitted")
         return patterns
     
     if step_path.is_dir():
@@ -250,14 +251,14 @@ def extract_step_patterns(step_path):
     # elif step_path.is_file() and step_path.suffix == '.py':
     #     py_files = [step_path]
     else:
-        logger.warning(f"Invalid step path: {step_path}")
+        logger.warning("Operation diagnostic; private details omitted")
         return patterns
     
-    logger.info(f"Found {len(py_files)} Python files to scan")
+    logger.info("Operation diagnostic; private details omitted")
     
     for py_file in py_files:
         time_s = time.time()
-        logger.info(f"Reading step file: {py_file}")
+        logger.info("Operation diagnostic; private details omitted")
         try:
             with open(py_file, 'r', encoding='utf-8') as f:
                 for line_num, line in enumerate(f, 1):
@@ -267,11 +268,11 @@ def extract_step_patterns(step_path):
                         for decorator, pattern in matches:
                             patterns.append((decorator.lower(), pattern.lower()))
         except Exception as e:
-            logger.error(f"Error reading file {py_file}: {repr(e)}")
+            logger.error("Operation diagnostic; private details omitted")
         
-        logger.info(f"Processed {py_file} in {time.time() - time_s:.3f} seconds")
+        logger.info("Operation diagnostic; private details omitted")
     
-    logger.info(f"Extracted {len(patterns)} step patterns")
+    logger.info("Operation diagnostic; private details omitted")
     return patterns
 
 
@@ -284,8 +285,8 @@ def gen_code_preview(browser_manager) -> dict:
     existing_patterns = extract_step_patterns(step_file)
     step_file_target_path = Path(browser_manager.step_file_target)
     
-    steps = extract_steps_from_cache(browser_manager.gen_code_id, browser_manager.gen_code_cache)
-    logger.info(f"Processing {len(steps)} extracted steps")
+    steps = extract_steps_from_cache(browser_manager.gen_code_id, redact(browser_manager.gen_code_cache, parse_strings=False))
+    logger.info("Operation diagnostic; private details omitted")
 
     # 先处理所有步骤，生成步骤定义，这样才能设置 need_package_import
     processed_steps = []
@@ -295,12 +296,12 @@ def gen_code_preview(browser_manager) -> dict:
 
     # 检查是否有任何步骤需要导入 package
     need_package_import = any(item.get('need_package_import', False) for item, _ in processed_steps)
-    print(f"Debug: need_package_import = {need_package_import}")  # 调试信息
+    logger.debug("Code generation diagnostic")
     
     # 根据是否需要 package 设置 header
     if not step_file_target_path.exists() or os.path.getsize(step_file_target_path) == 0:
         browser_manager.header_code = get_header_auto_gen(need_package_import)
-        print(f"Debug: Header set to: {browser_manager.header_code}")  # 调试信息
+        logger.debug("Code generation diagnostic")
 
     new_add_patterns = ()
     for item, step_code in processed_steps:
@@ -316,6 +317,7 @@ def gen_code_preview(browser_manager) -> dict:
             new_steps_code.append(step_code)
             new_add_patterns += ((step_type, step_text.lower()),)
 
+    new_steps_code = redact(new_steps_code)
     browser_manager.proposed_changes = new_steps_code
     browser_manager.new_steps_count = len(new_steps_code)
     
@@ -338,11 +340,11 @@ def ensure_step_path_exists(step_file: str) -> bool:
     try:
         parent_dir = step_path.parent
         if not parent_dir.exists():
-            logger.info(f"Creating directory structure: {parent_dir}")
+            logger.info("Operation diagnostic; private details omitted")
             parent_dir.mkdir(parents=True, exist_ok=True)
         return True
     except Exception as e:
-        logger.error(f"Error creating directory structure for {step_path}: {str(e)}")
+        logger.error("Operation diagnostic; private details omitted")
         return False
 
 
@@ -350,23 +352,23 @@ def read_step_files(step_path, max_depth=5, current_depth=0):
     existing_code = ""
     
     if current_depth > max_depth:
-        logger.warning(f"Maximum recursion depth reached at {step_path}")
+        logger.warning("Operation diagnostic; private details omitted")
         return existing_code
     
     if not step_path.exists():
-        logger.warning(f"Step path does not exist: {step_path}")
+        logger.warning("Operation diagnostic; private details omitted")
         return existing_code
         
     if step_path.is_dir():
         for py_file in step_path.glob("*.py"):
             try:
-                logger.info(f"Reading step file: {py_file}")
+                logger.info("Operation diagnostic; private details omitted")
                 with open(py_file, 'r', encoding='utf-8') as f:
                     file_content = f.read()
                     if file_content:
                         existing_code += file_content + "\n\n"
             except Exception as e:
-                logger.error(f"Error reading file {py_file}: {str(e)}")
+                logger.error("Operation diagnostic; private details omitted")
         
         for subdir in step_path.iterdir():
             if subdir.is_dir():
@@ -379,7 +381,7 @@ def read_step_files(step_path, max_depth=5, current_depth=0):
             with open(step_path, 'r', encoding='utf-8') as f:
                 existing_code = f.read()
         except Exception as e:
-            logger.error(f"Error reading file {step_path}: {str(e)}")
+            logger.error("Operation diagnostic; private details omitted")
             
     return existing_code
 
@@ -472,7 +474,7 @@ def record_calls(browser_manager):
         @functools.wraps(func)
         async def wrapper(*args, **kwargs):
             if not browser_manager.start_tool_execution(func.__name__):
-                logger.warning(f"Tool execution blocked: {func.__name__} is already running")
+                logger.warning("Operation diagnostic; private details omitted")
                 return json.dumps({
                     "status": "failed", 
                     "message": "Another tool is currently executing, please wait",
@@ -489,7 +491,7 @@ def record_calls(browser_manager):
                        json_result = json.loads(json_result)
                 else:
                     json_result = result
-                print(f"\n type of result: {type(result)}, type of json_result: {type(json_result)}\n")
+                logger.debug("Code generation diagnostic")
 
                 if json_result.get("status") != "success":
                     return result  
@@ -497,7 +499,7 @@ def record_calls(browser_manager):
                 call_info = {}
                 tool_params = log_params(func, *args, **kwargs)
                 if tool_params.get('caller') == MCP_SERVER_INTERNAL_CALL:
-                    logger.info(f"Internal call detected, no record: tool_name={func.__name__}, tool_params={tool_params}")
+                    logger.info("Operation diagnostic; private details omitted")
                     return result  # 返回原始的 result
                 
                 if browser_manager.gen_code_id and (tool_params.get('step_raw', '') or tool_params.get('step', '')):
@@ -509,17 +511,16 @@ def record_calls(browser_manager):
                     call_info['gen_code_id'] = browser_manager.gen_code_id
                     call_info['tool_name'] = func.__name__
                     call_info['tool_params'] = tool_params
-                    browser_manager.gen_code_cache.append(call_info)
-                    logger.info(f"record_calls: call_info={call_info}")
+                    browser_manager.gen_code_cache.append(redact(call_info, parse_strings=False))
+                    logger.info("Operation diagnostic; private details omitted")
                 else:
                     # logger.info(f"record_calls: No gen_code_id or step info, skipping record for tool_name={func.__name__}")
                     pass
  
                 return result  # 返回原始的 result（字符串格式）
             except Exception as e:
-                import traceback
-                traceback.print_exc()
-                logger.error(f"Error record_calls: {repr(e)}")
+                logger.error("Operation failed")
+                logger.error("Operation diagnostic; private details omitted")
                 raise e
             finally:
                 browser_manager.finish_tool_execution(func.__name__)

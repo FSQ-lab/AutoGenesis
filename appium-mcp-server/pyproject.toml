@@ -1,9 +1,9 @@
 [build-system]
-requires = ["setuptools>=45", "wheel"]
+requires = ["setuptools>=77,<81", "wheel>=0.45,<1"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "appium-mcp-server"
+name = "autogenesis-appium-mcp"
 version = "0.1.0"
 description = "Appium MCP Server for mobile automation testing"
 authors = [
@@ -11,28 +11,38 @@ authors = [
 ]
 requires-python = ">=3.10"
 dependencies = [
-    "psutil",
+    "autogenesis-agent-contract==1.0.0",
+    "anyio>=4.5,<5",
+    "pydantic>=2.7,<3",
+    "requests>=2.31,<3",
+    "python-dotenv>=1,<2",
+    "langchain-core>=0.1.52",
     "mcp>=1.23.0,<2",
     "selenium>=4.0.0",
     "appium-python-client>=2.0.0",
     "behave==1.2.6",
-    "janus>=0.6.0",
-    "browserstack-sdk==1.23.8",
-    "langchain>=0.1.20",
     "langchain-openai>=0.0.8",
     "langchain-anthropic>=0.0.8",  
     "langchain-google-genai>=0.0.8",
-    "google-generativeai>=0.4.0",
-    "anthropic>=0.22.0",
-    "openai>=1.0.0",
     "pillow==12.2.0",
-    "applicationinsights",
     "watchdog>=3.0.0",
 ]
 
 [tool.setuptools.packages.find]
-include = ["utils*", "tools*", "llm*"]
-exclude = ["logs*", "conf*"]
+where = ["src"]
+
+[project.scripts]
+autogenesis-appium-mcp = "autogenesis_appium_mcp.server:main"
+
+[project.optional-dependencies]
+test = ["pytest>=8.3,<9"]
+
+[tool.setuptools.package-data]
+autogenesis_appium_mcp = ["conf/appium_conf.template.json"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "--strict-markers"
 
 [tool.uv]
 dev-dependencies = [

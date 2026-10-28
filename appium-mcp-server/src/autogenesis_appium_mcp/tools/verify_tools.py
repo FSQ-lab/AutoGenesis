@@ -15,12 +15,12 @@ import inspect
 import xml.etree.ElementTree as ET
 from selenium.common.exceptions import TimeoutException
 
-# from utils.element_util import extract_element_info
-from utils.logger import log_tool_call
-from utils.response_format import format_tool_response, init_tool_response
-from utils.gen_code import record_calls
-from tools.appium_driver_tool import get_appium_locator, simplify_page_source
-from utils.logger import get_mcp_logger
+# from ..utils.element_util import extract_element_info
+from ..utils.logger import log_tool_call
+from ..utils.response_format import format_tool_response, init_tool_response
+from ..utils.gen_code import record_calls
+from ..tools.appium_driver_tool import get_appium_locator, simplify_page_source
+from ..utils.logger import get_mcp_logger
 
 
 logger = get_mcp_logger()
@@ -63,7 +63,7 @@ def register_verify_tools(mcp, driver_manager):
             resp["error"] = f"Element {locator_value} not found"
         except Exception as e:
             resp["error"] = repr(e)
-            logger.error(f"Error verifying element: {e}")
+            logger.error("Operation diagnostic; private details omitted")
         page_source = driver.page_source
         resp["data"] = {"page_source": simplify_page_source(page_source)}
 
@@ -163,7 +163,7 @@ def register_verify_tools(mcp, driver_manager):
                 raise ValueError(f"Unsupported rule: {rule}")
         except Exception as e:
             resp["error"] = repr(e)
-            logger.error(f"Error verifying element attribute: {e}")
+            logger.error("Operation diagnostic; private details omitted")
         page_source = driver.page_source
         resp["data"] = {"page_source": simplify_page_source(page_source)}
 
@@ -245,7 +245,7 @@ def register_verify_tools(mcp, driver_manager):
                 resp["error"] = f"Unsupported expected location: {expected_location}"
         except Exception as e:
             resp["error"] = repr(e)
-            logger.error(f"Error verifying element location: {e}")
+            logger.error("Operation diagnostic; private details omitted")
         page_source = driver.page_source
         resp["data"] = {"page_source": simplify_page_source(page_source)}
 

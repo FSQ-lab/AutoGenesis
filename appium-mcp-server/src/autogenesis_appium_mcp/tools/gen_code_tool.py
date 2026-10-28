@@ -9,11 +9,12 @@ import sys
 import time
 import uuid
 from pathlib import Path
-from utils.logger import log_tool_call
-from utils.gen_code import HEADER_AUTO_GEN, STEPS_DIR_DEFAULT, TARGET_STEP_FILE_DEFAULT
-from utils.gen_code import gen_code_preview, ensure_step_path_exists, gen_step_file_from_feature_path, parse_steps_dir_from_step_path
-from utils.response_format import format_tool_response, init_tool_response
-from utils.logger import get_mcp_logger
+from ..utils.logger import log_tool_call
+from ..utils.gen_code import HEADER_AUTO_GEN, STEPS_DIR_DEFAULT, TARGET_STEP_FILE_DEFAULT
+from ..utils.gen_code import gen_code_preview, ensure_step_path_exists, gen_step_file_from_feature_path, parse_steps_dir_from_step_path
+from ..utils.response_format import format_tool_response, init_tool_response
+from ..utils.logger import get_mcp_logger
+from ..utils.redaction import redact
 
 
 logger = get_mcp_logger()
@@ -49,7 +50,7 @@ def register_gen_code_tools(mcp, browser_manager):
             resp = init_tool_response()
             browser_manager.clear_gen_code_cache()
             browser_manager.gen_code_id = str(uuid.uuid4())
-            logger.info(f"[GEN CODE START]:{browser_manager.gen_code_id}")
+            logger.info("Operation diagnostic; private details omitted")
         
             if step_file and step_file.endswith('.py'):
                 browser_manager.steps_dir = parse_steps_dir_from_step_path(step_file)
@@ -69,7 +70,7 @@ def register_gen_code_tools(mcp, browser_manager):
             }
         except Exception as e:
             resp["error"] = f"Error during code generation: {repr(e)}"
-            logger.error(f"Error during code generation: {repr(e)}")
+            logger.error("Operation diagnostic; private details omitted")
             raise e
 
         return json.dumps(format_tool_response(resp))
@@ -110,8 +111,8 @@ def register_gen_code_tools(mcp, browser_manager):
         try:
             with open(browser_manager.step_file_target, 'a', encoding='utf-8') as f:
                 if hasattr(browser_manager, 'header_code') and browser_manager.header_code:
-                    f.write(browser_manager.header_code + "\n")
-                for item in browser_manager.proposed_changes:
+                    f.write(redact(browser_manager.header_code) + "\n")
+                for item in redact(browser_manager.proposed_changes):
                     f.write(item + "\n")
             
             result = f"Applied {len(browser_manager.proposed_changes)} new steps to {browser_manager.step_file_target}"
@@ -120,7 +121,7 @@ def register_gen_code_tools(mcp, browser_manager):
             resp["data"] = {"message": result, "new_steps_count": browser_manager.new_steps_count}
         except Exception as e:
             result = f"Error applying changes to {browser_manager.step_file_target}: {str(e)}"
-            logger.error(result)
+            logger.error("Code generation failed")
             resp["status"] = "error"
             resp["error"] = result
         

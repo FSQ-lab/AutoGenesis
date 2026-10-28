@@ -5,7 +5,7 @@ from langchain_openai import AzureChatOpenAI, ChatOpenAI
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.messages import HumanMessage
 from langchain_anthropic import ChatAnthropic
-from llm.prompt import img_task_prompt, ImgTaskResponse
+from ..llm.prompt import img_task_prompt, ImgTaskResponse
 import os
 import base64
 import io
@@ -13,6 +13,9 @@ from PIL import Image
 from typing import Union
 import requests
 import logging
+from ..utils.logger import get_mcp_logger
+from ..utils.redaction import remember_environment
+logger = get_mcp_logger()
 from dotenv import load_dotenv
 
 DEFAULT_TEMPERATURE = 0.2
@@ -35,6 +38,7 @@ class LLMClient:
 
     def __init__(self):
         load_dotenv()
+        remember_environment()
         self.model_name = DEFAULT_MODEL_NAME
         self.temperature = DEFAULT_TEMPERATURE
         self.max_tokens = DEFAULT_MAX_TOKENS
@@ -43,7 +47,7 @@ class LLMClient:
         self.api_key = os.getenv(AZURE_OPENAI_API_KEY)
         self.azure_endpoint = os.getenv(AZURE_OPENAI_ENDPOINT_ENV)
         self.local_lm_endpoint = DEFAULT_LOCAL_LM_ENDPOINT
-        logging.info(f"LLMClient initialized with: {self.__dict__}")
+        logger.info("Operation diagnostic; private details omitted")
 
     def get_azure_model(
         self,
@@ -209,10 +213,10 @@ class LLMClient:
                     logging.warning("gpt-5.4 model not found in local copilot tags.")
                     return False
             else:
-                logging.error(f"Failed to check local copilot availability: {response.status_code} - {response.text}")
+                logger.error("Operation diagnostic; private details omitted")
                 return False
         except Exception as e:
-            logging.error(f"Error checking local copilot availability: {repr(e)}")
+            logger.error("Operation diagnostic; private details omitted")
             return False
 
     def azure_gpt_available(self) -> bool:
@@ -242,7 +246,7 @@ if __name__ == "__main__":
             f.write(data)
 
     except FileNotFoundError:
-        print(f"Error: File not found at {path}")
+        logger.debug("Code generation diagnostic")
         exit(1)
 
     # # Call evaluate_task

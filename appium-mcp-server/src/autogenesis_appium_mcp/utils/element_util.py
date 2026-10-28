@@ -3,6 +3,7 @@
 
 import xml.etree.ElementTree as ET
 from collections import defaultdict
+from .redaction import sanitize_page_source
 
 
 def is_element_visible(element):
@@ -207,6 +208,7 @@ def simplify_page_source(page_source: str, max_size: int = 60000) -> str:
       5. Strip redundant attributes (keep only useful ones, drop defaults)
       *. Hard truncation as final fallback
     """
+    page_source = sanitize_page_source(page_source)
     # --- Stage 0: Size check ---
     if len(page_source) <= max_size:
         return page_source
@@ -391,6 +393,7 @@ def summarize_page_source(page_source):
     - UI structure tree (depth 2, depth 3 for dialogs/panels/menus)
     - Flat list of all interactive elements
     """
+    page_source = sanitize_page_source(page_source)
     if not page_source or not page_source.strip():
         return "Empty page source"
 

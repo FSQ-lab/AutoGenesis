@@ -11,13 +11,12 @@ import time
 import io
 import json
 
-# from utils.element_util import extract_element_util
-from utils.logger import log_tool_call
-from utils.response_format import format_tool_response, init_tool_response, handle_page_source
-from utils.gen_code import record_calls
-from utils.element_util import simplify_page_source
-from llm.chat import is_ai_enabled, LLMClient
-from utils.logger import get_mcp_logger
+# from ..utils.element_util import extract_element_util
+from ..utils.logger import log_tool_call
+from ..utils.response_format import format_tool_response, init_tool_response, handle_page_source
+from ..utils.gen_code import record_calls
+from ..utils.element_util import simplify_page_source
+from ..utils.logger import get_mcp_logger
 
 logger = get_mcp_logger()
 
@@ -93,7 +92,7 @@ def register_appium_driver_tools(mcp, driver_manager):
             resp["status"] = "success"
         except Exception as e:
             resp["error"] = repr(e)
-            logger.error(f"Error launching app: {e}")
+            logger.error("Operation diagnostic; private details omitted")
 
         return json.dumps(format_tool_response(resp))
 
@@ -108,7 +107,7 @@ def register_appium_driver_tools(mcp, driver_manager):
             resp["status"] = "success"
         except Exception as e:
             resp["error"] = repr(e)
-            logger.error(f"Error closing app: {e}")
+            logger.error("Operation diagnostic; private details omitted")
 
         return json.dumps(format_tool_response(resp))
 
@@ -123,7 +122,7 @@ def register_appium_driver_tools(mcp, driver_manager):
             resp["status"] = "success"
         except Exception as e:
             resp["error"] = repr(e)
-            logger.error(f"Error closing session: {e}")
+            logger.error("Operation diagnostic; private details omitted")
 
         return json.dumps(format_tool_response(resp))
 
@@ -169,7 +168,7 @@ def register_appium_driver_tools(mcp, driver_manager):
             resp["error"] = f"Element {locator_value} not found"
         except Exception as e:
             resp["error"] = repr(e)
-            logger.error(f"Error verifying element: {e}")
+            logger.error("Operation diagnostic; private details omitted")
             
         if resp.get("status") != "error":
             page_source = driver.page_source
@@ -209,7 +208,7 @@ def register_appium_driver_tools(mcp, driver_manager):
             # For macOS, delegate to mac-specific implementation
             if platform.lower() == "mac":
                 logger.info("Detected macOS platform - delegating to mac_driver_tool")
-                from tools.mac_driver_tool import click_element_macos
+                from ..tools.mac_driver_tool import click_element_macos
 
                 return await click_element_macos(caller, locator_value, locator_strategy, step, scenario, step_raw, driver_manager, page_source_file, summary_only)
 
@@ -218,20 +217,20 @@ def register_appium_driver_tools(mcp, driver_manager):
             try:
                 elements = WebDriverWait(driver, 5).until(EC.visibility_of_any_elements_located(locator))
                 if elements and len(elements) > 1:
-                    logger.warning(f"Multiple elements found for locator {locator_value}. Retrun error.")
+                    logger.warning("Operation diagnostic; private details omitted")
                     resp["status"] = "error"
                     resp["error"] = f"Multiple elements found for locator {locator_value}. Please refine your locator."
                 else:
                     WebDriverWait(driver, 5).until(EC.element_to_be_clickable(locator)).click()
                     resp["status"] = "success"
             except Exception as e:
-                logger.error(f"Error clicking element: {e}")
+                logger.error("Operation diagnostic; private details omitted")
                 resp["status"] = "error"
                 resp["error"] = f"Element {locator_value} not found or not clickable"
 
         except Exception as e:
             resp["error"] = repr(e)
-            logger.error(f"Error in click_element: {e}")
+            logger.error("Operation diagnostic; private details omitted")
             resp["status"] = "error"
 
         if resp.get("status") == "success":
@@ -280,7 +279,7 @@ def register_appium_driver_tools(mcp, driver_manager):
             element.send_keys(text)
             resp["status"] = "success"
         except Exception as e:
-            logger.error(f"Error entering text in element: {e}")
+            logger.error("Operation diagnostic; private details omitted")
             resp["status"] = "error"
             resp["error"] = f"Element {locator_value} not found or not editable"
         if resp.get("status") != "error":
@@ -352,7 +351,7 @@ def register_appium_driver_tools(mcp, driver_manager):
             resp["status"] = "success"
         except Exception as e:
             resp["error"] = repr(e)
-            logger.error(f"Error performing swipe: {e}")
+            logger.error("Operation diagnostic; private details omitted")
         if resp.get("status") != "error":
             page_source = driver.page_source
             handle_page_source(resp, page_source, page_source_file, summary_only)
@@ -403,7 +402,7 @@ def register_appium_driver_tools(mcp, driver_manager):
             resp["status"] = "success"
         except Exception as e:
             resp["error"] = repr(e)
-            logger.error(f"Error double clicking element: {e}")
+            logger.error("Operation diagnostic; private details omitted")
         if resp.get("status") != "error":
             page_source = driver.page_source
             handle_page_source(resp, page_source, page_source_file, summary_only)
@@ -468,7 +467,7 @@ def register_appium_driver_tools(mcp, driver_manager):
                             resp["error"] = f"Element {locator_value} not found after scrolling"
         except Exception as e:
             resp["error"] = repr(e)
-            logger.error(f"Error scrolling to element: {e}")
+            logger.error("Operation diagnostic; private details omitted")
         if resp.get("status") != "error":
             page_source = driver.page_source
             handle_page_source(resp, page_source, page_source_file, summary_only)
@@ -505,14 +504,14 @@ def register_appium_driver_tools(mcp, driver_manager):
             platform = driver.capabilities.get("platformName", "unknown")
 
             if platform.lower() == "mac":
-                from tools.mac_driver_tool import tap_coordinates_macos
+                from ..tools.mac_driver_tool import tap_coordinates_macos
                 return await tap_coordinates_macos(caller, x, y, step, scenario, step_raw, driver_manager, page_source_file, summary_only)
 
             driver.tap([(x, y)])
             resp["status"] = "success"
         except Exception as e:
             resp["error"] = repr(e)
-            logger.error(f"Error tapping coordinates: {e}")
+            logger.error("Operation diagnostic; private details omitted")
         if resp.get("status") != "error":
             page_source = driver.page_source
             handle_page_source(resp, page_source, page_source_file, summary_only)
@@ -554,7 +553,7 @@ def register_appium_driver_tools(mcp, driver_manager):
             resp["status"] = "success"
         except Exception as e:
             resp["error"] = repr(e)
-            logger.error(f"Error performing pinch zoom: {e}")
+            logger.error("Operation diagnostic; private details omitted")
         if resp.get("status") != "error":
             page_source = driver.page_source
             handle_page_source(resp, page_source, page_source_file, summary_only)
@@ -587,7 +586,7 @@ def register_appium_driver_tools(mcp, driver_manager):
 
         except Exception as e:
             resp["error"] = repr(e)
-            logger.error(f"Error hiding keyboard: {e}")
+            logger.error("Operation diagnostic; private details omitted")
         if resp.get("status") != "error":
             page_source = driver.page_source
             handle_page_source(resp, page_source, page_source_file, summary_only)
@@ -633,7 +632,7 @@ def register_appium_driver_tools(mcp, driver_manager):
             resp["status"] = "success"
         except Exception as e:
             resp["error"] = repr(e)
-            logger.error(f"Error switching element to on: {e}")
+            logger.error("Operation diagnostic; private details omitted")
         if resp.get("status") != "error":
             page_source = driver.page_source
             handle_page_source(resp, page_source, page_source_file, summary_only)
@@ -679,7 +678,7 @@ def register_appium_driver_tools(mcp, driver_manager):
             resp["status"] = "success"
         except Exception as e:
             resp["error"] = repr(e)
-            logger.error(f"Error switching element to off: {e}")
+            logger.error("Operation diagnostic; private details omitted")
         if resp.get("status") != "error":
             page_source = driver.page_source
             handle_page_source(resp, page_source, page_source_file, summary_only)
@@ -721,7 +720,7 @@ def register_appium_driver_tools(mcp, driver_manager):
         except Exception as e:
             resp["error"] = repr(e)
             resp["status"] = "error"
-            logger.error(f"Error switching element to off: {e}")
+            logger.error("Operation diagnostic; private details omitted")
 
         return json.dumps(format_tool_response(resp))
 
@@ -757,7 +756,7 @@ def register_appium_driver_tools(mcp, driver_manager):
         except Exception as e:
             resp["error"] = repr(e)
             resp["status"] = "error"
-            logger.error(f"Error getting page source tree: {e}")
+            logger.error("Operation diagnostic; private details omitted")
 
         return json.dumps(format_tool_response(resp))
 
@@ -782,7 +781,7 @@ def register_appium_driver_tools(mcp, driver_manager):
             resp["status"] = "success"
         except Exception as e:
             resp["error"] = repr(e)
-            logger.error(f"Error sleeping for {seconds} seconds: {e}")
+            logger.error("Operation diagnostic; private details omitted")
         if resp.get("status") != "error":
             page_source = driver_manager._driver.page_source
             handle_page_source(resp, page_source, page_source_file, summary_only)
@@ -825,6 +824,7 @@ def register_appium_driver_tools(mcp, driver_manager):
             driver = driver_manager._driver
             screenshot_data = driver.get_screenshot_as_png()
             # Initialize LLMClient
+            from ..llm.chat import LLMClient
             client = LLMClient()
 
             # Call evaluate_task
@@ -839,7 +839,7 @@ def register_appium_driver_tools(mcp, driver_manager):
         except Exception as e:
             resp["status"] = "error"
             resp["error"] = repr(e)
-            logger.error(f"Error in verify_visual_task: {e}")
+            logger.error("Operation diagnostic; private details omitted")
 
         return json.dumps(format_tool_response(resp))
 
@@ -862,6 +862,7 @@ def register_appium_driver_tools(mcp, driver_manager):
             driver = driver_manager._driver
             screenshot_data = driver.get_screenshot_as_png()
             # Initialize LLMClient
+            from ..llm.chat import LLMClient
             client = LLMClient()
             compress_data = client.compress_image(image_data=screenshot_data)
             with open(save_path, "wb") as f:
@@ -871,6 +872,6 @@ def register_appium_driver_tools(mcp, driver_manager):
         except Exception as e:
             resp["status"] = "error"
             resp["error"] = repr(e)
-            logger.error(f"Error in take_screenshot: {e}")
+            logger.error("Operation diagnostic; private details omitted")
 
         return json.dumps(format_tool_response(resp))

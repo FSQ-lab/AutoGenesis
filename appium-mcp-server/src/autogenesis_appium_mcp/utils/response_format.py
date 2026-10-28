@@ -65,7 +65,12 @@ def handle_page_source(resp, page_source, page_source_file="", summary_only=Fals
         file=X   summary=False → save simplified to file + resp["page_source"] = simplified
         file=X   summary=True  → save simplified to file + resp["page_source_summary"] = summary
     """
-    from utils.element_util import simplify_page_source
+    from ..utils.element_util import simplify_page_source
+    from .redaction import sanitize_page_source
+
+    # Discover secure-control values while raw attributes are still present.
+    # Protect every sink, including files and summaries outside MCP serialization.
+    page_source = sanitize_page_source(page_source)
 
     if "data" not in resp:
         resp["data"] = {}
@@ -78,7 +83,7 @@ def handle_page_source(resp, page_source, page_source_file="", summary_only=Fals
         resp["data"]["page_source_file"] = page_source_file
 
     if summary_only:
-        from utils.element_util import summarize_page_source
+        from ..utils.element_util import summarize_page_source
         # Use raw page_source for summary to avoid parsing truncated XML
         resp["data"]["page_source_summary"] = summarize_page_source(page_source)
     else:
