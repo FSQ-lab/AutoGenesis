@@ -37,6 +37,13 @@ The runtime pins Agent Contract **1.2.0**, manifest SHA-256
 `e655f773ac723cf29610364e60f733121740f4701eccdc144cc5001e1bd67d36`.
 Mismatched or corrupt contract assets prevent startup.
 
+Standard MCP Registry metadata is `appium-mcp-server/server.json`. From a source
+checkout, render the equivalent shell-free generic descriptor with:
+
+```bash
+python tools/render_mcp_descriptor.py --server appium --platform android --config /absolute/business/appium.json --project-root /absolute/business
+```
+
 ## Configuration and devices
 
 Selection order is `--config`, then business `conf/appium_conf.json`, then the
