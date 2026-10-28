@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "AutoGenesis identity resource schema 1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["contract_version", "manifest_sha256", "schema_version", "appendix"],
+  "properties": {
+    "contract_version": {"const": "1.0.0"},
+    "schema_version": {"const": 1},
+    "manifest_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "appendix": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "present", "sha256"],
+      "properties": {
+        "path": {"const": ".autogenesis/instructions.md"},
+        "present": {"type": "boolean"},
+        "sha256": {"type": ["string", "null"], "pattern": "^[0-9a-f]{64}$"}
+      },
+      "if": {"properties": {"present": {"const": false}}},
+      "then": {"properties": {"sha256": {"type": "null"}}},
+      "else": {"properties": {"sha256": {"type": "string"}}}
+    }
+  }
+}

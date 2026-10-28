@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "AutoGenesis manifest schema 1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "contract_version", "assets"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "contract_version": {"const": "1.0.0"},
+    "assets": {
+      "type": "object",
+      "minProperties": 9,
+      "maxProperties": 9,
+      "propertyNames": {
+        "enum": [
+          "core-policy.md",
+          "workflows/execute_scenario.md",
+          "workflows/generate_scenario_test.md",
+          "workflows/execute_natural_language_task.md",
+          "skills/autoGenesis-run/SKILL.md",
+          "skills/autoGenesis-win/SKILL.md",
+          "schemas/manifest.schema.json",
+          "schemas/identity.schema.json",
+          "schemas/arguments.schema.json"
+        ]
+      },
+      "additionalProperties": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+    }
+  }
+}

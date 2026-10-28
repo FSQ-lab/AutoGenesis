@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "source": {
+    "repository": "FSQ-lab/AutoGenesis",
+    "revision": "c97d4de61863175ccef7b6402523f005533b9a49",
+    "path": "bdd_ai_toolkit/src/constants/prompts.ts",
+    "source_sha256": "dba58bc1a6d33cc19b0e8bff044f3ce80cfcf062e49a34290005505faf0ae048"
+  },
+  "workflows": {
+    "execute_scenario": "Please use native-mcp-server to execute the following instructions:\n\n# Original BDD Test Case (strictly follow step-by-step):\n${scenario_text}\n\nRequirements:\nfeature_file = '${feature_file_path}'\n1. Before executing the first step, call `before_gen_code`, and after all steps are completed, sequentially call `preview_code_changes` and `confirm_code_change`.\n2. Execute **each step** exactly as written using native-mcp-server API calls, in order.\n3. **MANDATORY: For EVERY step, you MUST call an MCP tool. Never judge results by screenshots/snapshots alone.**\n4. **Do not modify, merge, skip, or add any step.** Do not lose bdd step keyword.\n5. Do not close browser",
+    "generate_scenario_test": "Please use native-mcp-server to execute the following instructions:\n\n# Original BDD Test Case (strictly follow step-by-step):\n${scenario_text}\n\nRequirements:\nfeature_file = '${feature_file_path}'\n1. Before executing the first step, call `before_gen_code`, and after all steps are completed, sequentially call `preview_code_changes` and `confirm_code_change`.\n2. Execute **each step** exactly as written using native-mcp-server API calls, in order.\n3. **MANDATORY: For EVERY step, you MUST call an MCP tool. Never judge results by screenshots/snapshots alone.**\n4. **Do not modify, merge, skip, or add any step.** Do not lose bdd step keyword.\n5. Do not close browser",
+    "execute_natural_language_task": "**\ud83e\udd16 EXECUTE WITH MCP TOOLS ONLY**\n\nPlease use `native-mcp-server` MCP tools to **test** the following scenario:\n\n**Task:** ${scenario_text}\n\n**\ud83d\udd27 MANDATORY REQUIREMENTS:**\n1. Operate in an interactive loop to complete the test\n2. **ONLY USE MCP TOOLS** - Do not describe actions, actually execute them\n3. For **EVERY action**, you **MUST call a native-mcp-server MCP tool**\n4. Execute steps **in sequence** - consider previous results before next action\n\n**\u26a0\ufe0f FORBIDDEN ACTIONS:**\n- Do NOT call `before_gen_code`, `preview_code_changes`, or `confirm_code_change`\n- Do NOT describe what you would do - actually DO it using MCP tools\n- Do NOT skip MCP tool calls\n\n**START EXECUTION NOW** \ud83d\ude80"
+  }
+}
