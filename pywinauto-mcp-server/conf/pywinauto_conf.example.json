@@ -1,0 +1,12 @@
+{
+  "PYWINAUTO_CONFIG": {
+    "apps_config": {
+      "notepad": {
+        "app_name": "Notepad",
+        "exe": "%WINDIR%\\System32\\notepad.exe",
+        "window_title_re": ".*Notepad.*",
+        "launch_args": []
+      }
+    }
+  }
+}

@@ -1,0 +1,38 @@
+{
+    "APPIUM_DRIVER_CONFIGS": {
+        "ios": {
+            "platformName": "iOS",
+            "deviceName": "iPhone 16 Pro",
+            "platformVersion": "18.0",
+            "appium:fullReset": true,
+            "appium:printPageSourceOnFindFailure": false,
+            "autoLaunch": false,
+            "orientation": "PORTRAIT",
+            "language": "en",
+            "locale": "US",
+            "automationName": "XCUITest",
+            "server_url": "http://127.0.0.1:4723"
+        },
+        "android": {
+            "platformName": "Android",
+            "deviceName": "Google Pixel 8",
+            "platformVersion": "14.0",
+            "appium:fullReset": true,
+            "autoLaunch": false,
+            "automationName": "UiAutomator2",
+            "server_url": "http://127.0.0.1:4723"
+        },
+        "mac": {
+            "platformName": "Mac",
+            "automationName": "Mac2",
+            "bundleId": "",
+            "appium:fullReset": false,
+            "appium:sessionTimeout": 6000,
+            "appium:newCommandTimeout": 6000,
+            "shouldUseSingletonTestManager": false,
+            "waitForQuiescence": false,
+            "showServerLogs": true,
+            "server_url": "http://127.0.0.1:4723"
+        }
+    }
+}

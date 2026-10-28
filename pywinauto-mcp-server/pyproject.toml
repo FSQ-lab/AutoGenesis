@@ -1,31 +1,45 @@
-[project]
-name = "pywinauto-mcp-server"
-version = "0.1.0"
-requires-python = ">=3.10"
-dependencies = [
-    "psutil",
-    "mcp>=1.23.0,<2",
-    "janus",
-    "pillow",
-    "pywinauto>=0.6.9",
-    "behave==1.2.6",
-    "playwright",
-    "langchain>=0.1.20",
-    "langchain-openai>=0.0.8",
-    "langchain-anthropic>=0.0.8",
-    "langchain-google-genai>=0.0.8",
-    "google-generativeai>=0.4.0",
-    "anthropic>=0.22.0",
-    "openai>=1.0.0",
-    "anyio>=4.9.0",
-    "pyautogui>=0.9.54",
-    "pympler==1.1",
-    "applicationinsights",
-]
-
 [build-system]
-requires = ["hatchling"]
+requires = ["hatchling>=1.27,<2"]
 build-backend = "hatchling.build"
 
-[tool.uv]
-package = false
+[project]
+name = "autogenesis-windows-mcp"
+version = "0.2.0"
+description = "AutoGenesis Windows desktop MCP runtime"
+readme = "WINDOWS-README.md"
+requires-python = ">=3.10"
+license = "MIT"
+classifiers = ["Operating System :: Microsoft :: Windows"]
+dependencies = [
+    "autogenesis-agent-contract==1.1.0",
+    "mcp>=1.23.0,<2",
+    "anyio>=4.9,<5",
+    "jsonschema>=4.20,<5",
+    "python-dotenv>=1,<2",
+    "psutil>=5.9,<8",
+    "pillow>=10,<13",
+    "pywinauto>=0.6.9,<0.7; sys_platform == 'win32'",
+    "pympler==1.1",
+    "pydantic>=2.7,<3",
+    "requests>=2.32,<3",
+    "langchain-core>=0.2,<2",
+    "langchain-openai>=0.1,<2",
+    "behave==1.2.6",
+]
+
+[project.scripts]
+autogenesis-windows-mcp = "autogenesis_windows_mcp.cli:main"
+
+[project.optional-dependencies]
+test = ["pytest>=8.3,<9", "packaging>=24,<27"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/autogenesis_windows_mcp"]
+
+[tool.hatch.build.targets.sdist]
+include = ["src", "tests", "scripts", "simple_server.py", "conf/pywinauto_conf.example.json", "pyproject.toml", "requirements.txt", "WINDOWS-README.md"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "--strict-markers"
+markers = ["windows: requires the real Windows automation dependencies"]

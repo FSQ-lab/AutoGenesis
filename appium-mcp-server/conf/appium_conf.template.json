@@ -10,20 +10,8 @@
             "orientation": "PORTRAIT",
             "language": "en",
             "locale": "US",
-            "browserstack.resignApp": "false",
             "automationName": "XCUITest",
-            "server_url": "http://hub.browserstack.com/wd/hub",
-            "bstack:options": {
-                "projectName": "Your Project Name",
-                "buildName": "ios automation",
-                "userName": "your_browserstack_username",
-                "accessKey": "your_browserstack_access_key",
-                "buildIdentifier": "your_build_id",
-                "appiumVersion": "2.12.1",
-                "idleTimeout": 900,
-                "interactiveDebugging": true
-            },
-            "appium:app": "bs://your_app_id"
+            "server_url": "http://127.0.0.1:4723"
         },
         "android": {
             "platformName": "Android",
@@ -32,18 +20,7 @@
             "appium:fullReset": true,
             "autoLaunch": false,
             "automationName": "UiAutomator2",
-            "server_url": "http://hub.browserstack.com/wd/hub",
-            "bstack:options": {
-                "projectName": "Your Project Name",
-                "buildName": "android automation",
-                "userName": "your_browserstack_username",
-                "accessKey": "your_browserstack_access_key",
-                "buildIdentifier": "your_build_id",
-                "appiumVersion": "2.12.1",
-                "idleTimeout": 900,
-                "interactiveDebugging": true
-            },
-            "appium:app": "bs://your_app_id"
+            "server_url": "http://127.0.0.1:4723"
         },
         "mac": {
             "platformName": "Mac",

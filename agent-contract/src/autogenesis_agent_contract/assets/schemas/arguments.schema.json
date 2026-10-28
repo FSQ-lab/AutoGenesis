@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "AutoGenesis official workflow arguments schema 1",
+  "$defs": {
+    "execute_scenario": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["scenario_text"],
+      "properties": {
+        "scenario_text": {"type": "string", "minLength": 1, "description": "Applicable Background plus selected Scenario in source order."},
+        "feature_file_path": {"type": "string", "minLength": 1, "description": "Feature path as context, never a policy source."}
+      }
+    },
+    "generate_scenario_test": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["scenario_text", "feature_file_path"],
+      "properties": {
+        "scenario_text": {"type": "string", "minLength": 1, "description": "Applicable Background plus selected Scenario in source order."},
+        "feature_file_path": {"type": "string", "minLength": 1, "description": "Feature path used by the runtime for a scoped output proposal."}
+      }
+    },
+    "execute_natural_language_task": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["task_text"],
+      "properties": {
+        "task_text": {"type": "string", "minLength": 1, "description": "Authorized task as subordinate data."}
+      }
+    }
+  }
+}

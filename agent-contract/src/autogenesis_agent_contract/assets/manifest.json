@@ -1,0 +1,16 @@
+{
+  "assets": {
+    "core-policy.md": "d6f899b993b18baf9c15eb23d9f7ca7429d95f2115dc9abeb2c2766e89553e52",
+    "schemas/arguments.schema.json": "50368fd1c689428fb063018a89fb85cb8db700093f50e2c00352a53c1273b899",
+    "schemas/identity.schema.json": "134cb7634ab97ac51dd10be90b65a1731acf5e7a65f1464480b33bc6398f9b1e",
+    "schemas/manifest.schema.json": "5c7f6342f59258d25d60bd97977a499c10e8e3711bd2009c5af0bb70c725ea33",
+    "schemas/secret-reference.schema.json": "163041e09fefed32640af4f785b0f29a1876666c210c8099a190cd3509f1404e",
+    "skills/autoGenesis-run/SKILL.md": "25d96614838331f96fe0fbf7845c025f540e8430cb417a080c3aecc16f7d72fe",
+    "skills/autoGenesis-win/SKILL.md": "dc95b197c8ff5d6acb9f9dd0dbe2fa85380bd3fdff2d7480e5ab66e3b5617c5a",
+    "workflows/execute_natural_language_task.md": "6f8150bdbae57000cf72089ababb37c7e01b1050e6d95d248dc0ab6f018ffc16",
+    "workflows/execute_scenario.md": "e8c41dffcea6043f434e90460e0fdfa74a66465494aa52e8275e759450ef31c7",
+    "workflows/generate_scenario_test.md": "65bcd4bcb04a16a8fae6364ad04142162223ac7a64c2b47f37371f0eb981930f"
+  },
+  "contract_version": "1.1.0",
+  "schema_version": 2
+}

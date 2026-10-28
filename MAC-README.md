@@ -1,397 +1,143 @@
-# Appium MCP Server - macOS Testing
+# AutoGenesis Appium MCP — macOS
 
-Appium MCP Server is a macOS application automated testing service based on Model Context Protocol (MCP), specifically supporting automated test script generation for macOS desktop applications.
+The distribution is `autogenesis-appium-mcp`, imported as
+`autogenesis_appium_mcp`, with command `autogenesis-appium-mcp`. It retains
+Mac2 automation and BDD generation. Python 3.10 or later is required. Actual
+macOS automation needs Appium, its Mac2 driver, Xcode setup, and Accessibility
+permissions for the application driving automation.
 
-## Features
+## Install from a business project
 
-- 🤖 AI-assisted test script generation based on MCP protocol
-- 🖥️ macOS desktop application automation support
-
-## Quick Start
-
-### Prerequisites
-
-- macOS 10.15+ (macOS 12+ recommended)
-- Python 3.10 or higher
-- [uv](https://docs.astral.sh/uv/) package manager
-- VS Code or Cursor
-- Xcode Command Line Tools
-- Node.js 16+
-
-#### Install uv
+Obtain the built runtime and Agent Contract wheels from the Integration Lead.
+No AutoGenesis checkout is needed. In an activated virtual environment:
 
 ```bash
-# Install uv for faster dependency management
-curl -LsSf https://astral.sh/uv/install.sh | sh
-
-# Or using Homebrew
-brew install uv
+python -m pip install /absolute/wheels/autogenesis_agent_contract-1.1.0-py3-none-any.whl /absolute/wheels/autogenesis_appium_mcp-0.2.0-py3-none-any.whl
+python -c "from importlib.resources import files; from pathlib import Path; Path('appium.json').write_bytes(files('autogenesis_appium_mcp').joinpath('conf/appium_conf.template.json').read_bytes())"
+autogenesis-appium-mcp --platform mac --config /absolute/business/appium.json
 ```
 
-### 1. Clone the Repository
+The default transport is **stdio**. The default platform is iOS, so pass
+`--platform mac` for Mac2. Initialize and discover tools/prompts/identity without
+Appium or a live application; automation calls create sessions when requested.
+stdout is reserved for MCP; diagnostics use stderr.
 
-Open Terminal and run:
-
-    git clone https://github.com/microsoft/AutoGenesis.git
-    cd AutoGenesis
-
-### 2. Install Dependencies
-
-Navigate to the `appium-mcp-server` directory and install Python dependencies:
-
-    cd appium-mcp-server
-    uv sync
-
-**Dependencies include:**
-- `appium-python-client` - Appium Python client
-- `mcp` - Model Context Protocol SDK
-- `selenium` - WebDriver support
-- Other necessary utility libraries
-
-### 3. Configure Appium Environment
-
-#### 3.1 Install and Configure Appium
-
-For detailed instructions on installing Xcode Command Line Tools, initializing Xcode, and installing Appium with Mac2 driver, please refer to the [macOS Appium Setup Guide](bdd_ai_toolkit/docs/macOS_Appium_Setup_Guide.md).
-
-If you encounter any issues during the setup process, please consult the [official Appium documentation](https://appium.io/docs/en/latest/) for troubleshooting.
-
-#### 3.2 Configure System Permissions
-
-##### Accessibility Permission
-
-1. Open **System Settings** → **Privacy & Security** → **Accessibility**
-2. Click **+** and add:
-   - Terminal
-   - VS Code (or your IDE)
-
-##### Screen Recording Permission (Optional)
-
-1. **Privacy & Security** → **Screen & System Audio Recording**
-2. Add the same applications
-
-#### 3.3 Configure Appium Connection
-
-Create a local config file from the template, then edit it for Mac platform:
+With uvx and local artifacts:
 
 ```bash
-cp conf/appium_conf.template.json conf/appium_conf.json
+uvx --from /absolute/wheels/autogenesis_appium_mcp-0.2.0-py3-none-any.whl --with /absolute/wheels/autogenesis_agent_contract-1.1.0-py3-none-any.whl autogenesis-appium-mcp --platform mac --config /absolute/business/appium.json
 ```
 
-Then update `conf/appium_conf.json`:
-
-    # Open conf/appium_conf.json and update the "mac" section:
-    # {
-    #   "APPIUM_DRIVER_CONFIGS": {
-    #     "mac": {
-    #       "platformName": "Mac",
-    #       "automationName": "Mac2",
-    #       "bundleId": "com.example.yourapp",
-    #       "appium:fullReset": false,
-    #       "appium:sessionTimeout": 6000,
-    #       "appium:newCommandTimeout": 6000,
-    #       "shouldUseSingletonTestManager": false,
-    #       "waitForQuiescence": false,
-    #       "showServerLogs": true,
-    #       "server_url": "http://127.0.0.1:4723"
-    #     }
-    #   }
-    # }
-
-**Configuration Details:**
-- `platformName`: Platform type (Mac)
-- `automationName`: Automation engine (Mac2 for macOS)
-- `bundleId`: The bundle identifier of your macOS application 
-- `appium:fullReset`: Whether to fully reset the app before testing
-- `appium:sessionTimeout`: Session timeout in milliseconds
-- `appium:newCommandTimeout`: New command timeout in milliseconds
-- `shouldUseSingletonTestManager`: Whether to use singleton test manager
-- `waitForQuiescence`: Whether to wait for UI to be idle
-- `showServerLogs`: Whether to show server logs
-- `server_url`: Local Appium server address
-
-### 4. Start Appium Server
-
-Before starting the MCP server, you need to start the Appium server locally:
-
-**Option A: Using the Setup Script**
+Once both packages are published to the configured index:
 
 ```bash
-cd docs
-./start_appium_on_mac.sh
+uvx --from autogenesis-appium-mcp==0.2.0 autogenesis-appium-mcp --platform mac --config /absolute/business/appium.json
 ```
 
-**Option B: Manual Start**
+Agent Contract is pinned to **1.1.0**, manifest SHA-256
+`80266f59b8ed32c83e374c870817f018361067c0aec6b7ce2b02b8f835850462`.
+A mismatched or corrupt contract prevents startup.
+
+## Configure Mac2
+
+Follow the [macOS Appium Setup Guide](appium-mcp-server/docs/macOS_Appium_Setup_Guide.md)
+for Xcode/Appium setup. Grant Terminal and the MCP client's host application
+Accessibility permission in System Settings → Privacy & Security. Grant Screen
+Recording permission if needed for screenshots. Before executing automation:
 
 ```bash
+appium driver install mac2
 appium server --port 4723
 ```
 
-Keep this terminal window open while running tests.
+Set the Mac profile in the business config, for example:
 
-### 5. Start MCP Server (SSE Mode Only)
-
-**This step is only required if you plan to use SSE (Server-Sent Events) mode. If you're using stdio mode, VS Code/Cursor will automatically manage the server process, so you can skip this step.**
-
-    uv run python simple_server.py --platform mac
-
-Default startup mode is SSE (Server-Sent Events).
-
-### 6. Configure MCP Client
-
-#### 6.1 VS Code Configuration
-
-Create or edit `.vscode/mcp.json` in your project root:
-
-**Method 1: Using SSE Mode (Server-Sent Events)**
-
-    # Add MCP server configuration to .vscode/mcp.json:
-    # {
-    #   "servers": {
-    #     "auto-genesis-mcp-sse-mac": {
-    #       "url": "http://localhost:8000/sse"
-    #     }
-    #   }
-    # }
-    After configuration, you need to click start to launch
-
-**Method 2: Using stdio Mode (Recommended for Local Development)**
-
-    # Add MCP server configuration to .vscode/mcp.json:
-    # {
-    #   "servers": {
-    #     "auto-genesis-mcp-mac": {
-    #       "command": "uv",
-    #       "args": [
-    #         "run",
-    #         "--project",
-    #         "/Users/yourusername/projects/AutoGenesis/appium-mcp-server",
-    #         "python",
-    #         "/Users/yourusername/projects/AutoGenesis/appium-mcp-server/simple_server.py",
-    #         "--transport",
-    #         "stdio",
-    #         "--platform",
-    #         "mac"
-    #       ],
-    #       "env": {
-    #         "PYTHONIOENCODING": "utf-8",
-    #         "PYTHONUTF8": "1",
-    #         "LANG": "en_US.UTF-8",
-    #         "LC_ALL": "en_US.UTF-8"
-    #       }
-    #     }
-    #   }
-    # }
-
-**Note:** Please replace the paths with your actual project path.
-
-#### 6.2 Cursor Configuration
-
-Configure MCP server in Cursor settings:
-
-**Method 1: Using SSE Mode (Server-Sent Events)**
-
-    # Add to Cursor MCP configuration:
-    # {
-    #   "mcpServers": {
-    #     "auto-genesis-mcp-sse-mac": {
-    #       "url": "http://localhost:8000/sse"
-    #     }
-    #   }
-    # }
-
-**Method 2: Using stdio Mode**
-
-    # Add to Cursor MCP configuration:
-    # {
-    #   "mcpServers": {
-    #     "auto-genesis-mcp-mac": {
-    #       "command": "uv",
-    #       "args": [
-    #         "run",
-    #         "--project",
-    #         "/Users/yourusername/projects/AutoGenesis/appium-mcp-server",
-    #         "python",
-    #         "/Users/yourusername/projects/AutoGenesis/appium-mcp-server/simple_server.py",
-    #         "--transport",
-    #         "stdio",
-    #         "--platform",
-    #         "mac"
-    #       ],
-    #       "env": {
-    #         "PYTHONIOENCODING": "utf-8",
-    #         "PYTHONUTF8": "1",
-    #         "LANG": "en_US.UTF-8",
-    #         "LC_ALL": "en_US.UTF-8"
-    #       }
-    #     }
-    #   }
-    # }
-
-**Note:** Please replace the paths with your actual project path.
-
-#### 6.3 Specify MCP Server Name for Behave Tests
-
-When running behave tests, the test framework auto-discovers MCP servers from `.vscode/mcp.json` whose names start with `auto-genesis`. If you have multiple MCP servers configured or use a custom server name, you can specify the exact server name by editing `behave-demo/features/environment.py`:
-
-```python
-# Set to a specific server name from .vscode/mcp.json to use it.
-# Leave empty to auto-discover (prefers stdio over SSE, matching "auto-genesis" prefix).
-AUTO_GENESIS_MCP_SERVER = 'auto-genesis-mcp-mac'
+```json
+{
+  "APPIUM_DRIVER_CONFIGS": {
+    "mac": {
+      "platformName": "Mac",
+      "automationName": "Mac2",
+      "bundleId": "com.example.yourapp",
+      "server_url": "http://127.0.0.1:4723",
+      "appium:fullReset": false,
+      "appium:sessionTimeout": 6000,
+      "appium:newCommandTimeout": 6000,
+      "shouldUseSingletonTestManager": false,
+      "waitForQuiescence": false
+    }
+  }
+}
 ```
 
-This ensures behave connects to the correct MCP server, especially useful when you have both SSE and stdio servers configured.
+Selection order is `--config`, business `conf/appium_conf.json`, then the bundled
+local-server template. Installed package files are never modified. Business config
+files hot reload after edits or atomic replacement; invalid edits retain the last
+valid snapshot. Settings apply to the next session. `reload_config` reloads the
+file; `get_current_config` returns literals and SecretRefs without resolving them.
+Whole-string `${VARIABLE}` references remain valid even when the variable is not
+present at discovery time; the selected operation fails safely if resolution is
+still unavailable at execution. Optional Azure visual verification reads its
+credentials only when constructing the provider client.
 
-### 7. Use MCP to Generate Test Code
+Credential capabilities must use lossless references such as
+`{"$secret":"env:BROWSERSTACK_ACCESS_KEY"}` in MCP tool arguments or
+`${BROWSERSTACK_ACCESS_KEY}` in JSON configuration. Plaintext credential fields
+are rejected. Generated steps retain the reference and resolve it only during
+execution; they never persist plaintext or `[REDACTED]` placeholders.
 
-#### 7.1 Write Test Cases
 
-The project already includes a sample test case `behave-demo/features/demo.feature`, you can refer to it to write new test cases suitable for your macOS app.
+## Configure an MCP client
 
-#### 7.2 Generate Test Code
+For a command on PATH, `.vscode/mcp.json` can contain:
 
-Use the autoGenesis-run skill to automatically generate test code from your scenarios:
-
-This project includes a pre-configured skill that simplifies the test execution process. Simply provide your scenario name and steps in natural language:
-
-**Quick Example:**
+```json
+{
+  "servers": {
+    "auto-genesis-mcp-mac": {
+      "type": "stdio",
+      "command": "autogenesis-appium-mcp",
+      "args": ["--platform", "mac", "--config", "/absolute/business/appium.json"]
+    }
+  }
+}
 ```
-Use skill autoGenesis-run to execute scenario: Test msn.com website on Edge
-```
 
-The skill will automatically:
-- Locate the scenario from .feature files in behave-demo/features/
-- Parse all scenario steps
-- Execute each step through MCP tool calls
-- Handle retry logic and error recovery
-- Generate BDD test code
-- Save the generated code to your project
+Cursor uses the same command/arguments under `mcpServers`. Use an absolute command
+path for a virtual environment, or `uvx` with the artifact arguments above.
+stdin closure or process termination stops watchers and releases driver resources.
+The installed and source entrypoints expose stdio only.
 
+Canonical workflows are prompts `execute_scenario`, `generate_scenario_test`,
+and `execute_natural_language_task`. Identity is available at
+`autogenesis://agent-contract/identity`. Use the generation workflow for the
+selected feature/scenario and its preview/confirmation steps. Default output is
+business-local `behave_demo/features/steps/common_steps.py`; explicit feature and
+step paths retain their existing behavior.
 
-**For more examples and usage details, see:** [.github/skills/autoGenesis-run/](.github/skills/autoGenesis-run/)
+## Source development and existing Behave projects
 
-### 8. Run Generated Test Code
+From the AutoGenesis repository root, in an activated development environment:
 
-#### 8.1 Run Specific Scenario
-
-Before running tests, install dependencies in the `behave-demo` directory:
-
-    cd behave-demo
-    uv sync
-
-#### 8.1 Run Specific Scenario
-
-Run a specific test scenario by name:
-
-    uv run python -m behave --name "Scenario Name"
-
-#### 8.2 More Options
-
-For more Behave run options and usage, please refer to [Behave Official Documentation](https://behave.readthedocs.io/).
-
-Common command examples:
-
-    # Generate JSON report
-    uv run python -m behave --format json -o reports/results.json
-    
-    # Filter using tags
-    uv run python -m behave --tags=@smoke
-    
-    # Verbose output
-    uv run python -m behave -v
-
-## Advanced Configuration
-
-### Azure GPT Integration (Optional)
-
-#### Configure Azure OpenAI
-
-Set environment variables for Azure OpenAI integration:
-
-    export AZURE_OPENAI_ENDPOINT="your-endpoint"
-    export AZURE_OPENAI_API_KEY="your-api-key"
-    export AZURE_OPENAI_DEPLOYMENT="your-deployment-name"
-
-Then configure Azure OpenAI credentials in `llm/chat.py` to enable screenshot analysis functionality.
-
-## Troubleshooting
-
-### MCP Server Cannot Start
-
-Check Python version and dependencies:
-
-    python --version
-    uv pip list
-
-Or try re-syncing:
-
-    uv sync
-
-Ensure Python version is 3.10 or higher. Check the log file `logs/mcp_server.log` for detailed error information.
-
-### Appium Server Cannot Start
-
-**WebDriverAgentMac SIGABRT Error:**
 ```bash
-sudo xcodebuild -runFirstLaunch
+python -m pip install /absolute/wheels/autogenesis_agent_contract-1.1.0-py3-none-any.whl -e ./appium-mcp-server
+python appium-mcp-server/simple_server.py --platform mac --config /absolute/business/appium.json
 ```
 
-**Permission Issues:**
-- Check Accessibility permissions in System Settings
-- Restart Terminal after granting permissions
+The source script calls the same synchronous main. With no `--config`, an existing
+source-side `appium-mcp-server/conf/appium_conf.json` retains legacy precedence.
+Copy the template there if needed. Acceptance uses built wheels in a clean
+business project, separate from editable source development.
 
-**Missing Drivers:**
-```bash
-appium driver install mac2
-```
+Existing Behave projects still use `features/environment.py` and their selected
+`auto-genesis` MCP server name. Run `python -m behave --name "Scenario Name"`
+from the business project. The repository's `behave-demo` remains an example.
 
-### AI Client Cannot Recognize MCP Tools
+For startup failures, check the explicit config path, environment references, and
+exact contract package. For automation failures, check the Mac2 driver, bundle
+identifier, application installation, and Accessibility permissions. Startup and
+discovery alone do not require a running Appium server.
 
-- Restart VS Code or Cursor
-- Check if MCP configuration file path is correct
-- Confirm MCP Server has started successfully
-- Verify Python path configuration
-- Ensure Appium server is running on port 4723
-
-### Generated Code Cannot Run
-
-Run tests in verbose mode to see detailed logs:
-
-    behave -v
-
-Check Appium configuration file and ensure:
-1. Appium server is running
-2. The bundleId is correct for your application
-3. System permissions are granted
-4. The target application is installed on your Mac
-
-### Application Not Found
-
-If you get an error about the application not being found:
-- Verify the `bundleId` in the configuration matches your application
-- Check that the application is installed on your Mac
-- Try launching the application manually first to verify it works
-
-## Example Use Cases
-
-View examples in the `behave-demo/features/` directory:
-
-- `demo.feature` - Contains complete test scenario examples
-
-## Additional Resources
-
-- [macOS Appium Setup Guide](bdd_ai_toolkit/docs/macOS_Appium_Setup_Guide.md) - Detailed setup instructions
-- [Appium Mac2 Driver Documentation](https://github.com/appium/appium-mac2-driver) - Official Mac2 driver documentation
-- [Appium Documentation](https://appium.io/docs/en/latest/) - General Appium documentation
-
-## Contributing
-
-Contributions are welcome! Please check [CONTRIBUTING.md](CONTRIBUTING.md) for details.
-
-## Contact
-
-For questions or suggestions, please contact: autogenesis@microsoft.com
-
-## License
-
-Please check [LICENSE](LICENSE)
+Uninstall with `python -m pip uninstall autogenesis-appium-mcp autogenesis-agent-contract`
+inside the environment, or remove it and its MCP client entry. Business config
+and generated tests remain intact.

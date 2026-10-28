@@ -1,431 +1,142 @@
-# Appium MCP Server - Mobile Testing
+# AutoGenesis Appium MCP — iOS and Android
 
-Appium MCP Server is a mobile application automated testing service based on Model Context Protocol (MCP), specifically supporting automated test script generation for iOS and Android mobile platforms.
+The distribution is `autogenesis-appium-mcp`, its import package is
+`autogenesis_appium_mcp`, and its command is `autogenesis-appium-mcp`.
+It retains the existing iOS/Android Appium tools, BrowserStack connections,
+visual verification, and BDD generation. Python 3.10 or later is required.
 
-## Features
+## Install in a business project
 
-- 🤖 AI-assisted test script generation based on MCP protocol
-- 📱 Multi-platform support (iOS, Android)
-- 🔄 Cloud testing capabilities integrated with BrowserStack
-- 🎯 Automatic generation of BDD format test code
-- 🚀 Support for various AI programming clients (VS Code, Cursor, etc.)
-
-## Quick Start
-
-### Prerequisites
-
-- Python 3.10 or higher
-- [uv](https://docs.astral.sh/uv/) package manager
-- VS Code or Cursor
-
-#### Install uv
-
-```powershell
-# Install uv for faster dependency management
-powershell -c "irm https://astral.sh/uv/install.ps1 | iex"
-
-# Or download from https://github.com/astral-sh/uv/releases/latest
-```
-
-### 1. Clone the Repository
-
-Open PowerShell and run:
-
-    git clone https://github.com/microsoft/AutoGenesis.git
-    cd AutoGenesis
-
-### 2. Install Dependencies
-
-Navigate to the `appium-mcp-server` directory and install Python dependencies:
-
-    cd appium-mcp-server
-    uv sync
-
-**Dependencies include:**
-- `appium-python-client` - Appium Python client
-- `mcp` - Model Context Protocol SDK
-- `selenium` - WebDriver support
-- Other necessary utility libraries
-
-### 3. Configure Appium Environment
-
-#### 3.1 Register for BrowserStack Free Trial
-
-1. Visit [BrowserStack](https://www.browserstack.com/app-automate) official website
-2. Click "Start Free Trial" to register an account (free trial available)
-3. After registration, enter the **App Automate** console
-4. Find your username and access key on the **Access Key** page
-
-#### 3.1.1 Upload Test Application to BrowserStack
-
-Upload your mobile application to BrowserStack for testing:
-
-**Method 1: Upload via BrowserStack Console**
-
-1. Login to [BrowserStack App Automate](https://app-automate.browserstack.com/)
-2. Click the "Upload" button
-3. Select your application file (`.apk` for Android, `.ipa` or `.app` for iOS)
-4. After successful upload, copy the returned application URL (format: `bs://xxxxxx`)
-
-**Method 2: Upload via Command Line**
-
-Use curl command to upload application:
-
-```powershell
-# Android APK
-curl -u "your_username:your_access_key" -X POST "https://api-cloud.browserstack.com/app-automate/upload" -F "file=@C:\path\to\your\app.apk"
-
-# iOS IPA
-curl -u "your_username:your_access_key" -X POST "https://api-cloud.browserstack.com/app-automate/upload" -F "file=@C:\path\to\your\app.ipa"
-```
-
-#### 3.2 Configure Appium Connection
-
-Create a local config file from the template, then edit it with your BrowserStack credentials:
+No AutoGenesis checkout is needed. Until packages are published, obtain both
+built wheels from the Integration Lead. In an activated Python virtual environment:
 
 ```bash
-cp conf/appium_conf.template.json conf/appium_conf.json
+python -m pip install /absolute/wheels/autogenesis_agent_contract-1.1.0-py3-none-any.whl /absolute/wheels/autogenesis_appium_mcp-0.2.0-py3-none-any.whl
+python -c "from importlib.resources import files; from pathlib import Path; Path('appium.json').write_bytes(files('autogenesis_appium_mcp').joinpath('conf/appium_conf.template.json').read_bytes())"
+autogenesis-appium-mcp --platform android --config /absolute/business/appium.json
 ```
 
-Then update `conf/appium_conf.json`:
+Use `--platform ios` for iOS. The default platform is iOS and transport is
+**stdio**. Initialization and tool/workflow discovery need no Appium server or
+device; automation tools create sessions when requested. stdout belongs to the
+MCP client; diagnostics use stderr.
 
-    # Open conf/appium_conf.json and update with your credentials:
-    # {
-    #   "android": {
-    #     "platformName": "Android",
-    #     "deviceName": "Google Pixel 8",
-    #     "platformVersion": "14.0",
-    #     "appium:fullReset": true,
-    #     "autoLaunch": false,
-    #     "automationName": "UiAutomator2",
-    #     "server_url": "http://hub.browserstack.com/wd/hub",
-    #     "bstack:options": {
-    #       "projectName": "Your Project Name",
-    #       "buildName": "android automation",
-    #       "userName": "your_browserstack_username",
-    #       "accessKey": "your_browserstack_access_key",
-    #       "buildIdentifier": "your_build_id",
-    #       "appiumVersion": "2.12.1",
-    #       "idleTimeout": 900,
-    #       "interactiveDebugging": true
-    #     },
-    #     "appium:app": "bs://your_app_id"
-    #   }
-    # }
+With uv/uvx, launch directly from the same local artifacts:
 
-**Configuration Details:**
-- `platformName`: Platform type (Android/iOS)
-- `deviceName`: Device name (e.g., Google Pixel 8)
-- `platformVersion`: OS version
-- `appium:fullReset`: Whether to fully reset the app before testing
-- `autoLaunch`: Whether to automatically launch the app
-- `automationName`: Automation engine (UiAutomator2 for Android, XCUITest for iOS)
-- `server_url`: BrowserStack Hub address
-- `bstack:options`: BrowserStack specific configurations
-  - `projectName`: Project name
-  - `buildName`: Build name
-  - `userName`: BrowserStack username
-  - `accessKey`: BrowserStack access key
-  - `buildIdentifier`: Build identifier
-  - `appiumVersion`: Appium version
-  - `idleTimeout`: Idle timeout in seconds
-  - `interactiveDebugging`: Whether to enable interactive debugging
-- `appium:app`: BrowserStack app URL (bs:// format link obtained after uploading the app)
-
-### 4. Start MCP Server
-
-Start the MCP server (default startup mode is SSE):
-
-    cd appium-mcp-server
-    uv run python simple_server.py --platform android
-
-### 5. Configure MCP Client
-
-#### 5.1 VS Code Configuration
-
-Create or edit `.vscode/mcp.json` in your project root:
-
-**Method 1: Using SSE Mode (Server-Sent Events)**
-
-    # Add MCP server configuration to .vscode/mcp.json:
-    # {
-    #   "servers": {
-    #     "auto-genesis-mcp-sse": {
-    #       "url": "http://localhost:8000/sse"
-    #     }
-    #   }
-    # }
-    After configuration, you need to click start to launch
-
-**Method 2: Using stdio Mode (Recommended for Local Development)**
-
-    # Add MCP server configuration to .vscode/mcp.json:
-    # {
-    #   "servers": {
-    #     "auto-genesis-mcp-mobile": {
-    #       "command": "uv",
-    #       "args": [
-    #         "run",
-    #         "--project",
-    #         "c:\\Users\\username\\projects\\AutoGenesis\\appium-mcp-server",
-    #         "python",
-    #         "c:\\Users\\username\\projects\\AutoGenesis\\appium-mcp-server\\simple_server.py",
-    #         "--transport",
-    #         "stdio",
-    #         "--platform",
-    #         "ios"
-    #       ],
-    #       "env": {
-    #         "PYTHONIOENCODING": "utf-8",
-    #         "PYTHONUTF8": "1",
-    #         "LANG": "en_US.UTF-8",
-    #         "LC_ALL": "en_US.UTF-8"
-    #       }
-    #     }
-    #   }
-    # }
-
-**Note:** 
-- stdio mode: VS Code automatically starts and manages the MCP server process, suitable for local development
-- SSE mode: Requires manual start of MCP server (`uv run python simple_server.py --platform android`), suitable for remote servers or multi-client scenarios
-- `--platform` parameter: specify `ios` or `android` based on your testing needs
-- Please replace the paths with your actual project paths
-
-#### 5.2 Cursor Configuration
-
-Configure MCP server in Cursor settings:
-
-**Method 1: Using SSE Mode (Server-Sent Events)**
-
-    # Add to Cursor MCP configuration:
-    # {
-    #   "mcpServers": {
-    #     "auto-genesis-mcp-sse": {
-    #       "url": "http://localhost:8000/sse"
-    #     }
-    #   }
-    # }
-
-**Method 2: Using stdio Mode**
-
-    # Add to Cursor MCP configuration:
-    # {
-    #   "mcpServers": {
-    #     "auto-genesis-mcp-mobile": {
-    #       "command": "uv",
-    #       "args": [
-    #         "run",
-    #         "--project",
-    #         "c:\\Users\\username\\projects\\AutoGenesis\\appium-mcp-server",
-    #         "python",
-    #         "c:\\Users\\username\\projects\\AutoGenesis\\appium-mcp-server\\simple_server.py",
-    #         "--transport",
-    #         "stdio",
-    #         "--platform",
-    #         "ios"
-    #       ],
-    #       "env": {
-    #         "PYTHONIOENCODING": "utf-8",
-    #         "PYTHONUTF8": "1",
-    #         "LANG": "en_US.UTF-8",
-    #         "LC_ALL": "en_US.UTF-8"
-    #       }
-    #     }
-    #   }
-    # }
-
-**Note:**
-- SSE mode: Need to manually start the server first (`uv run python simple_server.py --platform android`), then Cursor connects via HTTP
-- stdio mode: Cursor automatically starts and manages the server process
-- `--platform` parameter: specify `ios` or `android` based on your testing needs
-- Please replace the paths with your actual project paths
-
-#### 5.3 Specify MCP Server Name for Behave Tests
-
-When running behave tests, the test framework auto-discovers MCP servers from `.vscode/mcp.json` whose names start with `auto-genesis`. If you have multiple MCP servers configured or use a custom server name, you can specify the exact server name by editing `behave-demo/features/environment.py`:
-
-```python
-# Set to a specific server name from .vscode/mcp.json to use it.
-# Leave empty to auto-discover (prefers stdio over SSE, matching "auto-genesis" prefix).
-AUTO_GENESIS_MCP_SERVER = 'auto-genesis-mcp-mobile'
+```bash
+uvx --from /absolute/wheels/autogenesis_appium_mcp-0.2.0-py3-none-any.whl --with /absolute/wheels/autogenesis_agent_contract-1.1.0-py3-none-any.whl autogenesis-appium-mcp --platform android --config /absolute/business/appium.json
 ```
 
-This ensures behave connects to the correct MCP server, especially useful when you have both SSE and stdio servers configured.
+After both distributions are published to the configured index:
 
-### 6. Use MCP to Generate Test Code
-
-#### 6.1 Write Test Cases
-
-The project already includes a sample test case `behave-demo/features/demo.feature`, you can refer to it to write new test cases suitable for your app.
-
-View example:
-
-```gherkin
-# Reference behave-demo/features/demo.feature
-Feature: Mobile Browser Testing
-
-  Scenario: Open webpage and verify title
-    Given Open Edge browser
-    When Visit "https://www.bing.com"
-    Then Page title should contain "Bing"
+```bash
+uvx --from autogenesis-appium-mcp==0.2.0 autogenesis-appium-mcp --platform ios --config /absolute/business/appium.json
 ```
 
-#### 6.2 Generate Test Code
+The runtime pins Agent Contract **1.1.0**, manifest SHA-256
+`80266f59b8ed32c83e374c870817f018361067c0aec6b7ce2b02b8f835850462`.
+Mismatched or corrupt contract assets prevent startup.
 
-Use the autoGenesis-run skill to automatically generate test code from your scenarios:
+## Configuration and devices
 
-This project includes a pre-configured skill that simplifies the test execution process. Simply provide your scenario name and steps in natural language:
+Selection order is `--config`, then business `conf/appium_conf.json`, then the
+bundled local-server template. No config is written into the installed package.
+Business config files reload after edits or atomic replacement; invalid edits
+retain the last valid snapshot. Changes apply to the next driver session.
+`reload_config` requests a reload and `get_current_config` returns a masked view,
+including nested values and URLs. The bundled template does not need a watcher.
 
-**Quick Example:**
+For local devices, install Appium and its `uiautomator2` or `xcuitest` driver,
+then configure `server_url`, device capabilities, and app or bundle identifier.
+Local iOS automation needs macOS/Xcode; Android needs its SDK and a device or
+emulator. Keep `APPIUM_DRIVER_CONFIGS` as the top-level configuration key.
+
+BrowserStack connections use the Appium client directly; its SDK is not required.
+Upload the APK/IPA through App Automate, set `appium:app` to its returned URL, and
+use environment references for credentials:
+
+```json
+{
+  "APPIUM_DRIVER_CONFIGS": {
+    "android": {
+      "platformName": "Android",
+      "automationName": "UiAutomator2",
+      "deviceName": "Google Pixel 8",
+      "platformVersion": "14.0",
+      "server_url": "https://hub.browserstack.com/wd/hub",
+      "appium:app": "bs://your-uploaded-app",
+      "bstack:options": {
+        "userName": "${BROWSERSTACK_USERNAME}",
+        "accessKey": "${BROWSERSTACK_ACCESS_KEY}"
+      }
+    }
+  }
+}
 ```
-Use skill autoGenesis-run to execute scenario: Test msn.com website on Edge
+
+Set those variables in the server environment through the client or secret
+manager. Whole-string `${VARIABLE}` values remain references until execution;
+missing values fail the selected operation without rejecting discovery. Keep
+credentials out of tracked configuration and URLs. Optional Azure visual
+verification resolves its API key only when constructing the provider client.
+
+Credential capabilities must use `${NAME}` references in JSON configuration.
+Coding Agents may pass `{"$secret":"env:NAME"}` to secret-aware text tools.
+Generated steps retain that reference and resolve it only during execution;
+plaintext credentials and `[REDACTED]` placeholders are never persisted.
+
+
+## MCP client setup
+
+For an installed command on PATH, `.vscode/mcp.json` can use:
+
+```json
+{
+  "servers": {
+    "auto-genesis-mcp-mobile": {
+      "type": "stdio",
+      "command": "autogenesis-appium-mcp",
+      "args": ["--platform", "android", "--config", "/absolute/business/appium.json"]
+    }
+  }
+}
 ```
 
-The skill will automatically:
-- Locate the scenario from .feature files in behave-demo/features/
-- Parse all scenario steps
-- Execute each step through MCP tool calls
-- Handle retry logic and error recovery
-- Generate BDD test code
-- Save the generated code to your project
+Cursor uses the same command/arguments under `mcpServers`. An absolute command
+path in a virtual environment also works. A uvx client uses `command: "uvx"`
+with the artifact arguments above. stdin closure or process termination stops
+watchers and releases drivers. The installed and source entrypoints expose stdio only.
 
+The server publishes fixed instructions, prompts `execute_scenario`,
+`generate_scenario_test`, and `execute_natural_language_task`, and the read-only
+resource `autogenesis://agent-contract/identity`. Use the generation workflow for
+the selected scenario and its preview/confirmation steps. Default generated output
+is business-local `behave_demo/features/steps/common_steps.py`. Existing explicit
+feature/step paths retain their behavior.
 
-**For more examples and usage details, see:** [.github/skills/autoGenesis-run/](.github/skills/autoGenesis-run/)
+## Run from source
 
-### 7. Run Generated Test Code
+From the AutoGenesis repository root, in an activated development environment:
 
-Before running tests, install dependencies in the `behave-demo` directory:
+```bash
+python -m pip install /absolute/wheels/autogenesis_agent_contract-1.1.0-py3-none-any.whl -e ./appium-mcp-server
+python appium-mcp-server/simple_server.py --platform android --config /absolute/business/appium.json
+```
 
-    cd behave-demo
-    uv sync
+The source script calls the same synchronous main. With no `--config`, an
+existing source-side `appium-mcp-server/conf/appium_conf.json` retains legacy
+precedence. Copy the template there if needed. Package acceptance uses built
+wheels in a clean project, separate from this editable development setup.
 
-#### 7.1 Run Specific Scenario
+Existing Behave projects still use their `features/environment.py` MCP adapter.
+Select the matching `auto-genesis` server name when several are configured, then
+run `python -m behave --name "Scenario Name"` in the business project. The
+repository's `behave-demo` remains a separate example.
 
-Run a specific test scenario by name:
+For startup failures, check the selected config path, required environment
+references, and exact contract package. For automation failures, check Appium,
+device capabilities, and the device/cloud connection.
 
-    uv run python -m behave --name "Scenario Name"
-
-#### 7.2 More Options
-
-For more Behave run options and usage, please refer to [Behave Official Documentation](https://behave.readthedocs.io/).
-
-Common command examples:
-
-    # Generate JSON report
-    uv run python -m behave --format json -o reports/results.json
-    
-    # Filter using tags
-    uv run python -m behave --tags=@smoke
-    
-    # Verbose output
-    uv run python -m behave -v
-
-
-## Advanced Configuration
-
-### Azure GPT Integration (Optional)
-
-#### Configure Azure OpenAI
-
-Set environment variables for Azure OpenAI integration:
-
-    $env:AZURE_OPENAI_ENDPOINT = "your-endpoint"
-    $env:AZURE_OPENAI_API_KEY = "your-api-key"
-    $env:AZURE_OPENAI_DEPLOYMENT = "your-deployment-name"
-
-Then configure Azure OpenAI credentials in `llm/chat.py` to enable screenshot analysis functionality.
-
-### Local Appium Server (Optional)
-
-If not using BrowserStack, you can configure a local Appium Server.
-
-#### Install Appium
-
-Install Appium and required drivers globally:
-
-    npm install -g appium
-    appium driver install uiautomator2
-    appium driver install xcuitest
-
-**Detailed Configuration Reference:**
-- Android environment configuration: refer to [Appium Android Official Documentation](https://appium.io/docs/en/drivers/android-uiautomator2/)
-- iOS environment configuration: refer to [Appium iOS Official Documentation](https://appium.io/docs/en/drivers/ios-xcuitest/)
-- Appium installation guide: refer to [Appium Official Installation Documentation](https://appium.io/docs/en/about-appium/getting-started/)
-
-
-#### Update Configuration
-
-Create your local config first (if you have not created it yet):
-
-    cp conf/appium_conf.template.json conf/appium_conf.json
-
-Edit `conf/appium_conf.json` for local server:
-
-    # {
-    #   "appiumServer": "http://localhost:4723",
-    #   "platformName": "Android",
-    #   "deviceName": "emulator-5554",
-    #   "app": "/path/to/your/app.apk"
-    # }
-
-#### Start Appium Server
-
-Start the local Appium server:
-
-    appium
-
-## Troubleshooting
-
-### MCP Server Cannot Start
-
-Check Python version and dependencies:
-
-    python --version
-    uv pip list
-
-Or try re-syncing:
-
-    uv sync
-
-Ensure Python version is 3.10 or higher. Check the log file `logs/mcp_server.log` for detailed error information.
-
-### BrowserStack Connection Failed
-
-- Verify username and key are correct
-- Check network connection
-- Confirm BrowserStack account is active
-- Check firewall settings
-
-### AI Client Cannot Recognize MCP Tools
-
-- Restart VS Code or Cursor
-- Check if MCP configuration file path is correct
-- Confirm MCP Server has started successfully
-- Verify Python path configuration
-
-### Generated Code Cannot Run
-
-Run tests in verbose mode to see detailed logs:
-
-    behave -v
-
-Check Appium configuration file and device connection status.
-
-## Example Use Cases
-
-View examples in the `behave-demo/features/` directory:
-
-- `demo.feature` - Contains complete test scenario examples
-
-## Contributing
-
-Contributions are welcome! Please check [CONTRIBUTING.md](../CONTRIBUTING.md) for details.
-
-## Contact
-
-For questions or suggestions, please contact: autogenesis@microsoft.com
-
-## License
-
-Please check [LICENSE]
-
+Uninstall with `python -m pip uninstall autogenesis-appium-mcp autogenesis-agent-contract`
+inside its virtual environment, or remove that environment and its MCP client
+entry. Business configuration and generated tests remain in the business project.
