@@ -1,18 +1,16 @@
 # Copyright (c) Microsoft Corporation.
 # Licensed under the MIT license.
 
-from langchain_openai import AzureChatOpenAI, ChatOpenAI
-from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_openai import AzureChatOpenAI
 from langchain_core.messages import HumanMessage
-from langchain_anthropic import ChatAnthropic
-from llm.prompt import img_task_prompt, ImgTaskResponse
+from ..llm.prompt import img_task_prompt, ImgTaskResponse
 import os
 import base64
 import io
 from PIL import Image
-from typing import Union
 import requests
 import logging
+from pathlib import Path
 from dotenv import load_dotenv
 
 DEFAULT_TEMPERATURE = 0.2
@@ -34,7 +32,7 @@ class LLMClient:
     """
 
     def __init__(self):
-        load_dotenv()
+        load_dotenv(Path.cwd() / ".env", override=False)
         self.model_name = DEFAULT_MODEL_NAME
         self.temperature = DEFAULT_TEMPERATURE
         self.max_tokens = DEFAULT_MAX_TOKENS
@@ -43,11 +41,10 @@ class LLMClient:
         self.api_key = os.getenv(AZURE_OPENAI_API_KEY_ENV)
         self.azure_endpoint = os.getenv(AZURE_OPENAI_ENDPOINT_ENV)
         self.local_lm_endpoint = DEFAULT_LOCAL_LM_ENDPOINT
-        # logging.info(f"LLMClient initialized with: {self.__dict__}")
 
     def get_azure_model(
         self,
-    ) -> Union[ChatOpenAI, ChatGoogleGenerativeAI, ChatAnthropic, AzureChatOpenAI]:
+    ) -> AzureChatOpenAI:
         """
         Returns an instance of the appropriate chat model based on the model name.
 
@@ -77,7 +74,7 @@ class LLMClient:
                 timeout=self.timeout,
             )
         else:
-            raise ValueError(f"Unsupported model name: {self.model_name}")
+            raise ValueError("Unsupported visual verification model.")
 
     def compress_image(self, image_data: bytes, target_length: int = 60000) -> bytes:
         """
@@ -184,7 +181,7 @@ class LLMClient:
         }
         response = requests.post(f"{self.local_lm_endpoint}/v1/chat/completions", json=payload, timeout=30)
         if response.status_code != 200:
-            raise Exception(f"Failed to get response from local LLM: {response.status_code} - {response.text}")
+            raise RuntimeError("Local visual verification provider returned an unsuccessful response.")
         data = response.json()
         full_response = ""
         if "choices" in data:
@@ -210,10 +207,10 @@ class LLMClient:
                     logging.warning("gpt-5.4 model not found in local copilot tags.")
                     return False
             else:
-                logging.error(f"Failed to check local copilot availability: {response.status_code} - {response.text}")
+                logging.error("Local visual verification provider is unavailable.")
                 return False
         except Exception as e:
-            logging.error(f"Error checking local copilot availability: {repr(e)}")
+            logging.error("Local visual verification provider is unavailable.")
             return False
 
     def azure_gpt_available(self) -> bool:
@@ -224,32 +221,3 @@ def is_ai_enabled() -> bool:
     """Check if AI functionality is properly configured."""
     client = LLMClient()
     return client.azure_gpt_available() or client.local_copilot_available()
-
-
-if __name__ == "__main__":
-    client = LLMClient()
-
-    # Task description
-    task_info = "Determine if the search box is located at the bottom of the screenshot."
-    path = r"C:\Users\zhengdawang\Pictures\edge-screenshot\train\IMG_8973.png"
-
-    # Read the image file
-    try:
-        with open(path, "rb") as image_file:
-            image_data = image_file.read()
-
-        data = client.compress_image(image_data=image_data)
-        with open("compressed_image.jpg", "wb") as f:
-            f.write(data)
-    except FileNotFoundError:
-        print(f"Error: File not found at {path}")
-        exit(1)
-
-    # Call evaluate_task
-    # try:
-    #     response = client.evaluate_task(task_info=task_info, image_data=image_data)
-    #     print("Task Evaluation Result:")
-    #     print(f"Result: {response.result}")
-    #     print(f"Reason: {response.reason}")
-    # except Exception as e:
-    #     print(f"Error during task evaluation: {e}")

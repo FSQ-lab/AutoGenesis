@@ -1,13 +1,14 @@
+from ..security import safe_error
 # Copyright (c) Microsoft Corporation.
 # Licensed under the MIT license.
 
 import logging
 import time
-from utils.element_util import fill_snapshot, find_element_by_kwargs
-from utils.logger import log_tool_call
-from utils.response_format import format_tool_response, init_tool_response
-from utils.gen_code import record_calls
-from llm.chat import LLMClient
+from ..utils.element_util import fill_snapshot, find_element_by_kwargs
+from ..utils.logger import log_tool_call
+from ..utils.response_format import format_tool_response, init_tool_response
+from ..utils.gen_code import record_calls
+from ..llm.chat import LLMClient
 import io
 from pywinauto.findwindows import ElementAmbiguousError
 
@@ -88,19 +89,19 @@ def register_verify_tools(mcp, app_manager):
                     resp["status"] = "success"
                 else:
                     resp["status"] = "failed"
-                    resp["error"] = f"[{search_kwargs}] of [{parent_search_kwargs}] not found within {timeout} seconds."
-                    logger.error(f"{resp['error']}: {search_kwargs}")
+                    resp["error"] = safe_error()
+                    logger.error('[redacted]: [redacted]')
             else:
-                raise NotImplementedError(f"Not implemented for {control_framework} framework.")
+                raise NotImplementedError('Not implemented for [redacted] framework.')
 
             # await fill_snapshot(resp, app_manager, need_snapshot=need_snapshot)
         except ElementAmbiguousError as e:
             resp["status"] = "success"
-            resp["info"] = f"{str(e)}"
+            resp["info"] = "Element exists; multiple controls matched the requested locator."
         except Exception as e:
             resp["status"] = "error"
-            resp["error"] = repr(e)
-            logger.error(f"Error in verify_element_exists for '{name}': {e}")
+            resp["error"] = safe_error()
+            logger.error("Error in verify_element_exists for '[redacted]': [redacted]")
 
         return format_tool_response(resp)
 
@@ -164,22 +165,22 @@ def register_verify_tools(mcp, app_manager):
                     resp["status"] = "success"
                 else:
                     resp["status"] = "failed"
-                    resp["error"] = f"[{search_kwargs}] of [{parent_search_kwargs}] found."
-                    logger.error(f"{resp['error']}: {search_kwargs}")
+                    resp["error"] = safe_error()
+                    logger.error('[redacted]: [redacted]')
             else:
-                raise NotImplementedError(f"Not implemented for {control_framework} framework.")
+                raise NotImplementedError('Not implemented for [redacted] framework.')
 
             # await fill_snapshot(resp, app_manager, need_snapshot=need_snapshot)
         except ElementAmbiguousError as e:
             resp["status"] = "failed"
-            resp["info"] = f"{repr(e)}"
+            resp["info"] = "Multiple controls matched the requested locator."
         except TimeoutError:
             resp["status"] = "success"
-            resp["info"] = f"Element '{name}' not found within {timeout} seconds, as expected."
+            resp["info"] = "Element is absent within the requested timeout, as expected."
         except Exception as e:
             resp["status"] = "error"
-            resp["error"] = repr(e)
-            logger.error(f"Error in verify_element_not_exist for '{name}': {repr(e)}")
+            resp["error"] = safe_error()
+            logger.error("Error in verify_element_not_exist for '[redacted]': [redacted]")
 
         return format_tool_response(resp)
 
@@ -261,20 +262,20 @@ def register_verify_tools(mcp, app_manager):
                         resp["data"]["actual_state"] = actual_state
                     else:
                         resp["status"] = "failed"
-                        resp["error"] = f"Checkbox state mismatch. Expected: '{expected_state}', Actual: '{actual_state}'"
-                        logger.error(resp["error"])
+                        resp["error"] = safe_error()
+                        logger.error('Automation operation diagnostic; sensitive details withheld.')
                 else:
                     resp["status"] = "failed"
-                    resp["error"] = f"[{search_kwargs}] not found within {timeout} seconds."
-                    logger.error(resp['error'])
+                    resp["error"] = safe_error()
+                    logger.error('Automation operation diagnostic; sensitive details withheld.')
             else:
-                raise NotImplementedError(f"Not implemented for {control_framework} framework.")
+                raise NotImplementedError('Not implemented for [redacted] framework.')
 
             await fill_snapshot(resp, app_manager, need_snapshot=need_snapshot)
         except Exception as e:
             resp["status"] = "error"
-            resp["error"] = repr(e)
-            logger.error(f"Error in verify_checkbox_state for '{name}': {repr(e)}")
+            resp["error"] = safe_error()
+            logger.error("Error in verify_checkbox_state for '[redacted]': [redacted]")
 
         return format_tool_response(resp)
 
@@ -353,20 +354,20 @@ def register_verify_tools(mcp, app_manager):
                         resp["status"] = "success"
                     else:
                         resp["status"] = "failed"
-                        resp["error"] = f"Element value mismatch. Expected: '{expected_value}', Actual: '{actual_value}'"
-                        logger.error(resp["error"])
+                        resp["error"] = safe_error()
+                        logger.error('Automation operation diagnostic; sensitive details withheld.')
                 else:
                     resp["status"] = "failed"
-                    resp["error"] = f"[{search_kwargs}] of [{parent_search_kwargs}] not found within {timeout} seconds."
-                    logger.error(f"{resp['error']}: {search_kwargs}")
+                    resp["error"] = safe_error()
+                    logger.error('[redacted]: [redacted]')
             else:
-                raise NotImplementedError(f"Not implemented for {control_framework} framework.")
+                raise NotImplementedError('Not implemented for [redacted] framework.')
 
             await fill_snapshot(resp, app_manager, need_snapshot=need_snapshot)
         except Exception as e:
             resp["status"] = "error"
-            resp["error"] = repr(e)
-            logger.error(f"Error in verify_element_value for '{expected_value}': {e}")
+            resp["error"] = safe_error()
+            logger.error("Error in verify_element_value for '[redacted]': [redacted]")
 
         return format_tool_response(resp)
 
@@ -437,12 +438,12 @@ def register_verify_tools(mcp, app_manager):
                     )
                     if exists:
                         elsements.append(element.element_info)
-                        logger.info(f"Element [{search_kwargs}] found, search cost: {time.time() - time_s:.3f}s")
+                        logger.info('Element [[redacted]] found, search cost: [redacted]s')
                         if siblings is None:
                             siblings = element.element_info.parent.children()
-                            logger.info(f"Finding siblings for element '{name}', total siblings: {len(siblings)}, search cost: {time.time() - time_s:.3f}s")
+                            logger.info("Finding siblings for element '[redacted]', total siblings: [redacted], search cost: [redacted]s")
                     else:
-                        raise Exception(f"[{search_kwargs}] of [{parent_search_kwargs}] not found within {timeout} seconds.")
+                        raise Exception('[[redacted]] of [[redacted]] not found within [redacted] seconds.')
 
                 for element_info in elsements:
                     elements_real_order.append(siblings.index(element_info) + 1)
@@ -454,18 +455,18 @@ def register_verify_tools(mcp, app_manager):
                     resp["status"] = "success"
                 else:
                     resp["status"] = "failed"
-                    resp["error"] = f"Elements are not in the expected order. Expected: {expected_orders}, Actual: {elements_real_order}"
-                    logger.error(resp["error"])
+                    resp["error"] = safe_error()
+                    logger.error('Automation operation diagnostic; sensitive details withheld.')
             else:
                 raise NotImplementedError(
-                    f"{control_framework} framework does not support order verification directly. Please use pywinauto for this operation."
+                    '[redacted] framework does not support order verification directly. Please use pywinauto for this operation.'
                 )
 
             await fill_snapshot(resp, app_manager, need_snapshot=need_snapshot)
         except Exception as e:
             resp["status"] = "error"
-            resp["error"] = repr(e)
-            logger.error(f"Error in verify_elements_order: {repr(e)}")
+            resp["error"] = safe_error()
+            logger.error('Error in verify_elements_order: [redacted]')
 
         return format_tool_response(resp)
 
@@ -521,10 +522,10 @@ def register_verify_tools(mcp, app_manager):
                 "step_raw": step_raw,
             }
             if resp["status"] == "error":
-                resp["error"] = result.reason
+                resp["error"] = safe_error()
         except Exception as e:
             resp["status"] = "error"
-            resp["error"] = repr(e)
-            logger.error(f"Error in verify_visual_task: {e}")
+            resp["error"] = safe_error()
+            logger.error('Error in verify_visual_task: [redacted]')
 
         return format_tool_response(resp)

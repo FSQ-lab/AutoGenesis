@@ -1,0 +1,1375 @@
+{
+  "source_revision": "c36fb91d364808bb2a26143749ca65c6cfaa8cd4",
+  "source": "pywinauto-mcp-server/tools/*.py (pre-package function annotations/defaults)",
+  "tools": {
+    "app_launch": {
+      "properties": {
+        "caller": {
+          "title": "Caller",
+          "type": "string"
+        },
+        "scenario": {
+          "title": "Scenario",
+          "type": "string",
+          "default": ""
+        },
+        "step": {
+          "title": "Step",
+          "type": "string",
+          "default": ""
+        },
+        "step_raw": {
+          "title": "Step Raw",
+          "type": "string",
+          "default": ""
+        },
+        "need_snapshot": {
+          "title": "Need Snapshot",
+          "type": "integer",
+          "default": 1
+        }
+      },
+      "title": "app_launchArguments",
+      "type": "object",
+      "required": [
+        "caller"
+      ]
+    },
+    "app_screenshot": {
+      "properties": {
+        "caller": {
+          "title": "Caller",
+          "type": "string"
+        },
+        "path": {
+          "title": "Path",
+          "type": "string",
+          "default": "screenshots/screenshot.png"
+        },
+        "scenario": {
+          "title": "Scenario",
+          "type": "string",
+          "default": ""
+        },
+        "step_raw": {
+          "title": "Step Raw",
+          "type": "string",
+          "default": ""
+        },
+        "step": {
+          "title": "Step",
+          "type": "string",
+          "default": ""
+        }
+      },
+      "title": "app_screenshotArguments",
+      "type": "object",
+      "required": [
+        "caller"
+      ]
+    },
+    "app_close": {
+      "properties": {
+        "caller": {
+          "title": "Caller",
+          "type": "string"
+        },
+        "scenario": {
+          "title": "Scenario",
+          "type": "string",
+          "default": ""
+        },
+        "step_raw": {
+          "title": "Step Raw",
+          "type": "string",
+          "default": ""
+        },
+        "step": {
+          "title": "Step",
+          "type": "string",
+          "default": ""
+        }
+      },
+      "title": "app_closeArguments",
+      "type": "object",
+      "required": [
+        "caller"
+      ]
+    },
+    "element_click": {
+      "properties": {
+        "caller": {
+          "title": "Caller",
+          "type": "string"
+        },
+        "control_framework": {
+          "title": "Control Framework",
+          "type": "string"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "control_type": {
+          "title": "Control Type",
+          "type": "string"
+        },
+        "automation_id": {
+          "title": "Automation Id",
+          "type": "string",
+          "default": ""
+        },
+        "control_idx": {
+          "title": "Control Idx",
+          "type": "integer",
+          "default": 1
+        },
+        "class_name": {
+          "title": "Class Name",
+          "type": "string",
+          "default": ""
+        },
+        "parent_name": {
+          "title": "Parent Name",
+          "type": "string",
+          "default": ""
+        },
+        "parent_control_type": {
+          "title": "Parent Control Type",
+          "type": "string",
+          "default": ""
+        },
+        "parent_automation_id": {
+          "title": "Parent Automation Id",
+          "type": "string",
+          "default": ""
+        },
+        "main_window_type": {
+          "title": "Main Window Type",
+          "type": "string",
+          "default": ""
+        },
+        "click_count": {
+          "title": "Click Count",
+          "type": "integer",
+          "default": 1
+        },
+        "scenario": {
+          "title": "Scenario",
+          "type": "string",
+          "default": ""
+        },
+        "step_raw": {
+          "title": "Step Raw",
+          "type": "string",
+          "default": ""
+        },
+        "step": {
+          "title": "Step",
+          "type": "string",
+          "default": ""
+        },
+        "timeout": {
+          "title": "Timeout",
+          "type": "integer",
+          "default": 5
+        },
+        "need_snapshot": {
+          "title": "Need Snapshot",
+          "type": "integer",
+          "default": 1
+        }
+      },
+      "title": "element_clickArguments",
+      "type": "object",
+      "required": [
+        "caller",
+        "control_framework",
+        "name",
+        "control_type"
+      ]
+    },
+    "right_click": {
+      "properties": {
+        "caller": {
+          "title": "Caller",
+          "type": "string"
+        },
+        "control_framework": {
+          "title": "Control Framework",
+          "type": "string"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "control_type": {
+          "title": "Control Type",
+          "type": "string"
+        },
+        "automation_id": {
+          "title": "Automation Id",
+          "type": "string",
+          "default": ""
+        },
+        "control_idx": {
+          "title": "Control Idx",
+          "type": "integer",
+          "default": 1
+        },
+        "class_name": {
+          "title": "Class Name",
+          "type": "string",
+          "default": ""
+        },
+        "parent_name": {
+          "title": "Parent Name",
+          "type": "string",
+          "default": ""
+        },
+        "parent_control_type": {
+          "title": "Parent Control Type",
+          "type": "string",
+          "default": ""
+        },
+        "parent_automation_id": {
+          "title": "Parent Automation Id",
+          "type": "string",
+          "default": ""
+        },
+        "main_window_type": {
+          "title": "Main Window Type",
+          "type": "string",
+          "default": ""
+        },
+        "scenario": {
+          "title": "Scenario",
+          "type": "string",
+          "default": ""
+        },
+        "step_raw": {
+          "title": "Step Raw",
+          "type": "string",
+          "default": ""
+        },
+        "step": {
+          "title": "Step",
+          "type": "string",
+          "default": ""
+        },
+        "timeout": {
+          "title": "Timeout",
+          "type": "integer",
+          "default": 5
+        },
+        "need_snapshot": {
+          "title": "Need Snapshot",
+          "type": "integer",
+          "default": 1
+        }
+      },
+      "title": "right_clickArguments",
+      "type": "object",
+      "required": [
+        "caller",
+        "control_framework",
+        "name",
+        "control_type"
+      ]
+    },
+    "send_keystrokes": {
+      "properties": {
+        "caller": {
+          "title": "Caller",
+          "type": "string"
+        },
+        "key_sequence_raw": {
+          "title": "Key Sequence Raw",
+          "type": "string"
+        },
+        "key_sequence_formatted": {
+          "title": "Key Sequence Formatted",
+          "type": "string"
+        },
+        "step_raw": {
+          "title": "Step Raw",
+          "type": "string",
+          "default": ""
+        },
+        "step": {
+          "title": "Step",
+          "type": "string",
+          "default": ""
+        },
+        "scenario": {
+          "title": "Scenario",
+          "type": "string",
+          "default": ""
+        },
+        "need_snapshot": {
+          "title": "Need Snapshot",
+          "type": "integer",
+          "default": 1
+        }
+      },
+      "title": "send_keystrokesArguments",
+      "type": "object",
+      "required": [
+        "caller",
+        "key_sequence_raw",
+        "key_sequence_formatted"
+      ]
+    },
+    "enter_text": {
+      "properties": {
+        "caller": {
+          "title": "Caller",
+          "type": "string"
+        },
+        "control_framework": {
+          "title": "Control Framework",
+          "type": "string"
+        },
+        "title": {
+          "title": "Title",
+          "type": "string"
+        },
+        "content": {
+          "title": "Content",
+          "type": "string"
+        },
+        "control_type": {
+          "title": "Control Type",
+          "type": "string"
+        },
+        "automation_id": {
+          "title": "Automation Id",
+          "type": "string"
+        },
+        "control_idx": {
+          "title": "Control Idx",
+          "type": "integer",
+          "default": 1
+        },
+        "class_name": {
+          "title": "Class Name",
+          "type": "string",
+          "default": ""
+        },
+        "parent_name": {
+          "title": "Parent Name",
+          "type": "string",
+          "default": ""
+        },
+        "parent_control_type": {
+          "title": "Parent Control Type",
+          "type": "string",
+          "default": ""
+        },
+        "parent_automation_id": {
+          "title": "Parent Automation Id",
+          "type": "string",
+          "default": ""
+        },
+        "scenario": {
+          "title": "Scenario",
+          "type": "string",
+          "default": ""
+        },
+        "step_raw": {
+          "title": "Step Raw",
+          "type": "string",
+          "default": ""
+        },
+        "step": {
+          "title": "Step",
+          "type": "string",
+          "default": ""
+        },
+        "timeout": {
+          "title": "Timeout",
+          "type": "integer",
+          "default": 5
+        },
+        "need_snapshot": {
+          "title": "Need Snapshot",
+          "type": "integer",
+          "default": 1
+        }
+      },
+      "title": "enter_textArguments",
+      "type": "object",
+      "required": [
+        "caller",
+        "control_framework",
+        "title",
+        "content",
+        "control_type",
+        "automation_id"
+      ]
+    },
+    "open_folder": {
+      "properties": {
+        "caller": {
+          "title": "Caller",
+          "type": "string"
+        },
+        "control_framework": {
+          "title": "Control Framework",
+          "type": "string"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "control_type": {
+          "title": "Control Type",
+          "type": "string"
+        },
+        "automation_id": {
+          "title": "Automation Id",
+          "type": "string",
+          "default": ""
+        },
+        "control_idx": {
+          "title": "Control Idx",
+          "type": "integer",
+          "default": 1
+        },
+        "class_name": {
+          "title": "Class Name",
+          "type": "string",
+          "default": ""
+        },
+        "parent_name": {
+          "title": "Parent Name",
+          "type": "string",
+          "default": ""
+        },
+        "parent_control_type": {
+          "title": "Parent Control Type",
+          "type": "string",
+          "default": ""
+        },
+        "parent_automation_id": {
+          "title": "Parent Automation Id",
+          "type": "string",
+          "default": ""
+        },
+        "scenario": {
+          "title": "Scenario",
+          "type": "string",
+          "default": ""
+        },
+        "step_raw": {
+          "title": "Step Raw",
+          "type": "string",
+          "default": ""
+        },
+        "step": {
+          "title": "Step",
+          "type": "string",
+          "default": ""
+        },
+        "timeout": {
+          "title": "Timeout",
+          "type": "integer",
+          "default": 5
+        },
+        "need_snapshot": {
+          "title": "Need Snapshot",
+          "type": "integer",
+          "default": 1
+        }
+      },
+      "title": "open_folderArguments",
+      "type": "object",
+      "required": [
+        "caller",
+        "control_framework",
+        "name",
+        "control_type"
+      ]
+    },
+    "select_item": {
+      "properties": {
+        "caller": {
+          "title": "Caller",
+          "type": "string"
+        },
+        "control_framework": {
+          "title": "Control Framework",
+          "type": "string"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "control_type": {
+          "title": "Control Type",
+          "type": "string"
+        },
+        "automation_id": {
+          "title": "Automation Id",
+          "type": "string",
+          "default": ""
+        },
+        "control_idx": {
+          "title": "Control Idx",
+          "type": "integer",
+          "default": 1
+        },
+        "class_name": {
+          "title": "Class Name",
+          "type": "string",
+          "default": ""
+        },
+        "parent_name": {
+          "title": "Parent Name",
+          "type": "string",
+          "default": ""
+        },
+        "parent_control_type": {
+          "title": "Parent Control Type",
+          "type": "string",
+          "default": ""
+        },
+        "parent_automation_id": {
+          "title": "Parent Automation Id",
+          "type": "string",
+          "default": ""
+        },
+        "scenario": {
+          "title": "Scenario",
+          "type": "string",
+          "default": ""
+        },
+        "step_raw": {
+          "title": "Step Raw",
+          "type": "string",
+          "default": ""
+        },
+        "step": {
+          "title": "Step",
+          "type": "string",
+          "default": ""
+        },
+        "timeout": {
+          "title": "Timeout",
+          "type": "integer",
+          "default": 5
+        },
+        "need_snapshot": {
+          "title": "Need Snapshot",
+          "type": "integer",
+          "default": 1
+        }
+      },
+      "title": "select_itemArguments",
+      "type": "object",
+      "required": [
+        "caller",
+        "control_framework",
+        "name",
+        "control_type"
+      ]
+    },
+    "app_wait": {
+      "properties": {
+        "caller": {
+          "title": "Caller",
+          "type": "string"
+        },
+        "duration": {
+          "title": "Duration",
+          "type": "number"
+        },
+        "scenario": {
+          "title": "Scenario",
+          "type": "string",
+          "default": ""
+        },
+        "step_raw": {
+          "title": "Step Raw",
+          "type": "string",
+          "default": ""
+        },
+        "step": {
+          "title": "Step",
+          "type": "string",
+          "default": ""
+        },
+        "need_snapshot": {
+          "title": "Need Snapshot",
+          "type": "integer",
+          "default": 0
+        }
+      },
+      "title": "app_waitArguments",
+      "type": "object",
+      "required": [
+        "caller",
+        "duration"
+      ]
+    },
+    "before_gen_code": {
+      "properties": {
+        "feature_file": {
+          "title": "Feature File",
+          "type": "string",
+          "default": ""
+        },
+        "step_file": {
+          "title": "Step File",
+          "type": "string",
+          "default": ""
+        }
+      },
+      "title": "before_gen_codeArguments",
+      "type": "object"
+    },
+    "preview_code_changes": {
+      "properties": {},
+      "title": "preview_code_changesArguments",
+      "type": "object"
+    },
+    "confirm_code_changes": {
+      "properties": {},
+      "title": "confirm_code_changesArguments",
+      "type": "object"
+    },
+    "mouse_drag_drop": {
+      "properties": {
+        "caller": {
+          "title": "Caller",
+          "type": "string"
+        },
+        "control_framework": {
+          "title": "Control Framework",
+          "type": "string"
+        },
+        "source_title": {
+          "title": "Source Title",
+          "type": "string",
+          "default": ""
+        },
+        "source_control_type": {
+          "title": "Source Control Type",
+          "type": "string",
+          "default": ""
+        },
+        "from_type": {
+          "title": "From Type",
+          "type": "string",
+          "default": "element"
+        },
+        "from_x": {
+          "title": "From X",
+          "type": "integer",
+          "default": 0
+        },
+        "from_y": {
+          "title": "From Y",
+          "type": "integer",
+          "default": 0
+        },
+        "drag_type": {
+          "title": "Drag Type",
+          "type": "string",
+          "default": "to_element"
+        },
+        "target_title": {
+          "title": "Target Title",
+          "type": "string",
+          "default": ""
+        },
+        "target_control_type": {
+          "title": "Target Control Type",
+          "type": "string",
+          "default": ""
+        },
+        "x_offset": {
+          "title": "X Offset",
+          "type": "integer",
+          "default": 0
+        },
+        "y_offset": {
+          "title": "Y Offset",
+          "type": "integer",
+          "default": 0
+        },
+        "mouse_button": {
+          "title": "Mouse Button",
+          "type": "string",
+          "default": "left"
+        },
+        "scenario": {
+          "title": "Scenario",
+          "type": "string",
+          "default": ""
+        },
+        "step_raw": {
+          "title": "Step Raw",
+          "type": "string",
+          "default": ""
+        },
+        "step": {
+          "title": "Step",
+          "type": "string",
+          "default": ""
+        },
+        "timeout": {
+          "title": "Timeout",
+          "type": "integer",
+          "default": 5
+        },
+        "need_snapshot": {
+          "title": "Need Snapshot",
+          "type": "integer",
+          "default": 1
+        }
+      },
+      "title": "mouse_drag_dropArguments",
+      "type": "object",
+      "required": [
+        "caller",
+        "control_framework"
+      ]
+    },
+    "mouse_hover": {
+      "properties": {
+        "caller": {
+          "title": "Caller",
+          "type": "string"
+        },
+        "control_framework": {
+          "title": "Control Framework",
+          "type": "string"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "control_type": {
+          "title": "Control Type",
+          "type": "string"
+        },
+        "automation_id": {
+          "title": "Automation Id",
+          "type": "string",
+          "default": ""
+        },
+        "control_idx": {
+          "title": "Control Idx",
+          "type": "integer",
+          "default": 1
+        },
+        "class_name": {
+          "title": "Class Name",
+          "type": "string",
+          "default": ""
+        },
+        "parent_name": {
+          "title": "Parent Name",
+          "type": "string",
+          "default": ""
+        },
+        "parent_control_type": {
+          "title": "Parent Control Type",
+          "type": "string",
+          "default": ""
+        },
+        "parent_automation_id": {
+          "title": "Parent Automation Id",
+          "type": "string",
+          "default": ""
+        },
+        "scenario": {
+          "title": "Scenario",
+          "type": "string",
+          "default": ""
+        },
+        "step_raw": {
+          "title": "Step Raw",
+          "type": "string",
+          "default": ""
+        },
+        "step": {
+          "title": "Step",
+          "type": "string",
+          "default": ""
+        },
+        "need_snapshot": {
+          "title": "Need Snapshot",
+          "type": "integer",
+          "default": 1
+        },
+        "timeout": {
+          "title": "Timeout",
+          "type": "integer",
+          "default": 5
+        }
+      },
+      "title": "mouse_hoverArguments",
+      "type": "object",
+      "required": [
+        "caller",
+        "control_framework",
+        "name",
+        "control_type"
+      ]
+    },
+    "mouse_scroll": {
+      "properties": {
+        "caller": {
+          "title": "Caller",
+          "type": "string"
+        },
+        "control_framework": {
+          "title": "Control Framework",
+          "type": "string"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "control_type": {
+          "title": "Control Type",
+          "type": "string"
+        },
+        "automation_id": {
+          "title": "Automation Id",
+          "type": "string",
+          "default": ""
+        },
+        "control_idx": {
+          "title": "Control Idx",
+          "type": "integer",
+          "default": 1
+        },
+        "class_name": {
+          "title": "Class Name",
+          "type": "string",
+          "default": ""
+        },
+        "wheel_dist": {
+          "title": "Wheel Dist",
+          "type": "integer",
+          "default": -5
+        },
+        "parent_name": {
+          "title": "Parent Name",
+          "type": "string",
+          "default": ""
+        },
+        "parent_control_type": {
+          "title": "Parent Control Type",
+          "type": "string",
+          "default": ""
+        },
+        "parent_automation_id": {
+          "title": "Parent Automation Id",
+          "type": "string",
+          "default": ""
+        },
+        "scenario": {
+          "title": "Scenario",
+          "type": "string",
+          "default": ""
+        },
+        "step_raw": {
+          "title": "Step Raw",
+          "type": "string",
+          "default": ""
+        },
+        "step": {
+          "title": "Step",
+          "type": "string",
+          "default": ""
+        },
+        "need_snapshot": {
+          "title": "Need Snapshot",
+          "type": "integer",
+          "default": 1
+        },
+        "timeout": {
+          "title": "Timeout",
+          "type": "integer",
+          "default": 5
+        }
+      },
+      "title": "mouse_scrollArguments",
+      "type": "object",
+      "required": [
+        "caller",
+        "control_framework",
+        "name",
+        "control_type"
+      ]
+    },
+    "verify_element_exists": {
+      "properties": {
+        "caller": {
+          "title": "Caller",
+          "type": "string"
+        },
+        "control_framework": {
+          "title": "Control Framework",
+          "type": "string"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "control_type": {
+          "title": "Control Type",
+          "type": "string"
+        },
+        "automation_id": {
+          "title": "Automation Id",
+          "type": "string",
+          "default": ""
+        },
+        "class_name": {
+          "title": "Class Name",
+          "type": "string",
+          "default": ""
+        },
+        "control_idx": {
+          "title": "Control Idx",
+          "type": "integer",
+          "default": 1
+        },
+        "parent_name": {
+          "title": "Parent Name",
+          "type": "string",
+          "default": ""
+        },
+        "parent_control_type": {
+          "title": "Parent Control Type",
+          "type": "string",
+          "default": ""
+        },
+        "parent_automation_id": {
+          "title": "Parent Automation Id",
+          "type": "string",
+          "default": ""
+        },
+        "main_window_type": {
+          "title": "Main Window Type",
+          "type": "string",
+          "default": ""
+        },
+        "timeout": {
+          "title": "Timeout",
+          "type": "integer",
+          "default": 5
+        },
+        "scenario": {
+          "title": "Scenario",
+          "type": "string",
+          "default": ""
+        },
+        "step_raw": {
+          "title": "Step Raw",
+          "type": "string",
+          "default": ""
+        },
+        "step": {
+          "title": "Step",
+          "type": "string",
+          "default": ""
+        },
+        "need_snapshot": {
+          "title": "Need Snapshot",
+          "type": "integer",
+          "default": 1
+        }
+      },
+      "title": "verify_element_existsArguments",
+      "type": "object",
+      "required": [
+        "caller",
+        "control_framework",
+        "name",
+        "control_type"
+      ]
+    },
+    "verify_element_not_exist": {
+      "properties": {
+        "caller": {
+          "title": "Caller",
+          "type": "string"
+        },
+        "control_framework": {
+          "title": "Control Framework",
+          "type": "string"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "control_type": {
+          "title": "Control Type",
+          "type": "string"
+        },
+        "automation_id": {
+          "title": "Automation Id",
+          "type": "string",
+          "default": ""
+        },
+        "class_name": {
+          "title": "Class Name",
+          "type": "string",
+          "default": ""
+        },
+        "parent_name": {
+          "title": "Parent Name",
+          "type": "string",
+          "default": ""
+        },
+        "parent_control_type": {
+          "title": "Parent Control Type",
+          "type": "string",
+          "default": ""
+        },
+        "parent_automation_id": {
+          "title": "Parent Automation Id",
+          "type": "string",
+          "default": ""
+        },
+        "timeout": {
+          "title": "Timeout",
+          "type": "integer",
+          "default": 5
+        },
+        "scenario": {
+          "title": "Scenario",
+          "type": "string",
+          "default": ""
+        },
+        "step_raw": {
+          "title": "Step Raw",
+          "type": "string",
+          "default": ""
+        },
+        "step": {
+          "title": "Step",
+          "type": "string",
+          "default": ""
+        },
+        "need_snapshot": {
+          "title": "Need Snapshot",
+          "type": "integer",
+          "default": 1
+        }
+      },
+      "title": "verify_element_not_existArguments",
+      "type": "object",
+      "required": [
+        "caller",
+        "control_framework",
+        "name",
+        "control_type"
+      ]
+    },
+    "verify_checkbox_state": {
+      "properties": {
+        "caller": {
+          "title": "Caller",
+          "type": "string"
+        },
+        "control_framework": {
+          "title": "Control Framework",
+          "type": "string"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "expected_state": {
+          "title": "Expected State",
+          "type": "string"
+        },
+        "control_type": {
+          "title": "Control Type",
+          "type": "string"
+        },
+        "automation_id": {
+          "title": "Automation Id",
+          "type": "string",
+          "default": ""
+        },
+        "control_idx": {
+          "title": "Control Idx",
+          "type": "integer",
+          "default": 1
+        },
+        "class_name": {
+          "title": "Class Name",
+          "type": "string",
+          "default": ""
+        },
+        "parent_name": {
+          "title": "Parent Name",
+          "type": "string",
+          "default": ""
+        },
+        "parent_automation_id": {
+          "title": "Parent Automation Id",
+          "type": "string",
+          "default": ""
+        },
+        "parent_control_type": {
+          "title": "Parent Control Type",
+          "type": "string",
+          "default": ""
+        },
+        "timeout": {
+          "title": "Timeout",
+          "type": "integer",
+          "default": 5
+        },
+        "scenario": {
+          "title": "Scenario",
+          "type": "string",
+          "default": ""
+        },
+        "step_raw": {
+          "title": "Step Raw",
+          "type": "string",
+          "default": ""
+        },
+        "step": {
+          "title": "Step",
+          "type": "string",
+          "default": ""
+        },
+        "need_snapshot": {
+          "title": "Need Snapshot",
+          "type": "integer",
+          "default": 1
+        }
+      },
+      "title": "verify_checkbox_stateArguments",
+      "type": "object",
+      "required": [
+        "caller",
+        "control_framework",
+        "name",
+        "expected_state",
+        "control_type"
+      ]
+    },
+    "verify_element_value": {
+      "properties": {
+        "caller": {
+          "title": "Caller",
+          "type": "string"
+        },
+        "control_framework": {
+          "title": "Control Framework",
+          "type": "string"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "element_value": {
+          "title": "Element Value",
+          "type": "string"
+        },
+        "control_type": {
+          "title": "Control Type",
+          "type": "string"
+        },
+        "expected_value": {
+          "title": "Expected Value",
+          "type": "string"
+        },
+        "automation_id": {
+          "title": "Automation Id",
+          "type": "string",
+          "default": ""
+        },
+        "control_idx": {
+          "title": "Control Idx",
+          "type": "integer",
+          "default": 1
+        },
+        "class_name": {
+          "title": "Class Name",
+          "type": "string",
+          "default": ""
+        },
+        "parent_name": {
+          "title": "Parent Name",
+          "type": "string",
+          "default": ""
+        },
+        "parent_control_type": {
+          "title": "Parent Control Type",
+          "type": "string",
+          "default": ""
+        },
+        "parent_automation_id": {
+          "title": "Parent Automation Id",
+          "type": "string",
+          "default": ""
+        },
+        "step_raw": {
+          "title": "Step Raw",
+          "type": "string",
+          "default": ""
+        },
+        "step": {
+          "title": "Step",
+          "type": "string",
+          "default": ""
+        },
+        "scenario": {
+          "title": "Scenario",
+          "type": "string",
+          "default": ""
+        },
+        "timeout": {
+          "title": "Timeout",
+          "type": "integer",
+          "default": 5
+        },
+        "need_snapshot": {
+          "title": "Need Snapshot",
+          "type": "integer",
+          "default": 1
+        }
+      },
+      "title": "verify_element_valueArguments",
+      "type": "object",
+      "required": [
+        "caller",
+        "control_framework",
+        "name",
+        "element_value",
+        "control_type",
+        "expected_value"
+      ]
+    },
+    "verify_elements_order": {
+      "properties": {
+        "caller": {
+          "title": "Caller",
+          "type": "string"
+        },
+        "control_framework": {
+          "title": "Control Framework",
+          "type": "string"
+        },
+        "control_names": {
+          "title": "Control Names",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "control_type": {
+          "title": "Control Type",
+          "type": "string"
+        },
+        "automation_id": {
+          "title": "Automation Id",
+          "type": "string",
+          "default": ""
+        },
+        "control_idx": {
+          "title": "Control Idx",
+          "type": "integer",
+          "default": 1
+        },
+        "class_name": {
+          "title": "Class Name",
+          "type": "string",
+          "default": ""
+        },
+        "control_orders": {
+          "title": "Control Orders",
+          "type": "array",
+          "items": {
+            "type": "integer"
+          },
+          "default": []
+        },
+        "step_raw": {
+          "title": "Step Raw",
+          "type": "string",
+          "default": ""
+        },
+        "step": {
+          "title": "Step",
+          "type": "string",
+          "default": ""
+        },
+        "scenario": {
+          "title": "Scenario",
+          "type": "string",
+          "default": ""
+        },
+        "timeout": {
+          "title": "Timeout",
+          "type": "integer",
+          "default": 5
+        },
+        "need_snapshot": {
+          "title": "Need Snapshot",
+          "type": "integer",
+          "default": 1
+        }
+      },
+      "title": "verify_elements_orderArguments",
+      "type": "object",
+      "required": [
+        "caller",
+        "control_framework",
+        "control_names",
+        "control_type"
+      ]
+    },
+    "verify_visual_task": {
+      "properties": {
+        "caller": {
+          "title": "Caller",
+          "type": "string"
+        },
+        "screenshot_path": {
+          "title": "Screenshot Path",
+          "type": "string"
+        },
+        "task_description": {
+          "title": "Task Description",
+          "type": "string"
+        },
+        "scenario": {
+          "title": "Scenario",
+          "type": "string",
+          "default": ""
+        },
+        "step_raw": {
+          "title": "Step Raw",
+          "type": "string",
+          "default": ""
+        },
+        "step": {
+          "title": "Step",
+          "type": "string",
+          "default": ""
+        }
+      },
+      "title": "verify_visual_taskArguments",
+      "type": "object",
+      "required": [
+        "caller",
+        "screenshot_path",
+        "task_description"
+      ]
+    }
+  }
+}

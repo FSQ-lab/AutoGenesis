@@ -1,3 +1,4 @@
+from ..security import safe_error
 # Copyright (c) Microsoft Corporation.
 # Licensed under the MIT license.
 
@@ -8,10 +9,10 @@ import sys
 import time
 import uuid
 from pathlib import Path
-from utils.logger import log_tool_call
-from utils.gen_code import HEADER_AUTO_GEN, STEPS_DIR_DEFAULT, TARGET_STEP_FILE_DEFAULT
-from utils.gen_code import gen_code_preview, ensure_step_path_exists, gen_step_file_from_feature_path, parse_steps_dir_from_step_path
-from utils.response_format import format_tool_response, init_tool_response
+from ..utils.logger import log_tool_call
+from ..utils.gen_code import HEADER_AUTO_GEN, STEPS_DIR_DEFAULT, TARGET_STEP_FILE_DEFAULT
+from ..utils.gen_code import gen_code_preview, ensure_step_path_exists, gen_step_file_from_feature_path, parse_steps_dir_from_step_path
+from ..utils.response_format import format_tool_response, init_tool_response
 
 
 logger = logging.getLogger(__name__)
@@ -47,7 +48,7 @@ def register_gen_code_tools(mcp, app_manager):
             resp = init_tool_response()
             app_manager.clear_gen_code_cache()
             app_manager.gen_code_id = str(uuid.uuid4())
-            logger.info(f"[GEN CODE START]:{app_manager.gen_code_id}")
+            logger.info('[GEN CODE START]:[redacted]')
         
             if step_file and step_file.endswith('.py'):
                 app_manager.steps_dir = parse_steps_dir_from_step_path(step_file)
@@ -65,8 +66,8 @@ def register_gen_code_tools(mcp, app_manager):
                 "step_file_target": app_manager.step_file_target,
             }
         except Exception as e:
-            resp["error"] = f"Error during code generation: {repr(e)}"
-            logger.error(f"Error during code generation: {repr(e)}")
+            resp["error"] = safe_error()
+            logger.error('Error during code generation: [redacted]')
             raise e
 
         return format_tool_response(resp)
@@ -103,8 +104,8 @@ def register_gen_code_tools(mcp, app_manager):
             result = f"Applied {len(app_manager.proposed_changes)} new steps to {app_manager.step_file_target}"
             app_manager.new_steps_count = len(app_manager.proposed_changes)
         except Exception as e:
-            result = f"Error applying changes to {app_manager.step_file_target}: {str(e)}"
-            logger.error(result)
+            result = safe_error()
+            logger.error('Automation operation diagnostic; sensitive details withheld.')
         
         # Clear the proposed changes
         app_manager.clear_gen_code_cache()
