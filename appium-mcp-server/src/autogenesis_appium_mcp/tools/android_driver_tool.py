@@ -3,17 +3,17 @@
 
 import time
 import json
-from tools.appium_driver_tool import simplify_page_source, get_appium_locator
+from ..tools.appium_driver_tool import simplify_page_source, get_appium_locator
 
 import logging
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 
 
-# from utils.element_util import extract_element_info
-from utils.logger import log_tool_call
-from utils.response_format import format_tool_response, init_tool_response
-from utils.gen_code import record_calls
+# from ..utils.element_util import extract_element_info
+from ..utils.logger import log_tool_call
+from ..utils.response_format import format_tool_response, init_tool_response
+from ..utils.gen_code import record_calls
 
 
 logger = logging.getLogger(__name__)
@@ -43,7 +43,7 @@ def register_android_driver_tools(mcp, driver_manager):
             driver.press_keycode(int(text))
             resp["status"] = "success"
         except Exception as e:
-            logger.error(f"press key code error: {e}")
+            logger.error("Operation diagnostic; private details omitted")
             resp["status"] = "error"
             resp["error"] = f"press key code error: {str(e)}"
         page_source = driver.page_source
@@ -78,7 +78,7 @@ def register_android_driver_tools(mcp, driver_manager):
             driver.execute_script("mobile: longClickGesture", {"x": x, "y": y, "duration": duration})
             resp["status"] = "success"
         except Exception as e:
-            logger.error(f"Error long pressing element {locator_value}: {e}")
+            logger.error("Operation diagnostic; private details omitted")
             resp["status"] = "error"
             resp["error"] = f"Error long pressing element {locator_value}: {str(e)}"
         if resp["status"] == "success":

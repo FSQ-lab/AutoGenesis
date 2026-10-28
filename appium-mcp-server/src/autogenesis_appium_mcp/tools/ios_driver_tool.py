@@ -13,11 +13,11 @@ import sys
 import time
 import inspect
 
-# from utils.element_util import extract_element_info
-from utils.logger import log_tool_call
-from utils.response_format import format_tool_response, init_tool_response
-from utils.gen_code import record_calls
-from tools.appium_driver_tool import get_appium_locator, simplify_page_source
+# from ..utils.element_util import extract_element_info
+from ..utils.logger import log_tool_call
+from ..utils.response_format import format_tool_response, init_tool_response
+from ..utils.gen_code import record_calls
+from ..tools.appium_driver_tool import get_appium_locator, simplify_page_source
 
         
 logger = logging.getLogger(__name__)
@@ -51,7 +51,7 @@ def register_ios_driver_tools(mcp, driver_manager):
             resp["data"] = {"page_source": page_source}
         except Exception as e:
             resp["error"] = repr(e)
-            logger.error(f"Error dismissing alert: {e}")
+            logger.error("Operation diagnostic; private details omitted")
       
         return json.dumps(format_tool_response(resp))
     
@@ -112,7 +112,7 @@ def register_ios_driver_tools(mcp, driver_manager):
             driver.execute_script("mobile: touchAndHold", {"x": x, "y": y, "duration": duration})
             resp["status"] = "success"
         except Exception as e:
-            logger.error(f"Error right-clicking element: {e}")
+            logger.error("Operation diagnostic; private details omitted")
         if resp["status"] == "":
             resp["status"] = "error"
             resp["error"] = f"Element {locator_value} not found or not clickable"

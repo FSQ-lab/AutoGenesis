@@ -1,0 +1,67 @@
+name: Appium Package
+
+on:
+  pull_request:
+    branches: [main, feature/agent-integration]
+    paths:
+      - 'appium-mcp-server/**'
+      - 'agent-contract/**'
+      - 'MAC-README.md'
+      - 'MOBILE-README.md'
+      - '.github/workflows/appium-package.yml'
+  push:
+    branches: [feature/agent-integration]
+    paths:
+      - 'appium-mcp-server/**'
+      - 'agent-contract/**'
+      - '.github/workflows/appium-package.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: appium-package-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  package:
+    name: ${{ matrix.os }} / Python ${{ matrix.python }} / MCP ${{ matrix.mcp }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, macos-latest]
+        python: ['3.10', '3.12']
+        mcp: ['1.23.0', '1.29.1']
+    steps:
+      - name: Preserve canonical LF asset bytes
+        run: git config --global core.autocrlf false
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - name: Setup Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Install wheel builder
+        run: python -m pip --disable-pip-version-check install 'build==1.2.2.post1'
+      - name: Build local contract and runtime wheels
+        run: |
+          python -m build --wheel --outdir '${{ runner.temp }}/appium-wheels' agent-contract
+          python -m build --wheel --outdir '${{ runner.temp }}/appium-wheels' appium-mcp-server
+      - name: Install in a clean business project and verify protocol
+        run: >-
+          python appium-mcp-server/scripts/verify_wheels.py
+          --wheel-dir '${{ runner.temp }}/appium-wheels'
+          --mcp-version '${{ matrix.mcp }}'
+          --evidence-dir '${{ runner.temp }}/appium-evidence'
+      - name: Upload wheels and secret-checked evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: appium-${{ matrix.os }}-py${{ matrix.python }}-mcp${{ matrix.mcp }}
+          path: |
+            ${{ runner.temp }}/appium-wheels
+            ${{ runner.temp }}/appium-evidence
+          if-no-files-found: warn

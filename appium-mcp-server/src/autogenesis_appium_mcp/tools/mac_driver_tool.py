@@ -16,12 +16,12 @@ import sys
 import time
 import inspect
 
-# from utils.element_util import extract_element_info
-from utils.logger import log_tool_call
-from utils.response_format import format_tool_response, init_tool_response, handle_page_source
-from utils.gen_code import record_calls
-from utils.logger import get_mcp_logger
-from tools.appium_driver_tool import get_appium_locator
+# from ..utils.element_util import extract_element_info
+from ..utils.logger import log_tool_call
+from ..utils.response_format import format_tool_response, init_tool_response, handle_page_source
+from ..utils.gen_code import record_calls
+from ..utils.logger import get_mcp_logger
+from ..tools.appium_driver_tool import get_appium_locator
 
 
 logger = get_mcp_logger()
@@ -58,7 +58,7 @@ def _select_best_element(driver, locator, locator_strategy, locator_value):
             return WebDriverWait(driver, 5).until(EC.presence_of_element_located(locator))
             
     except Exception as e:
-        logger.warning(f"Failed to select element {locator_value}: {e}")
+        logger.warning("Operation diagnostic; private details omitted")
         return None
 
 def _is_menu_bar_element(element, driver):
@@ -103,7 +103,7 @@ def _is_menu_bar_element(element, driver):
         return False
         
     except Exception as e:
-        logger.warning(f"Menu detection failed: {e}")
+        logger.warning("Operation diagnostic; private details omitted")
         # Conservative fallback: simple position check
         try:
             return element.location.get('y', 0) < 35
@@ -134,7 +134,7 @@ async def tap_coordinates_macos(caller: str, x: int, y: int, step: str = "", sce
     except Exception as e:
         resp["status"] = "error"
         resp["error"] = f"Failed to tap at ({x}, {y}): {str(e)}"
-        logger.error(f"Error tapping coordinates on macOS: {e}")
+        logger.error("Operation diagnostic; private details omitted")
 
     if resp.get("status") != "error":
         try:
@@ -253,7 +253,7 @@ def register_mac_driver_tools(mcp, driver_manager):
                 driver.execute_script("macos: keys", {"keys": list(text)})
             resp["status"] = "success"
         except Exception as e:
-            logger.error(f"Error entering text in element: {e}")
+            logger.error("Operation diagnostic; private details omitted")
             resp["status"] = "error"
             resp["error"] = f"Element {locator_value} not found or not editable"
         
@@ -264,7 +264,7 @@ def register_mac_driver_tools(mcp, driver_manager):
                 page_source = driver.page_source
                 handle_page_source(resp, page_source, page_source_file, summary_only)
             except Exception as page_e:
-                logger.warning(f"Failed to get page source: {page_e}")
+                logger.warning("Operation diagnostic; private details omitted")
                 resp["data"] = {"page_source": ""}
 
         return json.dumps(format_tool_response(resp))
@@ -291,7 +291,7 @@ def register_mac_driver_tools(mcp, driver_manager):
             driver.execute_script("macos: keys", {"keys": list(text)})
             resp["status"] = "success"
         except Exception as e:
-            logger.error(f"Error sending keys directly: {e}")
+            logger.error("Operation diagnostic; private details omitted")
             resp["status"] = "error"
             resp["error"] = f"Failed to send keys {text}"
         
@@ -302,7 +302,7 @@ def register_mac_driver_tools(mcp, driver_manager):
                 page_source = driver.page_source
                 handle_page_source(resp, page_source, page_source_file, summary_only)
             except Exception as page_e:
-                logger.warning(f"Failed to get page source: {page_e}")
+                logger.warning("Operation diagnostic; private details omitted")
                 resp["data"] = {"page_source": ""}
 
         return json.dumps(format_tool_response(resp))
@@ -340,7 +340,7 @@ def register_mac_driver_tools(mcp, driver_manager):
                 resp["error"] = f"Element {locator_value} not found"
                 
         except Exception as e:
-            logger.error(f"Error right-clicking element: {e}")
+            logger.error("Operation diagnostic; private details omitted")
             resp["status"] = "error"
             resp["error"] = f"Element {locator_value} not found or not clickable"
         
@@ -352,7 +352,7 @@ def register_mac_driver_tools(mcp, driver_manager):
                 page_source = driver.page_source
                 handle_page_source(resp, page_source, page_source_file, summary_only)
             except Exception as page_e:
-                logger.warning(f"Failed to get page source: {page_e}")
+                logger.warning("Operation diagnostic; private details omitted")
                 resp["data"] = {"page_source": ""}
 
         return json.dumps(format_tool_response(resp))
@@ -440,7 +440,7 @@ def register_mac_driver_tools(mcp, driver_manager):
             resp["status"] = "success"
         except Exception as e:
             resp["error"] = repr(e)
-            logger.error(f"Error pressing key: {e}")
+            logger.error("Operation diagnostic; private details omitted")
         
         # Try to get page source safely
         if resp.get("status") != "error":
@@ -449,7 +449,7 @@ def register_mac_driver_tools(mcp, driver_manager):
                 page_source = driver.page_source
                 handle_page_source(resp, page_source, page_source_file, summary_only)
             except Exception as page_e:
-                logger.warning(f"Failed to get page source: {page_e}")
+                logger.warning("Operation diagnostic; private details omitted")
                 resp["data"] = {"page_source": ""}
 
         return json.dumps(format_tool_response(resp))
@@ -538,7 +538,7 @@ def register_mac_driver_tools(mcp, driver_manager):
                 page_source = driver.page_source
                 handle_page_source(resp, page_source, page_source_file, summary_only)
             except Exception as page_e:
-                logger.warning(f"Failed to get page source: {page_e}")
+                logger.warning("Operation diagnostic; private details omitted")
                 resp["data"] = {"page_source": ""}
 
         return json.dumps(format_tool_response(resp))
@@ -580,7 +580,7 @@ def register_mac_driver_tools(mcp, driver_manager):
 
             resp["status"] = "success"
         except Exception as e:
-            logger.error(f"Error hovering over element {locator_value}: {e}")
+            logger.error("Operation diagnostic; private details omitted")
             resp["status"] = "error"
             resp["error"] = f"Failed to hover over element {locator_value}"
 
@@ -591,7 +591,7 @@ def register_mac_driver_tools(mcp, driver_manager):
                 page_source = driver.page_source
                 handle_page_source(resp, page_source, page_source_file, summary_only)
             except Exception as page_e:
-                logger.warning(f"Failed to get page source: {page_e}")
+                logger.warning("Operation diagnostic; private details omitted")
                 resp["data"] = {"page_source": ""}
 
         return json.dumps(format_tool_response(resp))
@@ -639,7 +639,7 @@ def register_mac_driver_tools(mcp, driver_manager):
                     })
                         
                 except Exception as e:
-                    logger.warning(f"Failed to locate element with XPath '{xpath}': {e}")
+                    logger.warning("Operation diagnostic; private details omitted")
                     continue
             
             if len(elements_positions) < 2:
@@ -709,7 +709,7 @@ def register_mac_driver_tools(mcp, driver_manager):
                 page_source = driver.page_source
                 handle_page_source(resp, page_source, page_source_file, summary_only)
             except Exception as page_e:
-                logger.warning(f"Failed to get page source: {page_e}")
+                logger.warning("Operation diagnostic; private details omitted")
                 if "data" not in resp:
                     resp["data"] = {}
                 resp["data"]["page_source"] = ""

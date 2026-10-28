@@ -13,7 +13,7 @@ from appium import webdriver
 from appium.options.ios import XCUITestOptions
 from appium.options.mac import Mac2Options  # Add this import for Mac automation
 from appium.options.android import UiAutomator2Options  # Add this for Android if needed
-from utils.logger import get_mcp_logger
+from .utils.logger import get_mcp_logger
 
 logger = get_mcp_logger()
 
@@ -35,10 +35,10 @@ class DriverSessionManager:
 
     def update_config(self, new_driver_configs: dict):
         """Update configuration dynamically without restarting"""
-        logger.info(f"Updating configuration for device: {self.device}")
+        logger.info("Operation diagnostic; private details omitted")
 
         if self.device not in new_driver_configs:
-            logger.error(f"Device {self.device} not found in new configuration")
+            logger.error("Operation diagnostic; private details omitted")
             return False
 
         self.driver_configs = new_driver_configs
@@ -50,15 +50,15 @@ class DriverSessionManager:
 
     def start_tool_execution(self, tool_name):
         if self.is_executing:
-            logger.warning(f"Tool {tool_name} blocked: another tool is executing")
+            logger.warning("Operation diagnostic; private details omitted")
             return False
         self.is_executing = True
-        logger.info(f"Tool {tool_name} started execution")
+        logger.info("Operation diagnostic; private details omitted")
         return True
 
     def finish_tool_execution(self, tool_name):
         self.is_executing = False
-        logger.info(f"Tool {tool_name} finished execution")
+        logger.info("Operation diagnostic; private details omitted")
 
     def _is_session_valid(self):
         """Check if the current driver session is still valid"""
@@ -90,12 +90,12 @@ class DriverSessionManager:
                 self._driver.activate_app(package)
                 return self._driver
             except Exception as e:
-                logger.warning(f"Failed to activate app on existing session: {e}. Creating new session.")
+                logger.warning("Operation diagnostic; private details omitted")
                 self._driver = None  # Reset the driver to create a new one
 
         try:
             server_url = self.server_url
-            logger.info(f"Connecting to Appium server at: {server_url}")
+            logger.info("Operation diagnostic; private details omitted")
             
             # Create a copy of config to modify
             config_copy = self.config.copy()
@@ -103,9 +103,9 @@ class DriverSessionManager:
             # Add or override arguments if provided
             if arguments is not None:
                 config_copy["arguments"] = arguments
-                logger.info(f"Using custom arguments: {arguments}")
+                logger.info("Operation diagnostic; private details omitted")
             
-            logger.info(f"Using driver config: {config_copy}")
+            logger.info("Operation diagnostic; private details omitted")
 
             # Use appropriate options based on device type
             if self.device == "ios":
@@ -128,14 +128,14 @@ class DriverSessionManager:
                     self._driver.activate_app(package)
                     logger.info("App activated successfully")
                 except Exception as e:
-                    logger.warning(f"activate_app not supported or failed: {e}. Continuing without activation.")
+                    logger.warning("Operation diagnostic; private details omitted")
             else:
                 logger.info("Mac platform or no bundleId found, skipping app activation")
 
             return self._driver
 
         except Exception as e:
-            logger.error(f"Failed to create driver session: {str(e)}")
+            logger.error("Operation diagnostic; private details omitted")
             self._driver = None  # Ensure driver is reset on failure
             raise
 
@@ -167,7 +167,7 @@ class DriverSessionManager:
             package = self.app_package()
             if package and self.device in ["ios", "android"]:
                 # For iOS and Android, terminate the app using bundle ID
-                logging.info(f"Closing app with bundle ID: {package}")
+                logger.info("Operation diagnostic; private details omitted")
                 self._driver.terminate_app(package)
         else:
             logger.warning("No app to close or driver session is invalid.")
@@ -175,57 +175,42 @@ class DriverSessionManager:
     def _force_kill_mac_app(self, package):
         """Force kill a Mac app by bundle ID using osascript and kill -9"""
         try:
-            logger.info(f"Force killing {package} using osascript/kill")
+            logger.info("Operation diagnostic; private details omitted")
             cmd = ['osascript', '-e', f'tell application "System Events" to unix id of processes whose bundle identifier is "{package}"']
-            result = subprocess.run(cmd, capture_output=True, text=True, check=False)
+            result = subprocess.run(cmd, capture_output=True, text=True, check=False, timeout=5)
             if result.returncode == 0 and result.stdout.strip():
                 pids = result.stdout.strip().split(',')
                 for pid in pids:
                     pid = pid.strip()
                     if pid.isdigit():
-                        logger.info(f"Killing PID {pid}")
-                        subprocess.run(['kill', '-9', pid], check=False)
+                        logger.info("Operation diagnostic; private details omitted")
+                        subprocess.run(['kill', '-9', pid], check=False, timeout=5)
             else:
-                logger.info(f"No running processes found for {package}")
+                logger.info("Operation diagnostic; private details omitted")
         except Exception as e:
-            logger.warning(f"Failed to force kill app: {e}")
+            logger.warning("Operation diagnostic; private details omitted")
 
     def session_close(self):
-        """Close the current driver session"""
-        if self._driver and self._is_session_valid():
-            logger.info("Closing driver session")
-            
-            if self.device == "mac":
-                package = self.app_package()
-                
-                # Define a wrapper for quit to run in a thread
-                def quit_driver():
-                    try:
-                        if self._driver:
-                            self._driver.quit()
-                    except Exception as e:
-                        logger.warning(f"Error during driver quit: {e}")
+        """Release even a stale driver, with a bounded shutdown wait."""
+        driver, self._driver = self._driver, None
+        if driver is None:
+            return
+        package = self.config.get("bundleId") if self.device == "mac" else None
 
-                # Run quit in a thread with timeout
-                quit_thread = threading.Thread(target=quit_driver)
-                quit_thread.start()
-                quit_thread.join(timeout=5)  # Wait for 5 seconds
-                
-                if quit_thread.is_alive():
-                    logger.warning("Driver quit timed out (likely stuck on dialog), forcing app kill")
-                    if package:
-                        self._force_kill_mac_app(package)
-                    # Since we forced killed the app, the session is likely broken/gone.
-                    # We don't need to wait for the thread anymore.
-            else:
-                try:
-                    self._driver.quit()
-                except Exception as e:
-                    logger.warning(f"Error during driver quit: {e}")
-            
-            self._driver = None
-        else:
-            logger.warning("No valid driver session to close.")
+        def quit_driver():
+            try:
+                driver.quit()
+            except Exception:
+                logger.warning("Driver quit failed")
+
+        # A stuck remote endpoint must not prevent process exit.
+        quit_thread = threading.Thread(target=quit_driver, daemon=True)
+        quit_thread.start()
+        quit_thread.join(timeout=5)
+        if quit_thread.is_alive():
+            logger.warning("Driver quit timed out")
+            if package:
+                self._force_kill_mac_app(package)
 
     def get_app(self):
         if self._driver and self._is_session_valid():
@@ -266,10 +251,10 @@ class DriverSessionManager:
                 if self.device in ["android", "ios"]:
                     return self._driver.is_keyboard_shown()
                 else:
-                    logger.warning(f"Unsupported device type: {self.device}")
+                    logger.warning("Operation diagnostic; private details omitted")
                     return None
             except Exception as e:
-                logger.warning(f"Failed to check keyboard visibility: {e}")
+                logger.warning("Operation diagnostic; private details omitted")
                 return None
         else:
             logger.warning("Driver session is not valid. Cannot check keyboard visibility.")
