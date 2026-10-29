@@ -1,0 +1,76 @@
+name: AutoGenesis CLI
+
+on:
+  pull_request:
+    branches: [main, feature/agent-integration]
+    paths:
+      - 'autogenesis-cli/**'
+      - 'agent-contract/**'
+      - 'appium-mcp-server/pyproject.toml'
+      - 'pywinauto-mcp-server/pyproject.toml'
+      - '.github/skills/autogenesis-*/SKILL.md'
+      - '.github/workflows/autogenesis-cli.yml'
+  push:
+    branches: [feature/agent-integration]
+    paths:
+      - 'autogenesis-cli/**'
+      - 'agent-contract/**'
+      - 'appium-mcp-server/pyproject.toml'
+      - 'pywinauto-mcp-server/pyproject.toml'
+      - '.github/skills/autogenesis-*/SKILL.md'
+      - '.github/workflows/autogenesis-cli.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: autogenesis-cli-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  install:
+    name: ${{ matrix.os }} / Python ${{ matrix.python }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, windows-2022]
+        python: ['3.10', '3.12']
+    steps:
+      - name: Preserve exact LF Skill bytes
+        run: git config --global core.autocrlf false
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - name: Setup Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Build host bundle wheels
+        run: |
+          python -m pip --disable-pip-version-check install 'build==1.2.2.post1'
+          python -m build --wheel --outdir '${{ runner.temp }}/wheels' agent-contract
+          python -m build --wheel --outdir '${{ runner.temp }}/wheels' appium-mcp-server
+          python -m build --wheel --outdir '${{ runner.temp }}/wheels' pywinauto-mcp-server
+          python -m build --wheel --outdir '${{ runner.temp }}/wheels' autogenesis-cli
+      - name: Install only built wheels and test dependency
+        shell: bash
+        run: |
+          python -m pip --disable-pip-version-check install "${RUNNER_TEMP}"/wheels/*.whl 'pytest>=8.3,<9'
+      - name: Run installed CLI tests
+        run: python -I -m pytest --import-mode=importlib autogenesis-cli/tests -q
+      - name: Install canonical Skills
+        run: autogenesis install --skills-dir '${{ runner.temp }}/skills' --json
+      - name: Verify installed Skill bytes
+        shell: bash
+        run: |
+          cmp "${RUNNER_TEMP}/skills/autogenesis-setup/SKILL.md" agent-contract/src/autogenesis_agent_contract/assets/skills/autogenesis-setup/SKILL.md
+          cmp "${RUNNER_TEMP}/skills/autogenesis-run/SKILL.md" agent-contract/src/autogenesis_agent_contract/assets/skills/autogenesis-run/SKILL.md
+      - name: Upload built wheels
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: autogenesis-cli-${{ matrix.os }}-py${{ matrix.python }}
+          path: ${{ runner.temp }}/wheels
+          if-no-files-found: warn

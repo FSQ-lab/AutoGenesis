@@ -45,6 +45,14 @@ async def test_versioned_tool_names_and_secret_ref_schemas_without_driver(platfo
         runtime.close()
 
 
+def test_cli_version_does_not_start_runtime(capsys, monkeypatch):
+    monkeypatch.setattr(server, "Runtime", Mock(side_effect=AssertionError("version lookup started runtime")))
+    with pytest.raises(SystemExit) as caught:
+        server.parse_args(["--version"])
+    assert caught.value.code == 0
+    assert capsys.readouterr() == ("autogenesis-appium-mcp 0.4.0\n", "")
+
+
 def test_platform_transport_and_config_selection(config_path, tmp_path, monkeypatch):
     defaults = server.parse_args([])
     assert (defaults.platform, defaults.transport, defaults.config, defaults.project_root) == ("ios", "stdio", None, None)

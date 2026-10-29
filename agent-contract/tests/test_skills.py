@@ -1,4 +1,6 @@
+import hashlib
 import os
+import re
 import runpy
 import shutil
 import subprocess
@@ -9,7 +11,7 @@ import pytest
 
 from autogenesis_agent_contract._asset_io import MAX_ASSET_BYTES, MAX_MANIFEST_BYTES
 
-NAMES = ("autoGenesis-run", "autoGenesis-win")
+NAMES = ("autogenesis-setup", "autogenesis-run")
 
 
 def test_repository_skills_are_exact_canonical_projections(repo_root):
@@ -18,9 +20,66 @@ def test_repository_skills_are_exact_canonical_projections(repo_root):
         assert (repo_root / f".github/skills/{name}/SKILL.md").read_bytes() == source
         assert f"name: {name}\n".encode() in source
         assert b"prompts/list" in source and b"autogenesis://agent-contract/identity" in source
-        assert len(source) < 2048
+        assert len(source) < 4096
         for obsolete in (b"before_gen_code", b"confirm_code_change", b"RETRY UNTIL SUCCESS", b"clear_cache"):
             assert obsolete not in source
+
+
+def test_skills_follow_agent_skills_names_and_separate_responsibilities(repo_root):
+    setup = (repo_root / ".github/skills/autogenesis-setup/SKILL.md").read_text(encoding="utf-8")
+    run = (repo_root / ".github/skills/autogenesis-run/SKILL.md").read_text(encoding="utf-8")
+    for name, content in zip(NAMES, (setup, run), strict=True):
+        assert re.fullmatch(r"[a-z0-9]+(?:-[a-z0-9]+)*", name)
+        assert content.startswith("---\n")
+        assert f"name: {name}\n" in content
+        assert "contract-version: \"2.0.0\"" in content
+        assert "Linux and WSL are unsupported" in content
+    assert all(value in setup for value in (
+        "autogenesis-appium-mcp", "autogenesis-windows-mcp", "appium driver doctor",
+        "Ready", "Action Required", "Blocked",
+    ))
+    assert all(value in setup for value in (
+        "xcrun devicectl list devices", "appium driver doctor xcuitest",
+        "WebDriverAgent", "VPN & Device Management", "tunnel-creation",
+    ))
+    assert all(value in run for value in (
+        "autogenesis-setup", "execute_natural_language_task", "execute_scenario",
+        "generate_scenario_test", "current preview", "Windows MCP", "Appium MCP",
+    ))
+    assert "npm install" not in run and "pip install" not in run
+    projected_names = {path.name for path in (repo_root / ".github/skills").iterdir()}
+    assert not {"autoGenesis-run", "autoGenesis-win"} & projected_names
+
+
+def test_skill_release_assets_match_contract_and_install_prompt(tmp_path, repo_root):
+    output = tmp_path / "release"
+    base = "https://example.invalid/releases/agent-contract-v2.0.0"
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(repo_root / "agent-contract/tools/build_skill_release.py"),
+            "--output-dir",
+            str(output),
+            "--base-url",
+            base,
+        ],
+        cwd=repo_root,
+        capture_output=True,
+        text=True,
+        check=False,
+        timeout=10,
+    )
+    assert result.returncode == 0
+    checksums = {}
+    for line in (output / "SHA256SUMS").read_text(encoding="ascii").splitlines():
+        digest, filename = line.split("  ", 1)
+        checksums[filename] = digest
+        assert hashlib.sha256((output / filename).read_bytes()).hexdigest() == digest
+    assert set(checksums) == {"autogenesis-setup-SKILL.md", "autogenesis-run-SKILL.md"}
+    prompt = (output / "agent-install-prompt.txt").read_text(encoding="utf-8")
+    assert f"{base}/autogenesis-setup-SKILL.md" in prompt
+    assert checksums["autogenesis-setup-SKILL.md"] in prompt
+    assert "do not execute it yet" in prompt
 
 
 @pytest.fixture
@@ -43,7 +102,7 @@ def invoke(root, *arguments):
 
 def test_projection_drift_fails_check_and_sync_is_deterministic_scoped_and_atomic(projection_repo):
     root = projection_repo
-    target = root / ".github/skills/autoGenesis-run/SKILL.md"
+    target = root / ".github/skills/autogenesis-run/SKILL.md"
     official = target.read_bytes()
     unrelated = root / "unrelated.txt"
     unrelated.write_bytes(b"Preserve user work")
@@ -62,9 +121,9 @@ def test_projection_drift_fails_check_and_sync_is_deterministic_scoped_and_atomi
 
 def test_source_tampering_is_not_silently_projected(projection_repo):
     root = projection_repo
-    source = root / "agent-contract/src/autogenesis_agent_contract/assets/skills/autoGenesis-run/SKILL.md"
+    source = root / "agent-contract/src/autogenesis_agent_contract/assets/skills/autogenesis-run/SKILL.md"
     source.write_bytes(b"Tampered source\n")
-    target = root / ".github/skills/autoGenesis-run/SKILL.md"
+    target = root / ".github/skills/autogenesis-run/SKILL.md"
     before = target.read_bytes()
     assert invoke(root).returncode != 0
     assert target.read_bytes() == before
@@ -91,19 +150,19 @@ def test_unsafe_manifest_inputs_fail_before_projection(projection_repo, kind):
 def test_fifo_manifest_fails_without_blocking_or_writing(projection_repo):
     root = projection_repo
     manifest = root / "agent-contract/src/autogenesis_agent_contract/assets/manifest.json"
-    before = (root / ".github/skills/autoGenesis-run/SKILL.md").read_bytes()
+    before = (root / ".github/skills/autogenesis-run/SKILL.md").read_bytes()
     manifest.unlink()
     os.mkfifo(manifest)
     result = invoke(root)
     assert result.returncode != 0
     assert "Contract integrity error" in result.stderr
-    assert (root / ".github/skills/autoGenesis-run/SKILL.md").read_bytes() == before
+    assert (root / ".github/skills/autogenesis-run/SKILL.md").read_bytes() == before
 
 
 def test_oversized_canonical_asset_is_never_projected(projection_repo):
     root = projection_repo
-    source = root / "agent-contract/src/autogenesis_agent_contract/assets/skills/autoGenesis-run/SKILL.md"
-    target = root / ".github/skills/autoGenesis-run/SKILL.md"
+    source = root / "agent-contract/src/autogenesis_agent_contract/assets/skills/autogenesis-run/SKILL.md"
+    target = root / ".github/skills/autogenesis-run/SKILL.md"
     before = target.read_bytes()
     with source.open("wb") as stream:
         stream.truncate(MAX_ASSET_BYTES + 1)

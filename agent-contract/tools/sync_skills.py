@@ -6,7 +6,7 @@ from pathlib import Path
 from _files import atomic_write
 from freeze_assets import PACKAGE, load_asset_io, release_bytes
 
-SKILLS = ("autoGenesis-run", "autoGenesis-win")
+SKILLS = ("autogenesis-setup", "autogenesis-run")
 
 
 def main() -> None:

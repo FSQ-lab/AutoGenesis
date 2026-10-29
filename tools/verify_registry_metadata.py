@@ -41,6 +41,9 @@ SERVERS = {
     },
 }
 
+CLI_PROJECT = "autogenesis-cli/pyproject.toml"
+CLI_ENTRYPOINT = "autogenesis = autogenesis_cli.cli:main"
+
 
 class VerificationError(ValueError):
     pass
@@ -215,9 +218,33 @@ def _verify_wheels(wheel_dir: Path, metadata: dict[str, dict]) -> None:
             raise VerificationError("Built wheel lacks its MCP Registry ownership token")
 
 
+def _verify_cli_wheel(repo: Path, wheel_dir: Path) -> None:
+    project = tomllib.loads((repo / CLI_PROJECT).read_text(encoding="utf-8"))["project"]
+    wheel_name = project["name"].replace("-", "_")
+    wheels = sorted(wheel_dir.glob(f"{wheel_name}-{project['version']}-*.whl"))
+    if len(wheels) != 1:
+        raise VerificationError("Expected one local AutoGenesis CLI wheel")
+    name, version, entrypoints, requirements, project_urls, _ = _wheel_metadata(wheels[0])
+    if name != project["name"] or version != project["version"]:
+        raise VerificationError("Built AutoGenesis CLI identity differs from its project")
+    if CLI_ENTRYPOINT not in entrypoints:
+        raise VerificationError("Built AutoGenesis CLI entrypoint is unavailable")
+    normalized = requirements.replace(" ", "").lower()
+    for requirement in (
+        "autogenesis-agent-contract==2.0.0",
+        "autogenesis-appium-mcp==0.4.0;sys_platform==\"darwin\"orsys_platform==\"win32\"",
+        "autogenesis-windows-mcp==0.4.0;sys_platform==\"win32\"",
+    ):
+        if requirement not in normalized:
+            raise VerificationError("AutoGenesis CLI host bundle dependencies drifted")
+    if f"Repository, {REPOSITORY}" not in project_urls:
+        raise VerificationError("AutoGenesis CLI wheel lacks repository ownership metadata")
+
+
 def _verify_pypi(repo: Path, metadata: dict[str, dict]) -> None:
     contract = tomllib.loads((repo / "agent-contract/pyproject.toml").read_text(encoding="utf-8"))["project"]
-    packages = [(contract["name"], contract["version"])]
+    cli = tomllib.loads((repo / CLI_PROJECT).read_text(encoding="utf-8"))["project"]
+    packages = [(contract["name"], contract["version"]), (cli["name"], cli["version"])]
     packages.extend(
         (document["packages"][0]["identifier"], document["packages"][0]["version"])
         for document in metadata.values()
@@ -243,6 +270,7 @@ def main() -> None:
     descriptors = _verify_descriptors(repo, metadata)
     if args.wheel_dir is not None:
         _verify_wheels(args.wheel_dir.resolve(strict=True), metadata)
+        _verify_cli_wheel(repo, args.wheel_dir.resolve(strict=True))
     if args.check_pypi:
         _verify_pypi(repo, metadata)
     if args.evidence_dir is not None:

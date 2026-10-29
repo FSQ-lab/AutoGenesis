@@ -1,3 +1,3 @@
 """Generated release pin; update only for an intentional contract release."""
 
-MANIFEST_SHA256 = "e655f773ac723cf29610364e60f733121740f4701eccdc144cc5001e1bd67d36"
+MANIFEST_SHA256 = "4367a2e388d0d5cb41a415b25b6a58e25025f1da6749bfdffe87a37c60a0c9d3"

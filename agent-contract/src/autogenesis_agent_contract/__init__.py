@@ -1,4 +1,4 @@
-"""Canonical AutoGenesis Agent Contract, release 1.2.0 / schema 2."""
+"""Canonical AutoGenesis Agent Contract, release 2.0.0 / schema 2."""
 
 from .appendix import ProjectAppendix, load_project_appendix
 from .contract import AgentContract, load_contract

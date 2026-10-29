@@ -48,8 +48,8 @@ export class CommandHandlers {
         .getBackgroundExtractor()
         .extractBackground(document);
 
-      // Check if autoGenesis-run skill exists in the workspace
-      const skillName = 'autoGenesis-run';
+      // Check if the canonical autogenesis-run skill exists in the workspace
+      const skillName = 'autogenesis-run';
       let textToSend: string;
 
       if (this.copilotService.hasSkillInWorkspace(skillName)) {

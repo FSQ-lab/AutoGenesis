@@ -36,6 +36,14 @@ def test_sync_main_preserves_app_config_transport_and_source_defaults(monkeypatc
     assert calls[-1] == ("server", "stdio")
 
 
+def test_cli_version_does_not_load_configuration(capsys, monkeypatch):
+    monkeypatch.setattr(cli, "load_app_config", lambda *args: pytest.fail("version lookup loaded configuration"))
+    with pytest.raises(SystemExit) as caught:
+        cli.main(["--version"])
+    assert caught.value.code == 0
+    assert capsys.readouterr() == ("autogenesis-windows-mcp 0.4.0\n", "")
+
+
 def test_invalid_config_never_constructs_server(monkeypatch, tmp_path, caplog):
     monkeypatch.setattr(cli, "configure_logging", lambda: None)
     monkeypatch.setattr(cli, "create_server", lambda config, root=None: pytest.fail("Server started before validating configuration."))

@@ -1,6 +1,6 @@
 """Release layout shared by the loader and deterministic release tooling."""
 
-CONTRACT_VERSION = "1.2.0"
+CONTRACT_VERSION = "2.0.0"
 SCHEMA_VERSION = 2
 CORE_POLICY = "core-policy.md"
 WORKFLOWS = (
@@ -8,7 +8,7 @@ WORKFLOWS = (
     "generate_scenario_test",
     "execute_natural_language_task",
 )
-SKILLS = ("autoGenesis-run", "autoGenesis-win")
+SKILLS = ("autogenesis-setup", "autogenesis-run")
 SCHEMAS = ("manifest", "identity", "arguments", "secret-reference")
 ASSET_PATHS = (
     CORE_POLICY,

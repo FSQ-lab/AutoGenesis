@@ -2,15 +2,15 @@
   "assets": {
     "core-policy.md": "d6f899b993b18baf9c15eb23d9f7ca7429d95f2115dc9abeb2c2766e89553e52",
     "schemas/arguments.schema.json": "50368fd1c689428fb063018a89fb85cb8db700093f50e2c00352a53c1273b899",
-    "schemas/identity.schema.json": "9ed33992d14f0929cb4f5f6d787625b19207d7b5df06050279cf27dceef61bac",
-    "schemas/manifest.schema.json": "fc7d95788bf27fb3fe62dbdbb8975a9f2ac67f2941319d9514b935cc735b0d73",
+    "schemas/identity.schema.json": "1d4971193cbb393d612763f93b3808f5403ac350e9df210420cb39f58b421297",
+    "schemas/manifest.schema.json": "a17e510166f93d38e3a96b2f8f9536a2b808474330c3b06aa1ebfb9deed489c4",
     "schemas/secret-reference.schema.json": "163041e09fefed32640af4f785b0f29a1876666c210c8099a190cd3509f1404e",
-    "skills/autoGenesis-run/SKILL.md": "f437334335c0f747463abfbbbd89cf9438919c03e9f3ec3e6f41119b2124afe3",
-    "skills/autoGenesis-win/SKILL.md": "a597093b771ac0e74009a891f08b7f1f730f4602a1794afc0f223fc024b5df89",
+    "skills/autogenesis-run/SKILL.md": "8494b8270a661d9d2ec5b46ce5f603e13f32e9f3f293ecbd689a14429e69a9e7",
+    "skills/autogenesis-setup/SKILL.md": "f5611259856bab9011dba31cb6c01c3ada5e04f1f2431c1f38d470fb4bccf099",
     "workflows/execute_natural_language_task.md": "6f8150bdbae57000cf72089ababb37c7e01b1050e6d95d248dc0ab6f018ffc16",
     "workflows/execute_scenario.md": "e8c41dffcea6043f434e90460e0fdfa74a66465494aa52e8275e759450ef31c7",
     "workflows/generate_scenario_test.md": "65bcd4bcb04a16a8fae6364ad04142162223ac7a64c2b47f37371f0eb981930f"
   },
-  "contract_version": "1.2.0",
+  "contract_version": "2.0.0",
   "schema_version": 2
 }

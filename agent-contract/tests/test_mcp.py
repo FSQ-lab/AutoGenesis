@@ -48,9 +48,9 @@ async def test_registration_fails_before_exposing_prompts_on_mismatch(contract, 
     server = FastMCP("mismatch", instructions=contract.instructions if kind != "instructions" else "Other policy")
     expected = requirement(contract)
     if kind == "version":
-        expected = RuntimeContractRequirement("2.0.0", contract.identity.manifest_sha256)
+        expected = RuntimeContractRequirement("3.0.0", contract.identity.manifest_sha256)
     elif kind == "hash":
-        expected = RuntimeContractRequirement("1.2.0", "0" * 64)
+        expected = RuntimeContractRequirement("2.0.0", "0" * 64)
     elif kind == "missing_requirement":
         expected = None
     with pytest.raises(ContractError) as caught:

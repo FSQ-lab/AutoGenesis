@@ -1,9 +1,8 @@
 # AutoGenesis Agent Contract
 
-Canonical Python distribution `autogenesis-agent-contract`, contract `1.2.0`,
+Canonical Python distribution `autogenesis-agent-contract`, contract `2.0.0`,
 manifest schema `2`, Python >=3.10, MCP SDK >=1.23,<2. Requirement and frozen
-interface: [issue #2](https://github.com/FSQ-lab/AutoGenesis/issues/2) and
-[approved freeze](https://github.com/FSQ-lab/AutoGenesis/issues/2#issuecomment-6462101884).
+interface: [issue #26](https://github.com/FSQ-lab/AutoGenesis/issues/26).
 
 ## Consumer interface
 
@@ -16,8 +15,8 @@ from mcp.server.fastmcp import FastMCP
 
 # These pins belong to the runtime release, independently of the installed wheel.
 required = RuntimeContractRequirement(
-    contract_version="1.2.0",
-    manifest_sha256="e655f773ac723cf29610364e60f733121740f4701eccdc144cc5001e1bd67d36",
+    contract_version="2.0.0",
+    manifest_sha256="4367a2e388d0d5cb41a415b25b6a58e25025f1da6749bfdffe87a37c60a0c9d3",
 )
 contract = load_contract(ContractIdentity(required.contract_version, required.manifest_sha256))
 appendix = load_project_appendix("/absolute/business-project")
@@ -155,8 +154,10 @@ module through their generation tools.
 
 Only change official assets while authoring a new unreleased contract version.
 Published `1.0.0` bytes remain immutable. Contract `1.1.0` added the versioned
-SecretRef schema; contract `1.2.0` adds project-scoped, preview-bound atomic
-generation commits. Later changes require a new version and schema review as appropriate.
+SecretRef schema; contract `1.2.0` added project-scoped, preview-bound atomic
+generation commits. Contract `2.0.0` replaces the platform-split camel-case
+Skills with Agent Skills-compliant `autogenesis-setup` and unified
+`autogenesis-run`. Later changes require a new version and schema review as appropriate.
 
 ```bash
 python3 agent-contract/tools/freeze_assets.py --write
