@@ -33,7 +33,7 @@ within the file for "TODO".
 
 AutoGenesis is an AI-powered automated testing framework based on Model Context Protocol (MCP), supporting multiple platforms including desktop applications (Windows/macOS) and mobile applications (iOS/Android).
 
-## Install AutoGenesis 2.0
+## Install AutoGenesis 1.1
 
 Native macOS and native Windows are supported; Linux and WSL are not. Python
 3.10 or newer is required. Do not run the Agent Install Prompt on an unsupported
