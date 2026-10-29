@@ -1,0 +1,46 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.fsq-lab/autogenesis-windows",
+  "title": "AutoGenesis Windows",
+  "description": "BDD automation runtime for Windows desktop applications through pywinauto.",
+  "repository": {
+    "url": "https://github.com/FSQ-lab/AutoGenesis",
+    "source": "github",
+    "id": "1412652894",
+    "subfolder": "pywinauto-mcp-server"
+  },
+  "version": "0.3.0",
+  "packages": [
+    {
+      "registryType": "pypi",
+      "registryBaseUrl": "https://pypi.org",
+      "identifier": "autogenesis-windows-mcp",
+      "version": "0.3.0",
+      "runtimeHint": "uvx",
+      "transport": {
+        "type": "stdio"
+      },
+      "packageArguments": [
+        {
+          "type": "named",
+          "name": "--config",
+          "description": "UTF-8 application profile configuration in the business project.",
+          "format": "filepath",
+          "isRequired": true
+        },
+        {
+          "type": "named",
+          "name": "--app",
+          "description": "Configured application profile; defaults to the first profile."
+        },
+        {
+          "type": "named",
+          "name": "--project-root",
+          "description": "Existing business-project root that scopes generated writes.",
+          "format": "filepath",
+          "isRequired": true
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/FSQ-lab/AutoGenesis/registry/generic-launch.schema.json",
+  "title": "AutoGenesis generic MCP launch descriptor",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["server", "type", "command", "args"],
+  "properties": {
+    "server": {
+      "type": "string",
+      "pattern": "^[a-zA-Z0-9.-]+/[a-zA-Z0-9._-]+$"
+    },
+    "type": {
+      "const": "stdio"
+    },
+    "command": {
+      "const": "uvx"
+    },
+    "args": {
+      "type": "array",
+      "minItems": 7,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    }
+  }
+}

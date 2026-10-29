@@ -5,6 +5,8 @@ Issue #8 evolves the Windows runtime as **autogenesis-windows-mcp**
 command **autogenesis-windows-mcp**. Python 3.10+ and Windows are required for
 serving automation tools. Linux CI checks package metadata/imports only.
 
+<!-- mcp-name: io.github.fsq-lab/autogenesis-windows -->
+
 ## Install in a business project
 
 Build artifacts must contain both the Windows runtime wheel and the merged
@@ -39,6 +41,13 @@ The runtime depends exactly on autogenesis-agent-contract==1.2.0 and requires
 manifest SHA-256
 e655f773ac723cf29610364e60f733121740f4701eccdc144cc5001e1bd67d36.
 Missing, corrupt or incompatible contract assets fail startup.
+
+Standard MCP Registry metadata is `pywinauto-mcp-server/server.json`. From a
+source checkout, render the equivalent shell-free generic descriptor with:
+
+```powershell
+python tools/render_mcp_descriptor.py --server windows --config C:/business/apps.json --app notepad --project-root C:/business
+```
 
 ## Application profiles
 

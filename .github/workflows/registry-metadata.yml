@@ -1,0 +1,80 @@
+name: Registry metadata
+
+on:
+  pull_request:
+    branches: [main, feature/agent-integration]
+    paths:
+      - 'agent-contract/**'
+      - 'appium-mcp-server/pyproject.toml'
+      - 'appium-mcp-server/server.json'
+      - 'pywinauto-mcp-server/pyproject.toml'
+      - 'pywinauto-mcp-server/server.json'
+      - 'registry/**'
+      - 'tools/render_mcp_descriptor.py'
+      - 'tools/verify_registry_metadata.py'
+      - '.github/workflows/registry-metadata.yml'
+  push:
+    branches: [main, feature/agent-integration]
+    paths:
+      - 'agent-contract/**'
+      - 'appium-mcp-server/pyproject.toml'
+      - 'appium-mcp-server/server.json'
+      - 'pywinauto-mcp-server/pyproject.toml'
+      - 'pywinauto-mcp-server/server.json'
+      - 'registry/**'
+      - 'tools/render_mcp_descriptor.py'
+      - 'tools/verify_registry_metadata.py'
+      - '.github/workflows/registry-metadata.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: registry-metadata-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Official schema, descriptors, and wheels
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Preserve exact LF bytes
+        run: git config --global core.autocrlf false
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - name: Setup Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: '3.12'
+      - name: Install verifier dependencies
+        run: python -m pip --disable-pip-version-check install 'build==1.2.2.post1' 'jsonschema>=4.20,<5'
+      - name: Build canonical local wheels
+        run: |
+          python -m build --wheel --outdir '${{ runner.temp }}/registry-wheels' agent-contract
+          python -m build --wheel --outdir '${{ runner.temp }}/registry-wheels' appium-mcp-server
+          python -m build --wheel --outdir '${{ runner.temp }}/registry-wheels' pywinauto-mcp-server
+      - name: Validate official schema and generated descriptors
+        run: >-
+          python tools/verify_registry_metadata.py
+          --wheel-dir '${{ runner.temp }}/registry-wheels'
+          --evidence-dir '${{ runner.temp }}/registry-evidence'
+      - name: Install local packages in a clean business environment
+        run: |
+          python -m venv '${{ runner.temp }}/registry-venv'
+          '${{ runner.temp }}/registry-venv/bin/python' -m pip --disable-pip-version-check install '${{ runner.temp }}/registry-wheels/'*.whl
+          '${{ runner.temp }}/registry-venv/bin/autogenesis-appium-mcp' --help
+          '${{ runner.temp }}/registry-venv/bin/autogenesis-windows-mcp' --help
+      - name: Upload Registry evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: registry-metadata
+          path: |
+            appium-mcp-server/server.json
+            pywinauto-mcp-server/server.json
+            registry/generic-launch.schema.json
+            ${{ runner.temp }}/registry-evidence
+            ${{ runner.temp }}/registry-wheels
+          if-no-files-found: warn

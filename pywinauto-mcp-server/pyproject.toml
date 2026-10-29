@@ -27,6 +27,9 @@ dependencies = [
     "behave==1.2.6",
 ]
 
+[project.urls]
+Repository = "https://github.com/FSQ-lab/AutoGenesis"
+
 [project.scripts]
 autogenesis-windows-mcp = "autogenesis_windows_mcp.cli:main"
 

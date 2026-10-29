@@ -38,6 +38,13 @@ Agent Contract is pinned to **1.2.0**, manifest SHA-256
 `e655f773ac723cf29610364e60f733121740f4701eccdc144cc5001e1bd67d36`.
 A mismatched or corrupt contract prevents startup.
 
+Standard MCP Registry metadata is `appium-mcp-server/server.json`. From a source
+checkout, render the equivalent shell-free generic descriptor with:
+
+```bash
+python tools/render_mcp_descriptor.py --server appium --platform mac --config /absolute/business/appium.json --project-root /absolute/business
+```
+
 ## Configure Mac2
 
 Follow the [macOS Appium Setup Guide](appium-mcp-server/docs/macOS_Appium_Setup_Guide.md)
