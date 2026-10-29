@@ -80,6 +80,12 @@ def test_skill_release_assets_match_contract_and_install_prompt(tmp_path, repo_r
     assert f"{base}/autogenesis-setup-SKILL.md" in prompt
     assert checksums["autogenesis-setup-SKILL.md"] in prompt
     assert "do not execute it yet" in prompt
+    assert "Stop on Linux, WSL" in prompt
+    assert "before process execution, network access, or filesystem writes" in prompt
+    assert "request fresh approval if any plan element changes" in prompt
+    assert "Preserve different existing content" in prompt
+    assert "Hash the exact installed file after writing" in prompt
+    assert "no higher-precedence or ambiguous copy" in prompt
 
 
 @pytest.fixture
