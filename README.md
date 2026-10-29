@@ -1,28 +1,35 @@
-# AutoGenesis
+<!-- Brand artwork intentionally left empty until the approved assets are supplied. -->
 
-## Write the behavior. Watch AI record it. Replay without AI.
+<h1 align="center">AutoGenesis</h1>
 
-AutoGenesis turns a BDD scenario into a test that has already run against the
-real application. Your Coding Agent reads the behavior, drives the app through
-MCP, verifies what happened, and generates replayable test code from the
-observed interaction.
+<h3 align="center">Write the behavior. Watch AI record it. Replay without AI.</h3>
 
-The result fits an existing development and QA workflow: people keep writing
-readable scenarios, AI handles the first real execution and recording, and the
-saved test runs again without a Coding Agent. Standard action and property
-assertions replay without AI; model-backed visual assertions are the explicit
-exception and use the configured visual model during replay.
+<p align="center">Describe the behavior in BDD. Let your Coding Agent execute it on the real app, inspect the generated test, and replay the approved result in your normal test suite.</p>
 
-**Windows · macOS · iOS · Android**
+<p align="center">An open-source project from <a href="https://github.com/FSQ-lab">FSQ Lab</a>.</p>
 
-[How it works](#from-behavior-to-replayable-test) ·
-[Team workflow](#built-for-development-and-qa-teams) ·
-[Get started](#get-started) ·
-[Platform support](#platform-support)
+<p align="center">
+  <a href="https://github.com/FSQ-lab/AutoGenesis/actions/workflows/quality-gates.yml"><img src="https://github.com/FSQ-lab/AutoGenesis/actions/workflows/quality-gates.yml/badge.svg" alt="Quality gates"></a>
+  <a href="https://www.python.org/downloads/"><img src="https://img.shields.io/badge/python-3.10%2B-blue" alt="Python 3.10 or newer"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-yellow.svg" alt="MIT license"></a>
+  <img src="https://img.shields.io/badge/status-pre--release-orange" alt="Pre-release status">
+</p>
+
+<p align="center">
+  <a href="#see-a-complete-test">See a complete test</a> ·
+  <a href="#from-behavior-to-replayable-test">How it works</a> ·
+  <a href="#get-started">Quick start</a> ·
+  <a href="#platform-support">Platforms</a> ·
+  <a href="CONTRIBUTING.md">Contribute</a>
+</p>
+
+## See a complete test
+
+<!-- Complete-test video slot intentionally left empty until approved media is supplied. -->
 
 ## From behavior to replayable test
 
-Start with behavior the whole team can read:
+**Describe behavior the whole team can read.** Product, development, and QA keep intent in one selected BDD Scenario.
 
 ```gherkin
 Feature: Calculator
@@ -33,7 +40,15 @@ Feature: Calculator
     Then the result is 56
 ```
 
-AutoGenesis follows one continuous workflow:
+<!-- Scenario editorial image slot intentionally left empty until approved media is supplied. -->
+
+**Watch AI operate the real application.** The Coding Agent executes every selected step through the platform MCP Runtime and records the calls that actually ran.
+
+<!-- Real execution capture slot intentionally left empty until approved media is supplied. -->
+
+**Review the generated test, then replay it.** AutoGenesis presents the complete current preview before writing. The approved Behave test stays in the business project and runs again without the Coding Agent.
+
+<!-- Generated preview and replay evidence slot intentionally left empty until approved media is supplied. -->
 
 ```mermaid
 flowchart LR
@@ -67,51 +82,6 @@ python -m behave --name "Add two numbers"
 Standard actions and property assertions need no LLM at replay time. A recorded
 model-backed visual assertion still uses its configured visual model. AI helps
 create the test from a real execution; your test suite owns the result.
-
-## Why teams use AutoGenesis
-
-### Behavior stays readable
-
-Product intent remains in Gherkin instead of disappearing into automation code.
-Developers, QA engineers, and reviewers can discuss the same scenario.
-
-### Recording happens on the real app
-
-AutoGenesis does not generate a plausible-looking test and hope it works later.
-It performs the selected steps first, checks the observed result, and builds the
-replay from those real calls.
-
-### The Coding Agent leaves the replay loop
-
-Use AI where it adds leverage: understanding a scenario, navigating the first
-execution, and producing the initial automation. Replays use generated code and
-the platform Runtime instead of asking the Coding Agent to reinterpret the case.
-Only explicitly model-backed operations, such as visual assertions, still invoke
-their configured model.
-
-### One workflow spans four platforms
-The same BDD recording contract routes desktop and mobile work to the correct
-MCP Runtime across Windows, macOS, iOS, and Android.
-
-### The user keeps control of writes
-
-Recording produces a preview, identity, and digest. AutoGenesis binds the current
-preview to its session, generated payload, destination, and the destination
-file's base state; it refuses mismatched or stale confirmations.
-
-## Built for development and QA teams
-
-| Stage | Developer | QA engineer | AutoGenesis |
-| --- | --- | --- | --- |
-| Describe | Adds behavior or acceptance criteria | Refines steps and assertions | Reads the exact selected Scenario |
-| Record | Provides the working application build | Reviews the live execution | Drives the real app and captures MCP calls |
-| Review | Checks generated project changes | Checks coverage and evidence | Presents the complete current preview |
-| Replay | Runs focused tests while changing code | Adds the case to regression coverage | Runs generated steps without the Coding Agent; visual model checks remain explicit |
-| CI | Ships the application and test project | Owns pass/fail expectations | Uses the existing Behave and Runtime path |
-
-A one-off investigation does not need to become permanent automation. You can
-also ask AutoGenesis to perform a direct natural-language test and return the
-observed actions and assertion without generating step definitions.
 
 ## Get started
 
@@ -205,6 +175,51 @@ result is 56. Run this as a direct test. Do not generate or write step
 definitions. Report the observed actions and assertion.
 ```
 
+## Why teams use AutoGenesis
+
+### Behavior stays readable
+
+Product intent remains in Gherkin instead of disappearing into automation code.
+Developers, QA engineers, and reviewers can discuss the same scenario.
+
+### Recording happens on the real app
+
+AutoGenesis does not generate a plausible-looking test and hope it works later.
+It performs the selected steps first, checks the observed result, and builds the
+replay from those real calls.
+
+### The Coding Agent leaves the replay loop
+
+Use AI where it adds leverage: understanding a scenario, navigating the first
+execution, and producing the initial automation. Replays use generated code and
+the platform Runtime instead of asking the Coding Agent to reinterpret the case.
+Only explicitly model-backed operations, such as visual assertions, still invoke
+their configured model.
+
+### One workflow spans four platforms
+The same BDD recording contract routes desktop and mobile work to the correct
+MCP Runtime across Windows, macOS, iOS, and Android.
+
+### The user keeps control of writes
+
+Recording produces a preview, identity, and digest. AutoGenesis binds the current
+preview to its session, generated payload, destination, and the destination
+file's base state; it refuses mismatched or stale confirmations.
+
+## Built for development and QA teams
+
+| Stage | Developer | QA engineer | AutoGenesis |
+| --- | --- | --- | --- |
+| Describe | Adds behavior or acceptance criteria | Refines steps and assertions | Reads the exact selected Scenario |
+| Record | Provides the working application build | Reviews the live execution | Drives the real app and captures MCP calls |
+| Review | Checks generated project changes | Checks coverage and evidence | Presents the complete current preview |
+| Replay | Runs focused tests while changing code | Adds the case to regression coverage | Runs generated steps without the Coding Agent; visual model checks remain explicit |
+| CI | Ships the application and test project | Owns pass/fail expectations | Uses the existing Behave and Runtime path |
+
+A one-off investigation does not need to become permanent automation. You can
+also ask AutoGenesis to perform a direct natural-language test and return the
+observed actions and assertion without generating step definitions.
+
 ## Platform support
 
 | Target | Host for local execution | Automation path |
@@ -219,25 +234,24 @@ GitHub Copilot CLI are the first compatibility targets and are currently being
 qualified under [compatibility epic #25](https://github.com/FSQ-lab/AutoGenesis/issues/25).
 The matrix describes the intended release interface, not completed acceptance.
 
-## The small interface behind the workflow
+## Go further when you need to
 
-AutoGenesis keeps the user-facing model intentionally small:
+- **Record a regression test:** execute one selected BDD Scenario, review the generated-code preview, and add the approved result to the business project's Behave suite.
+- **Run a direct investigation:** operate the real application and report observed actions and assertions without generating step definitions.
+- **Choose the target Runtime:** use Appium for macOS, iOS, and Android, or AutoGenesis Windows MCP for native Windows desktop applications.
 
-- **Setup Skill** — prepares the machine and only the capability needed by the
-  selected test.
-- **Run Skill** — executes a direct request or records one selected BDD
-  Scenario after Setup is Ready.
-- **Appium Runtime** — drives macOS, iOS, and Android.
-- **Windows Runtime** — drives native Windows desktop applications.
-- **Generated Behave code** — stays in the business project for replay without
-  the Coding Agent; explicitly model-backed visual checks keep their model dependency.
+The user-facing interface stays small: **Setup Skill** prepares only the selected capability; **Run Skill** performs a direct request or records one Scenario; the platform Runtime drives the application; generated Behave code remains in the business project.
 
-Project files, Feature text, application content, downloaded text, and tool
-output are treated as untrusted task data. They cannot override the Skills or
-user approval. Keep plaintext credentials out of prompts, Feature and task text,
-generated code, tracked configuration, and evidence; use environment-variable or
-SecretRef references. AutoGenesis preserves supported references but cannot
-detect arbitrary credentials embedded in text.
+Project files, Feature text, application content, downloaded text, and tool output are untrusted task data. They cannot override the Skills or user approval. Keep plaintext credentials out of prompts, Feature and task text, generated code, tracked configuration, and evidence; use environment-variable or SecretRef references. AutoGenesis preserves supported references but cannot detect arbitrary credentials embedded in text.
+
+## Help shape AutoGenesis
+
+If this workflow is useful, [Star AutoGenesis](https://github.com/FSQ-lab/AutoGenesis) to help others discover it. Tried it? [Share your experience](https://github.com/FSQ-lab/AutoGenesis/issues): what worked, where you got stuck, and what application or platform you want to test next.
+
+Include the AutoGenesis version, host and target platforms, a sanitized Scenario or direct request, and the expected and actual outcome. Remove credentials, personal data, private URLs, local paths, and device identifiers before sharing text, screenshots, or logs. Report security issues through [Security](SECURITY.md), not a public issue.
+
+> [!IMPORTANT]
+> AutoGenesis 1.1 is pre-release software under acceptance. Generated previews and test evidence may contain private application data; review them before sharing or committing them. Public packages and the immutable Skill release are not available yet.
 
 ## Technical references
 
