@@ -1,29 +1,32 @@
 from autogenesis_agent_contract import (
-    SECRET_REFERENCE_REQUIRED, SecretBindings, SecretReferenceError,
-    apply_bindings, serialize,
+    SECRET_REFERENCE_REQUIRED,
+    SecretBindings,
+    SecretReferenceError,
+    apply_bindings,
+    commit_generation_preview,
+    prepare_generation_preview,
+    validate_generation_destination,
+    serialize,
 )
 from ..safe_output import safe_error
 # Copyright (c) Microsoft Corporation.
 # Licensed under the MIT license.
 
-import os
-import re
 import logging
-import sys
-import time
 import uuid
 from pathlib import Path
+
+from ..utils.gen_code import gen_code_preview, gen_step_file_from_feature_path, parse_steps_dir_from_step_path
 from ..utils.logger import log_tool_call
-from ..utils.gen_code import HEADER_AUTO_GEN, STEPS_DIR_DEFAULT, TARGET_STEP_FILE_DEFAULT
-from ..utils.gen_code import gen_code_preview, ensure_step_path_exists, gen_step_file_from_feature_path, parse_steps_dir_from_step_path
 from ..utils.response_format import format_tool_response, init_tool_response
 
 
 logger = logging.getLogger(__name__)
 
 
-def register_gen_code_tools(mcp, app_manager):
+def register_gen_code_tools(mcp, app_manager, business_root=None):
     """Register generage code tools to MCP server."""    
+    project_root = Path(business_root or Path.cwd()).resolve(strict=True)
     
     @mcp.tool()
     @log_tool_call
@@ -60,8 +63,12 @@ def register_gen_code_tools(mcp, app_manager):
             elif feature_file:
                 app_manager.steps_dir, app_manager.step_file_target = gen_step_file_from_feature_path(feature_file)
             else:
-                app_manager.steps_dir = STEPS_DIR_DEFAULT
-                app_manager.step_file_target = TARGET_STEP_FILE_DEFAULT
+                app_manager.steps_dir = str(project_root / "features" / "steps")
+                app_manager.step_file_target = str(project_root / "features" / "steps" / "common_steps.py")
+            app_manager.step_file_target = str(validate_generation_destination(
+                project_root, app_manager.step_file_target,
+            ))
+            app_manager.steps_dir = str(Path(app_manager.step_file_target).parent)
 
             resp["status"] = "success"
             resp["data"] = {
@@ -86,33 +93,52 @@ def register_gen_code_tools(mcp, app_manager):
             return "No pending code changes to preview"
         
         bound_cache = serialize(apply_bindings(app_manager.gen_code_cache, secret_bindings))
+        app_manager.pending_write = None
         result = gen_code_preview(app_manager, bound_cache)
-    
-        return result.get('diff_preview')
+        append_payload = result.get("append_payload", "")
+        if not append_payload:
+            resp = init_tool_response()
+            resp["status"] = "success"
+            resp["data"] = {"message": result.get("diff_preview", "No pending code changes to preview")}
+            return format_tool_response(resp)
+        preview = prepare_generation_preview(
+            project_root,
+            app_manager.step_file_target,
+            app_manager.gen_code_id,
+            append_payload,
+        )
+        app_manager.pending_write = preview
+        resp = init_tool_response()
+        resp["status"] = "success"
+        resp["data"] = {"diff_preview": result.get("diff_preview"), **preview.to_dict()}
+        return format_tool_response(resp)
 
 
     @mcp.tool()
     @log_tool_call
-    async def confirm_code_changes() -> str:
-        """Confirm the previewed code changes"""
-        if not getattr(app_manager, 'pending_write', None):
-            return "No pending code changes to confirm"
-        
-        if not ensure_step_path_exists(app_manager.step_file_target):
-            return f"Failed to create directory structure for {app_manager.step_file_target}"
-        
-        try:
-            with open(app_manager.step_file_target, 'a', encoding='utf-8') as f:
-                f.write(app_manager.pending_write)
-            
-            result = f"Applied {len(app_manager.proposed_changes)} new steps to {app_manager.step_file_target}"
-            app_manager.new_steps_count = len(app_manager.proposed_changes)
-        except Exception as e:
-            result = safe_error()
-            logger.error('Automation operation diagnostic; sensitive details withheld.')
-        
-        # Clear the proposed changes
+    async def confirm_code_changes(
+        preview_id: str = "",
+        digest: str = "",
+        approved: bool = False,
+    ) -> str:
+        """Atomically commit exactly the complete, current, approved preview."""
+        preview = getattr(app_manager, "pending_write", None)
+        count = len(app_manager.proposed_changes or [])
+        destination = commit_generation_preview(
+            preview,
+            preview_id=preview_id,
+            digest=digest,
+            approved=approved,
+        )
+        app_manager.new_steps_count = count
         app_manager.clear_gen_code_cache()
-        return result
+        resp = init_tool_response()
+        resp["status"] = "success"
+        resp["data"] = {
+            "message": "Approved generated code committed atomically",
+            "destination": destination,
+            "new_steps_count": count,
+        }
+        return format_tool_response(resp)
 
 

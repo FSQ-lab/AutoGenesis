@@ -11,9 +11,9 @@ No AutoGenesis checkout is needed. Until packages are published, obtain both
 built wheels from the Integration Lead. In an activated Python virtual environment:
 
 ```bash
-python -m pip install /absolute/wheels/autogenesis_agent_contract-1.1.0-py3-none-any.whl /absolute/wheels/autogenesis_appium_mcp-0.2.0-py3-none-any.whl
+python -m pip install /absolute/wheels/autogenesis_agent_contract-1.2.0-py3-none-any.whl /absolute/wheels/autogenesis_appium_mcp-0.3.0-py3-none-any.whl
 python -c "from importlib.resources import files; from pathlib import Path; Path('appium.json').write_bytes(files('autogenesis_appium_mcp').joinpath('conf/appium_conf.template.json').read_bytes())"
-autogenesis-appium-mcp --platform android --config /absolute/business/appium.json
+autogenesis-appium-mcp --platform android --config /absolute/business/appium.json --project-root /absolute/business
 ```
 
 Use `--platform ios` for iOS. The default platform is iOS and transport is
@@ -24,17 +24,17 @@ MCP client; diagnostics use stderr.
 With uv/uvx, launch directly from the same local artifacts:
 
 ```bash
-uvx --from /absolute/wheels/autogenesis_appium_mcp-0.2.0-py3-none-any.whl --with /absolute/wheels/autogenesis_agent_contract-1.1.0-py3-none-any.whl autogenesis-appium-mcp --platform android --config /absolute/business/appium.json
+uvx --from /absolute/wheels/autogenesis_appium_mcp-0.3.0-py3-none-any.whl --with /absolute/wheels/autogenesis_agent_contract-1.2.0-py3-none-any.whl autogenesis-appium-mcp --platform android --config /absolute/business/appium.json --project-root /absolute/business
 ```
 
 After both distributions are published to the configured index:
 
 ```bash
-uvx --from autogenesis-appium-mcp==0.2.0 autogenesis-appium-mcp --platform ios --config /absolute/business/appium.json
+uvx --from autogenesis-appium-mcp==0.3.0 autogenesis-appium-mcp --platform ios --config /absolute/business/appium.json --project-root /absolute/business
 ```
 
-The runtime pins Agent Contract **1.1.0**, manifest SHA-256
-`80266f59b8ed32c83e374c870817f018361067c0aec6b7ce2b02b8f835850462`.
+The runtime pins Agent Contract **1.2.0**, manifest SHA-256
+`e655f773ac723cf29610364e60f733121740f4701eccdc144cc5001e1bd67d36`.
 Mismatched or corrupt contract assets prevent startup.
 
 ## Configuration and devices
@@ -96,7 +96,7 @@ For an installed command on PATH, `.vscode/mcp.json` can use:
     "auto-genesis-mcp-mobile": {
       "type": "stdio",
       "command": "autogenesis-appium-mcp",
-      "args": ["--platform", "android", "--config", "/absolute/business/appium.json"]
+      "args": ["--platform", "android", "--config", "/absolute/business/appium.json", "--project-root", "/absolute/business"]
     }
   }
 }
@@ -110,17 +110,18 @@ watchers and releases drivers. The installed and source entrypoints expose stdio
 The server publishes fixed instructions, prompts `execute_scenario`,
 `generate_scenario_test`, and `execute_natural_language_task`, and the read-only
 resource `autogenesis://agent-contract/identity`. Use the generation workflow for
-the selected scenario and its preview/confirmation steps. Default generated output
-is business-local `behave_demo/features/steps/common_steps.py`. Existing explicit
-feature/step paths retain their behavior.
+the selected scenario. Preview returns the complete payload, identity, and digest;
+confirmation must echo the identity and digest with `approved=true`. The runtime
+rejects stale base files, escaping paths and symlinks, then atomically replaces
+the target. Default generated output is business-local
+`features/steps/common_steps.py`; explicit paths must remain inside the project.
 
 ## Run from source
 
 From the AutoGenesis repository root, in an activated development environment:
-
 ```bash
-python -m pip install /absolute/wheels/autogenesis_agent_contract-1.1.0-py3-none-any.whl -e ./appium-mcp-server
-python appium-mcp-server/simple_server.py --platform android --config /absolute/business/appium.json
+python -m pip install /absolute/wheels/autogenesis_agent_contract-1.2.0-py3-none-any.whl -e ./appium-mcp-server
+python appium-mcp-server/simple_server.py --platform android --config /absolute/business/appium.json --project-root /absolute/business
 ```
 
 The source script calls the same synchronous main. With no `--config`, an

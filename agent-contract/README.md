@@ -1,6 +1,6 @@
 # AutoGenesis Agent Contract
 
-Canonical Python distribution `autogenesis-agent-contract`, contract `1.1.0`,
+Canonical Python distribution `autogenesis-agent-contract`, contract `1.2.0`,
 manifest schema `2`, Python >=3.10, MCP SDK >=1.23,<2. Requirement and frozen
 interface: [issue #2](https://github.com/FSQ-lab/AutoGenesis/issues/2) and
 [approved freeze](https://github.com/FSQ-lab/AutoGenesis/issues/2#issuecomment-6462101884).
@@ -16,8 +16,8 @@ from mcp.server.fastmcp import FastMCP
 
 # These pins belong to the runtime release, independently of the installed wheel.
 required = RuntimeContractRequirement(
-    contract_version="1.1.0",
-    manifest_sha256="80266f59b8ed32c83e374c870817f018361067c0aec6b7ce2b02b8f835850462",
+    contract_version="1.2.0",
+    manifest_sha256="e655f773ac723cf29610364e60f733121740f4701eccdc144cc5001e1bd67d36",
 )
 contract = load_contract(ContractIdentity(required.contract_version, required.manifest_sha256))
 appendix = load_project_appendix("/absolute/business-project")
@@ -145,17 +145,18 @@ are read, with a bounded 64 KiB + 1 read. There is no upward discovery, network
 fetch, include processing, environment expansion, templating, or execution.
 
 Callers must supply secret-free task and domain text, using environment-variable
-references. This package does not detect arbitrary credentials in text. The
-policy requires bounded attempts, verified ordered steps, cancellation/denial
-stops, preview, and explicit approval. It does not implement automation or
-runtime approval/write enforcement. Those runtime protections remain issue #8;
-consumers must stop where required runtime enforcement is unavailable.
+references. This package does not detect arbitrary credentials in text. Its
+generation module binds a complete preview to the session, destination, base-file
+state, and digest; confirmation requires explicit approval and atomically replaces
+the file inside the selected project root. Runtime adapters expose that shared
+module through their generation tools.
 
 ## Generated sources
 
 Only change official assets while authoring a new unreleased contract version.
-Published `1.0.0` bytes remain immutable. Contract `1.1.0` adds the versioned
-SecretRef schema; later changes require a new version, schema review as appropriate,
+Published `1.0.0` bytes remain immutable. Contract `1.1.0` added the versioned
+SecretRef schema; contract `1.2.0` adds project-scoped, preview-bound atomic
+generation commits. Later changes require a new version and schema review as appropriate.
 
 ```bash
 python3 agent-contract/tools/freeze_assets.py --write

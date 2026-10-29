@@ -240,17 +240,16 @@ def gen_code_preview(app_manager, cache=None) -> dict:
     app_manager.proposed_changes = new_steps_code
     app_manager.new_steps_count = len(new_steps_code)
     if not new_steps_code:
-        app_manager.pending_write = None
         return {'diff_preview': "No new code changes to apply - all steps already exist", 'new_steps_code': [], 'append_payload': ''}
     parts = []
     if app_manager.header_code:
         parts.append(app_manager.header_code + "\n")
     parts.extend(item + "\n" for item in new_steps_code)
-    app_manager.pending_write = "".join(parts)
+    append_payload = "".join(parts)
     return {
-        'diff_preview': app_manager.pending_write,
+        'diff_preview': append_payload,
         'new_steps_code': new_steps_code,
-        'append_payload': app_manager.pending_write,
+        'append_payload': append_payload,
     }
 
 def gen_code_preview_test(gen_code_id, gen_code_cache) -> str:
@@ -262,18 +261,6 @@ def gen_code_preview_test(gen_code_id, gen_code_cache) -> str:
     app_manager.step_file_target = TARGET_STEP_FILE_DEFAULT
     return gen_code_preview(app_manager)
 
-
-def ensure_step_path_exists(step_file: str) -> bool:
-    step_path = Path(step_file)
-    try:
-        parent_dir = step_path.parent
-        if not parent_dir.exists():
-            logger.info('Creating directory structure: [redacted]')
-            parent_dir.mkdir(parents=True, exist_ok=True)
-        return True
-    except Exception as e:
-        logger.error('Error creating directory structure for [redacted]: [redacted]')
-        return False
 
 
 def read_step_files(step_path, max_depth=5, current_depth=0):
@@ -350,7 +337,6 @@ def parse_steps_dir_from_step_path(step_file: str):
         else:
             steps_dir = step_path
       
-    os.makedirs(steps_dir, exist_ok=True)
     return str(steps_dir)
 
 
@@ -382,7 +368,6 @@ def gen_step_file_from_feature_path(feature_file: str):
         step_file_dir = step_file_dir / rel_path.stem
         step_file_name = "common_step.py"
     step_file_path = step_file_dir / step_file_name
-    os.makedirs(step_file_dir, exist_ok=True)
   
     return str(steps_dir), str(step_file_path)
 

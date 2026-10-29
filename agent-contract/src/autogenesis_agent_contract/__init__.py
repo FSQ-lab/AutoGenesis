@@ -1,4 +1,4 @@
-"""Canonical AutoGenesis Agent Contract, release 1.1.0 / schema 2."""
+"""Canonical AutoGenesis Agent Contract, release 1.2.0 / schema 2."""
 
 from .appendix import ProjectAppendix, load_project_appendix
 from .contract import AgentContract, load_contract
@@ -7,6 +7,19 @@ from .errors import (
     CONTRACT_MISMATCH,
     PROJECT_INSTRUCTIONS_INVALID,
     ContractError,
+)
+from .generation import (
+    GENERATION_APPROVAL_REQUIRED,
+    GENERATION_DESTINATION_INVALID,
+    GENERATION_PREVIEW_MISMATCH,
+    GENERATION_PREVIEW_REQUIRED,
+    GENERATION_PREVIEW_STALE,
+    GENERATION_WRITE_FAILED,
+    GenerationCommitError,
+    GenerationPreview,
+    commit_generation_preview,
+    prepare_generation_preview,
+    validate_generation_destination,
 )
 from .identity import ContractIdentity, RuntimeContractRequirement
 from .mcp import register_mcp
@@ -33,5 +46,9 @@ __all__ = [
     "record_arguments", "mark_secret", "mark_control_argument_secret",
     "execution_plaintext", "input_reference", "require_sensitive_target",
     "safe_secret_error", "unresolved_bindings", "normalize_bindings",
-    "apply_bindings", "sanitize_result",
+    "apply_bindings", "sanitize_result", "GenerationCommitError", "GenerationPreview",
+    "GENERATION_PREVIEW_REQUIRED", "GENERATION_APPROVAL_REQUIRED",
+    "GENERATION_PREVIEW_MISMATCH", "GENERATION_PREVIEW_STALE",
+    "GENERATION_DESTINATION_INVALID", "GENERATION_WRITE_FAILED",
+    "prepare_generation_preview", "commit_generation_preview", "validate_generation_destination",
 ]

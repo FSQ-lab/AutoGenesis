@@ -2,7 +2,7 @@
 # Licensed under the MIT license.
 """Payload-free logs. stdout belongs exclusively to the MCP transport."""
 
-from autogenesis_agent_contract import SecretReferenceError, sanitize_result, tool_execution
+from autogenesis_agent_contract import GenerationCommitError, SecretReferenceError, sanitize_result, tool_execution
 import json
 from mcp.server.fastmcp.exceptions import ToolError
 import logging
@@ -66,7 +66,7 @@ def log_tool_call(func):
                 logger.info("Tool call completed")
                 sanitized = sanitize_result(result)
                 return json.dumps(sanitized, ensure_ascii=False) if string_result and not isinstance(sanitized, str) else sanitized
-            except SecretReferenceError as error:
+            except (GenerationCommitError, SecretReferenceError) as error:
                 raise ToolError(str(error)) from None
             except Exception:
                 logger.error("Tool call failed")
