@@ -22,6 +22,7 @@
 <p align="center">
   <a href="#see-a-complete-test">See a complete test</a> ·
   <a href="#from-behavior-to-replayable-test">How it works</a> ·
+  <a href="#proven-on-the-edge-browser-product-line">Edge results</a> ·
   <a href="#get-started">Quick start</a> ·
   <a href="#platform-support">Platforms</a> ·
   <a href="CONTRIBUTING.md">Contribute</a>
@@ -86,6 +87,16 @@ python -m behave --name "Add two numbers"
 Standard actions and property assertions need no LLM at replay time. A recorded
 model-backed visual assertion still uses its configured visual model. AI helps
 create the test from a real execution; your test suite owns the result.
+
+## Proven on the Edge browser product line
+
+The automation approach behind AutoGenesis has been applied at production scale on the Microsoft Edge browser product line:
+
+| 2.30M | 3,193 | 4 | 99.7% |
+| ---: | ---: | ---: | ---: |
+| Test steps executed in the reported 30-day period | Hours saved in the monthly operating period | Platforms: Windows, macOS, iOS, and Android | Pass-rate consistency |
+
+These are observed Edge deployment results, not projected savings or a universal benchmark for every product and environment.
 
 ## Get started
 
