@@ -90,13 +90,18 @@ create the test from a real execution; your test suite owns the result.
 
 ## Proven on the Edge browser product line
 
-The automation approach behind AutoGenesis has been applied at production scale on the Microsoft Edge browser product line:
+The automation approach behind AutoGenesis has already operated at production scale on the Microsoft Edge browser product line.
 
-| 2.30M | 3,193 | 4 | 99.7% |
-| ---: | ---: | ---: | ---: |
-| Test steps executed in the reported 30-day period | Hours saved in the monthly operating period | Platforms: Windows, macOS, iOS, and Android | Pass-rate consistency |
+<p align="center">
+  <picture>
+    <source media="(max-width: 480px)" srcset="docs/assets/edge-deployment-results-mobile.svg">
+    <img src="docs/assets/edge-deployment-results.svg" alt="Microsoft Edge browser product-line deployment: 2.30 million test steps in a reported 30-day period, 3,193 hours saved monthly, four platforms, and 99.7 percent pass-rate consistency" width="1120">
+  </picture>
+</p>
 
-These are observed Edge deployment results, not projected savings or a universal benchmark for every product and environment.
+In the reported operating period, the Edge deployment executed **2.30 million test steps**, saved **3,193 hours per month**, covered **Windows, macOS, iOS, and Android**, and reported **99.7% pass-rate consistency**. These are observed results from that product line—not projected savings or a universal benchmark.
+
+<sub>Microsoft Edge is a trademark of the Microsoft group of companies.</sub>
 
 ## Get started
 
