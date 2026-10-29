@@ -1,6 +1,10 @@
-<!-- Brand artwork intentionally left empty until the approved assets are supplied. -->
-
-<h1 align="center">AutoGenesis</h1>
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/assets/autogenesis-logo-dark.svg">
+    <source media="(prefers-color-scheme: light)" srcset="docs/assets/autogenesis-logo-light.svg">
+    <img alt="AutoGenesis — Behavior to replayable tests" src="docs/assets/autogenesis-logo-light.svg" width="420">
+  </picture>
+</p>
 
 <h3 align="center">Write the behavior. Watch AI record it. Replay without AI.</h3>
 
