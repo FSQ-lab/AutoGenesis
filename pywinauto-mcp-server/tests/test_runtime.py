@@ -45,7 +45,7 @@ async def test_canonical_instructions_prompts_and_identity_use_merged_adapter(ap
     server = runtime.create_server(app_config)
     contract = load_contract()
     assert server.instructions == contract.instructions
-    assert runtime.RUNTIME_CONTRACT == RuntimeContractRequirement("2.0.0", "8f9d138c629b8c2db753c4459bb589b4652158233fb9e9bed8b6e5f48569c133")
+    assert runtime.RUNTIME_CONTRACT == RuntimeContractRequirement("2.0.0", "4367a2e388d0d5cb41a415b25b6a58e25025f1da6749bfdffe87a37c60a0c9d3")
     assert {prompt.name: [(arg.name, arg.required) for arg in prompt.arguments] for prompt in await server.list_prompts()} == {
         "execute_scenario": [("scenario_text", True), ("feature_file_path", False)],
         "generate_scenario_test": [("scenario_text", True), ("feature_file_path", True)],
@@ -65,7 +65,7 @@ async def test_canonical_instructions_prompts_and_identity_use_merged_adapter(ap
     assert {key: identity[key] for key in contract.identity.to_dict()} == contract.identity.to_dict()
 
 
-@pytest.mark.parametrize("version,digest", [("3.0.0", "8f9d138c629b8c2db753c4459bb589b4652158233fb9e9bed8b6e5f48569c133"), ("2.0.0", "0" * 64)])
+@pytest.mark.parametrize("version,digest", [("3.0.0", "4367a2e388d0d5cb41a415b25b6a58e25025f1da6749bfdffe87a37c60a0c9d3"), ("2.0.0", "0" * 64)])
 def test_contract_drift_fails_closed_before_driver_import(monkeypatch, app_config, version, digest):
     monkeypatch.setattr(runtime, "RUNTIME_CONTRACT", RuntimeContractRequirement(version, digest))
     with pytest.raises(ContractError):

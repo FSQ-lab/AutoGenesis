@@ -39,18 +39,25 @@ project MCP configuration, or business files.
 
 ## Project readiness
 
-Run only after the target platform or task is known. The Coding Agent owns its
-current-project discovery, MCP registration scope and format, Runtime arguments,
-configuration layout, and reload mechanism. Follow the user's choices rather than
-imposing a project/global scope, `--project-root`, or config schema.
+Run only after the target is known. Follow the user's project discovery, MCP
+scope/format, Runtime arguments, configuration layout, and reload choices; do not
+impose project/global scope, `--project-root`, or a config schema.
 
-For local Appium capabilities, use Appium's official CLI rather than recreating
-it: inspect `appium --version`, `appium driver list --installed`, and the target
-`appium driver doctor`; after approval use `npm install -g appium`, `appium setup`,
-or `appium driver install` as appropriate. Remote Appium may not need local
-Server or Drivers. Windows desktop automation uses the Windows Runtime, not
-Appium. Never persist plaintext credentials; preserve environment or SecretRef
-references.
+For local Appium, use its official CLI: inspect `appium --version`,
+`appium driver list --installed`, and the target `appium driver doctor`; after
+approval use `npm install -g appium`, `appium setup`, or `appium driver install`.
+Remote Appium may need no local Server or Driver. Windows desktop uses Windows
+MCP. Preserve environment or SecretRef credentials; never persist plaintext.
+
+For a physical iPhone, discover the device with `xcrun devicectl list devices`
+and run `appium driver doctor xcuitest`. WebDriverAgent must use the Apple Team
+ID (certificate OU, not its parenthesized user ID) and be trusted under Settings
+→ General → VPN & Device Management. On failure, temporarily enable
+`showXcodeLog`; distinguish provisioning-profile, wrong-team/certificate, and
+untrusted-developer errors, then disable verbose logs and sanitize evidence.
+iOS 18+ may require Appium's `appium driver run xcuitest tunnel-creation`; never
+run its sudo path without approval. Ready requires a real XCUITest session that
+launches the target and exposes its UI through MCP.
 
 Use the Coding Agent's native MCP mechanism. A capability is Ready only after the
 selected Runtime starts, MCP initialize succeeds, `prompts/list` and required tool

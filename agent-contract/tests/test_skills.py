@@ -38,6 +38,10 @@ def test_skills_follow_agent_skills_names_and_separate_responsibilities(repo_roo
         "autogenesis-appium-mcp", "autogenesis-windows-mcp", "appium driver doctor",
         "Ready", "Action Required", "Blocked",
     ))
+    assert all(value in setup for value in (
+        "xcrun devicectl list devices", "appium driver doctor xcuitest",
+        "WebDriverAgent", "VPN & Device Management", "tunnel-creation",
+    ))
     assert all(value in run for value in (
         "autogenesis-setup", "execute_natural_language_task", "execute_scenario",
         "generate_scenario_test", "current preview", "Windows MCP", "Appium MCP",
