@@ -36,7 +36,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [macos-14, windows-2022]
+        os: [macos-latest, windows-2022]
         python: ['3.10', '3.12']
     steps:
       - name: Preserve exact LF Skill bytes
