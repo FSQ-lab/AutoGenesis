@@ -10,4 +10,4 @@ autogenesis-appium-mcp --platform android --config /absolute/business/appium.jso
 
 Canonical Registry metadata is in [`server.json`](server.json). Generated-code confirmation requires the exact preview identity and digest plus explicit approval.
 
-<!-- mcp-name: io.github.fsq-lab/autogenesis-appium -->
+<!-- mcp-name: io.github.FSQ-lab/autogenesis-appium -->

@@ -41,7 +41,7 @@ def test_built_wheel_contains_every_runtime_module_and_only_public_templates():
     wheel_dir = os.environ.get("AUTOGENESIS_WHEEL_DIR")
     if not wheel_dir:
         pytest.skip("Set AUTOGENESIS_WHEEL_DIR to inspect built artifacts.")
-    wheels = list(Path(wheel_dir).glob("autogenesis_windows_mcp-0.3.0-*.whl"))
+    wheels = list(Path(wheel_dir).glob("autogenesis_windows_mcp-0.3.1-*.whl"))
     assert len(wheels) == 1
     with zipfile.ZipFile(wheels[0]) as wheel:
         names = set(wheel.namelist())

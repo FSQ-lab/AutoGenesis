@@ -20,7 +20,7 @@ URI = "autogenesis://agent-contract/identity"
 
 def test_installed_console_and_exact_contract_requirement():
     distribution = metadata.distribution("autogenesis-appium-mcp")
-    assert distribution.version == "0.3.0"
+    assert distribution.version == "0.3.1"
     entrypoints = [item for item in distribution.entry_points if item.group == "console_scripts"]
     assert [(item.name, item.value) for item in entrypoints] == [
         ("autogenesis-appium-mcp", "autogenesis_appium_mcp.server:main"),

@@ -1,11 +1,11 @@
 # AutoGenesis Windows MCP package
 
 Issue #8 evolves the Windows runtime as **autogenesis-windows-mcp**
-(version 0.3.0), importable as **autogenesis_windows_mcp**, with the console
+(version 0.3.1), importable as **autogenesis_windows_mcp**, with the console
 command **autogenesis-windows-mcp**. Python 3.10+ and Windows are required for
 serving automation tools. Linux CI checks package metadata/imports only.
 
-<!-- mcp-name: io.github.fsq-lab/autogenesis-windows -->
+<!-- mcp-name: io.github.FSQ-lab/autogenesis-windows -->
 
 ## Install in a business project
 
@@ -15,7 +15,7 @@ checkout of AutoGenesis:
 
 ```powershell
 python -m venv .venv
-.venv/Scripts/python -m pip install C:/artifacts/autogenesis_agent_contract-1.2.0-py3-none-any.whl C:/artifacts/autogenesis_windows_mcp-0.3.0-py3-none-any.whl
+.venv/Scripts/python -m pip install C:/artifacts/autogenesis_agent_contract-1.2.0-py3-none-any.whl C:/artifacts/autogenesis_windows_mcp-0.3.1-py3-none-any.whl
 .venv/Scripts/autogenesis-windows-mcp --config ./apps.json --app notepad --project-root .
 ```
 
@@ -28,13 +28,13 @@ the app_close automation tool or terminate the user's application.
 With uv installed, isolated execution from local artifacts is also supported:
 
 ```powershell
-uvx --with C:/artifacts/autogenesis_agent_contract-1.2.0-py3-none-any.whl --from C:/artifacts/autogenesis_windows_mcp-0.3.0-py3-none-any.whl autogenesis-windows-mcp --config ./apps.json --app notepad --project-root .
+uvx --with C:/artifacts/autogenesis_agent_contract-1.2.0-py3-none-any.whl --from C:/artifacts/autogenesis_windows_mcp-0.3.1-py3-none-any.whl autogenesis-windows-mcp --config ./apps.json --app notepad --project-root .
 ```
 
 After these versions are published to the configured package index:
 
 ```powershell
-uvx --from autogenesis-windows-mcp==0.3.0 autogenesis-windows-mcp --config ./apps.json --app notepad --project-root .
+uvx --from autogenesis-windows-mcp==0.3.1 autogenesis-windows-mcp --config ./apps.json --app notepad --project-root .
 ```
 
 The runtime depends exactly on autogenesis-agent-contract==1.2.0 and requires
