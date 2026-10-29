@@ -9,6 +9,7 @@ on:
       - 'appium-mcp-server/server.json'
       - 'pywinauto-mcp-server/pyproject.toml'
       - 'pywinauto-mcp-server/server.json'
+      - 'autogenesis-cli/**'
       - 'registry/**'
       - 'tools/render_mcp_descriptor.py'
       - 'tools/verify_registry_metadata.py'
@@ -21,6 +22,7 @@ on:
       - 'appium-mcp-server/server.json'
       - 'pywinauto-mcp-server/pyproject.toml'
       - 'pywinauto-mcp-server/server.json'
+      - 'autogenesis-cli/**'
       - 'registry/**'
       - 'tools/render_mcp_descriptor.py'
       - 'tools/verify_registry_metadata.py'
@@ -55,6 +57,7 @@ jobs:
           python -m build --wheel --outdir '${{ runner.temp }}/registry-wheels' agent-contract
           python -m build --wheel --outdir '${{ runner.temp }}/registry-wheels' appium-mcp-server
           python -m build --wheel --outdir '${{ runner.temp }}/registry-wheels' pywinauto-mcp-server
+          python -m build --wheel --outdir '${{ runner.temp }}/registry-wheels' autogenesis-cli
       - name: Validate official schema and generated descriptors
         run: >-
           python tools/verify_registry_metadata.py
@@ -66,6 +69,7 @@ jobs:
           '${{ runner.temp }}/registry-venv/bin/python' -m pip --disable-pip-version-check install '${{ runner.temp }}/registry-wheels/'*.whl
           '${{ runner.temp }}/registry-venv/bin/autogenesis-appium-mcp' --help
           '${{ runner.temp }}/registry-venv/bin/autogenesis-windows-mcp' --help
+          '${{ runner.temp }}/registry-venv/bin/autogenesis' --help
       - name: Upload Registry evidence
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4

@@ -6,7 +6,7 @@
   "required": ["schema_version", "contract_version", "assets"],
   "properties": {
     "schema_version": {"const": 2},
-    "contract_version": {"const": "1.2.0"},
+    "contract_version": {"const": "2.0.0"},
     "assets": {
       "type": "object",
       "minProperties": 10,
@@ -17,8 +17,8 @@
           "workflows/execute_scenario.md",
           "workflows/generate_scenario_test.md",
           "workflows/execute_natural_language_task.md",
-          "skills/autoGenesis-run/SKILL.md",
-          "skills/autoGenesis-win/SKILL.md",
+          "skills/autogenesis-setup/SKILL.md",
+          "skills/autogenesis-run/SKILL.md",
           "schemas/manifest.schema.json",
           "schemas/identity.schema.json",
           "schemas/arguments.schema.json",

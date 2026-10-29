@@ -5,15 +5,15 @@ on:
     branches: [main, feature/agent-integration]
     paths:
       - 'agent-contract/**'
-      - '.github/skills/autoGenesis-run/SKILL.md'
-      - '.github/skills/autoGenesis-win/SKILL.md'
+      - '.github/skills/autogenesis-setup/SKILL.md'
+      - '.github/skills/autogenesis-run/SKILL.md'
       - '.github/workflows/agent-contract.yml'
   push:
     branches: [feature/agent-integration]
     paths:
       - 'agent-contract/**'
-      - '.github/skills/autoGenesis-run/SKILL.md'
-      - '.github/skills/autoGenesis-win/SKILL.md'
+      - '.github/skills/autogenesis-setup/SKILL.md'
+      - '.github/skills/autogenesis-run/SKILL.md'
       - '.github/workflows/agent-contract.yml'
   workflow_dispatch:
 

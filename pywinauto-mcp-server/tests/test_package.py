@@ -18,7 +18,7 @@ def test_distribution_entrypoint_and_exact_contract_dependency():
     requirements = [Requirement(item) for item in dist.requires]
     contract = [item for item in requirements if item.name == "autogenesis-agent-contract"]
     assert len(contract) == 1
-    assert str(contract[0].specifier) == "==1.2.0"
+    assert str(contract[0].specifier) == "==2.0.0"
     console = [item for item in dist.entry_points if item.group == "console_scripts"]
     assert [(item.name, item.value) for item in console] == [
         ("autogenesis-windows-mcp", "autogenesis_windows_mcp.cli:main"),
@@ -41,7 +41,7 @@ def test_built_wheel_contains_every_runtime_module_and_only_public_templates():
     wheel_dir = os.environ.get("AUTOGENESIS_WHEEL_DIR")
     if not wheel_dir:
         pytest.skip("Set AUTOGENESIS_WHEEL_DIR to inspect built artifacts.")
-    wheels = list(Path(wheel_dir).glob("autogenesis_windows_mcp-0.3.1-*.whl"))
+    wheels = list(Path(wheel_dir).glob("autogenesis_windows_mcp-0.4.0-*.whl"))
     assert len(wheels) == 1
     with zipfile.ZipFile(wheels[0]) as wheel:
         names = set(wheel.namelist())

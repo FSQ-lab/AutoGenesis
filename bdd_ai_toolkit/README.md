@@ -90,7 +90,7 @@ Now you're ready to use AI-powered test automation!
 3. Click **"Send to Copilot"** above the scenario
 4. AI generates automation code automatically
 
-> If `.github/skills/autoGenesis-run/SKILL.md` exists in the workspace, the extension sends `/autoGenesis-run <Scenario Name>` to Copilot instead of the default prompt.
+> If `.github/skills/autogenesis-run/SKILL.md` exists in the workspace, the extension sends `/autogenesis-run <Scenario Name>` to Copilot instead of the default prompt.
 
 **Replaying** (Execute tests):
 1. Open a `.feature` file with recorded scenarios
@@ -128,7 +128,7 @@ Customize how AI generates code:
 - `${scenario_text}` - Full scenario content
 - `${feature_file_path}` - Path to feature file
 
-> **Note**: This prompt is used as fallback when the `autoGenesis-run` skill is not present in the workspace.
+> **Note**: This prompt is used as fallback when the `autogenesis-run` skill is not present in the workspace.
 
 ---
 

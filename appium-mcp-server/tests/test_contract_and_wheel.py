@@ -12,15 +12,15 @@ from autogenesis_agent_contract import ContractError, RuntimeContractRequirement
 
 from autogenesis_appium_mcp import server
 
-VERSION = "1.2.0"
-DIGEST = "e655f773ac723cf29610364e60f733121740f4701eccdc144cc5001e1bd67d36"
+VERSION = "2.0.0"
+DIGEST = "8f9d138c629b8c2db753c4459bb589b4652158233fb9e9bed8b6e5f48569c133"
 PROMPTS = {"execute_scenario", "generate_scenario_test", "execute_natural_language_task"}
 URI = "autogenesis://agent-contract/identity"
 
 
 def test_installed_console_and_exact_contract_requirement():
     distribution = metadata.distribution("autogenesis-appium-mcp")
-    assert distribution.version == "0.3.1"
+    assert distribution.version == "0.4.0"
     entrypoints = [item for item in distribution.entry_points if item.group == "console_scripts"]
     assert [(item.name, item.value) for item in entrypoints] == [
         ("autogenesis-appium-mcp", "autogenesis_appium_mcp.server:main"),
@@ -28,7 +28,7 @@ def test_installed_console_and_exact_contract_requirement():
     assert entrypoints[0].load() is server.main
     assert not inspect.iscoroutinefunction(server.main)
     dependencies = [item.lower().replace(" ", "") for item in distribution.requires]
-    assert "autogenesis-agent-contract==1.2.0" in dependencies
+    assert "autogenesis-agent-contract==2.0.0" in dependencies
     assert not any(item.startswith("browserstack-sdk") for item in dependencies)
     assert server.REQUIREMENT == RuntimeContractRequirement(VERSION, DIGEST)
     manifest = resources.files("autogenesis_agent_contract").joinpath("assets/manifest.json").read_bytes()
@@ -98,7 +98,7 @@ async def test_canonical_instructions_prompt_arguments_and_identity(config_path)
         runtime.close()
 
 
-@pytest.mark.parametrize("requirement", [RuntimeContractRequirement("2.0.0", DIGEST), RuntimeContractRequirement(VERSION, "0" * 64)])
+@pytest.mark.parametrize("requirement", [RuntimeContractRequirement("3.0.0", DIGEST), RuntimeContractRequirement(VERSION, "0" * 64)])
 def test_contract_drift_fails_closed_before_server_publication(requirement, config_path, monkeypatch):
     monkeypatch.setattr(server, "REQUIREMENT", requirement)
     with pytest.raises(ContractError):

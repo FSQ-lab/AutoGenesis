@@ -185,7 +185,7 @@ export class CopilotIntegrationService {
    * Generate a skill invocation command for Copilot
    * @param skillName Name of the skill
    * @param scenarioName Name of the scenario
-   * @returns Skill invocation string (e.g. "/autoGenesis-run Scenario Name")
+   * @returns Skill invocation string (e.g. "/autogenesis-run Scenario Name")
    */
   generateSkillCommand(skillName: string, scenarioName: string): string {
     return `/${skillName} ${scenarioName}`;

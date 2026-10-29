@@ -28,8 +28,20 @@ jobs:
           python -m build --wheel --outdir dist agent-contract
           python -m build --wheel --outdir dist appium-mcp-server
           python -m build --wheel --outdir dist pywinauto-mcp-server
+          python -m build --wheel --outdir dist autogenesis-cli
       - name: Verify Registry metadata against release wheels
         run: python tools/verify_registry_metadata.py --wheel-dir dist --evidence-dir registry-evidence
+      - name: Build immutable Skill release assets
+        run: >-
+          python agent-contract/tools/build_skill_release.py
+          --output-dir skill-release
+          --base-url https://github.com/FSQ-lab/AutoGenesis/releases/download/agent-contract-v2.0.0
+      - name: Upload immutable Skill release assets
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: release-autogenesis-skills-2.0.0
+          path: skill-release
+          if-no-files-found: error
       - name: Upload Agent Contract wheel
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
@@ -47,6 +59,12 @@ jobs:
         with:
           name: pypi-autogenesis-windows-mcp
           path: dist/autogenesis_windows_mcp-*.whl
+          if-no-files-found: error
+      - name: Upload AutoGenesis CLI wheel
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: pypi-autogenesis-cli
+          path: dist/autogenesis_cli-*.whl
           if-no-files-found: error
 
   publish-pypi:
@@ -67,6 +85,9 @@ jobs:
           - project: autogenesis-windows-mcp
             artifact: pypi-autogenesis-windows-mcp
             environment: pypi-windows-mcp
+          - project: autogenesis-cli
+            artifact: pypi-autogenesis-cli
+            environment: pypi-autogenesis-cli
     environment:
       name: ${{ matrix.environment }}
       url: https://pypi.org/p/${{ matrix.project }}
@@ -85,9 +106,42 @@ jobs:
           packages-dir: dist
           skip-existing: true
 
+  publish-skills:
+    name: Publish immutable Agent Skills
+    needs: publish-pypi
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      RELEASE_TAG: agent-contract-v2.0.0
+    steps:
+      - name: Download verified Skill assets
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: release-autogenesis-skills-2.0.0
+          path: skill-release
+      - name: Create or verify immutable Skill release
+        run: |
+          set -euo pipefail
+          if gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            mkdir existing-release
+            gh release download "$RELEASE_TAG" --dir existing-release --repo "$GITHUB_REPOSITORY"
+            for asset in skill-release/*; do
+              cmp "$asset" "existing-release/$(basename "$asset")"
+            done
+          else
+            gh release create "$RELEASE_TAG" skill-release/* \
+              --repo "$GITHUB_REPOSITORY" \
+              --target "$GITHUB_SHA" \
+              --title "AutoGenesis Agent Contract 2.0.0" \
+              --notes "Canonical AutoGenesis Agent Skills and verified Agent Install Prompt."
+          fi
+
   publish-registry:
     name: Publish Appium and Windows Registry records
-    needs: publish-pypi
+    needs: publish-skills
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     environment: mcp-registry-publish
@@ -105,7 +159,7 @@ jobs:
           python-version: '3.12'
       - name: Install Registry verifier dependency
         run: python -m pip --disable-pip-version-check install 'jsonschema>=4.20,<5'
-      - name: Require all three public PyPI versions
+      - name: Require all four public PyPI versions
         run: python tools/verify_registry_metadata.py --check-pypi --evidence-dir registry-release-evidence
       - name: Install cosign
         uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2

@@ -85,7 +85,7 @@ def main():
             ], cwd=business, env=env)
             summary["clean_install"] = {
                 "exit_code": 0, "source": "local built wheels", "business_project_outside_checkout": True,
-                "contract": "1.2.0", "runtime": "0.3.1",
+                "contract": "2.0.0", "runtime": "0.4.0",
             }
             # Copy tests and the source shim only; no runtime source or contract assets.
             checks = root / "checks"

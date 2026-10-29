@@ -33,6 +33,34 @@ within the file for "TODO".
 
 AutoGenesis is an AI-powered automated testing framework based on Model Context Protocol (MCP), supporting multiple platforms including desktop applications (Windows/macOS) and mobile applications (iOS/Android).
 
+## Install AutoGenesis
+
+Native macOS and native Windows are supported; Linux and WSL are not. Python
+3.10 or newer is required.
+
+### Agent-first
+
+Copy [`agent-install-prompt.txt`](https://github.com/FSQ-lab/AutoGenesis/releases/download/agent-contract-v2.0.0/agent-install-prompt.txt)
+from the immutable Agent Contract 2.0.0 release into OMP, Pi, Codex CLI, or
+GitHub Copilot CLI. The prompt installs only the integrity-checked
+`autogenesis-setup` Skill; that Skill then shows and requests approval for the
+machine setup plan. The release also publishes `SHA256SUMS`.
+
+### CLI-first
+
+Install `autogenesis-cli` from the Python index and environment you choose, then
+run:
+
+```bash
+autogenesis install
+```
+
+The command verifies the host Runtime bundle and installs `autogenesis-setup`
+and `autogenesis-run` to `~/.agents/skills`. It does not install Appium Server,
+Drivers, SDKs, project MCP configuration, or execute an application. Low-level
+`autogenesis-appium-mcp` and `autogenesis-windows-mcp` packages remain usable
+without Skills for expert CLI/MCP consumers.
+
 ## Platform-Specific Documentation
 
 Please refer to the appropriate documentation based on your testing platform:
