@@ -12,7 +12,7 @@ Obtain the built runtime and Agent Contract wheels from the Integration Lead.
 No AutoGenesis checkout is needed. In an activated virtual environment:
 
 ```bash
-python -m pip install /absolute/wheels/autogenesis_agent_contract-1.2.0-py3-none-any.whl /absolute/wheels/autogenesis_appium_mcp-0.3.0-py3-none-any.whl
+python -m pip install /absolute/wheels/autogenesis_agent_contract-1.2.0-py3-none-any.whl /absolute/wheels/autogenesis_appium_mcp-0.3.1-py3-none-any.whl
 python -c "from importlib.resources import files; from pathlib import Path; Path('appium.json').write_bytes(files('autogenesis_appium_mcp').joinpath('conf/appium_conf.template.json').read_bytes())"
 autogenesis-appium-mcp --platform mac --config /absolute/business/appium.json --project-root /absolute/business
 ```
@@ -25,13 +25,13 @@ stdout is reserved for MCP; diagnostics use stderr.
 With uvx and local artifacts:
 
 ```bash
-uvx --from /absolute/wheels/autogenesis_appium_mcp-0.3.0-py3-none-any.whl --with /absolute/wheels/autogenesis_agent_contract-1.2.0-py3-none-any.whl autogenesis-appium-mcp --platform mac --config /absolute/business/appium.json --project-root /absolute/business
+uvx --from /absolute/wheels/autogenesis_appium_mcp-0.3.1-py3-none-any.whl --with /absolute/wheels/autogenesis_agent_contract-1.2.0-py3-none-any.whl autogenesis-appium-mcp --platform mac --config /absolute/business/appium.json --project-root /absolute/business
 ```
 
 Once both packages are published to the configured index:
 
 ```bash
-uvx --from autogenesis-appium-mcp==0.3.0 autogenesis-appium-mcp --platform mac --config /absolute/business/appium.json --project-root /absolute/business
+uvx --from autogenesis-appium-mcp==0.3.1 autogenesis-appium-mcp --platform mac --config /absolute/business/appium.json --project-root /absolute/business
 ```
 
 Agent Contract is pinned to **1.2.0**, manifest SHA-256

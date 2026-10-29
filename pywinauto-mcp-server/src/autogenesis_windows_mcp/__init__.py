@@ -1,3 +1,3 @@
 """AutoGenesis Windows MCP runtime; importing metadata does not load UI drivers."""
 
-__version__ = "0.3.0"
+__version__ = "0.3.1"

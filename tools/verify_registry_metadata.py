@@ -26,7 +26,7 @@ SERVERS = {
     "appium": {
         "path": "appium-mcp-server/server.json",
         "project": "appium-mcp-server/pyproject.toml",
-        "name": "io.github.fsq-lab/autogenesis-appium",
+        "name": "io.github.FSQ-lab/autogenesis-appium",
         "package": "autogenesis-appium-mcp",
         "entrypoint": "autogenesis-appium-mcp = autogenesis_appium_mcp.server:main",
         "arguments": {"--platform", "--config", "--project-root"},
@@ -34,7 +34,7 @@ SERVERS = {
     "windows": {
         "path": "pywinauto-mcp-server/server.json",
         "project": "pywinauto-mcp-server/pyproject.toml",
-        "name": "io.github.fsq-lab/autogenesis-windows",
+        "name": "io.github.FSQ-lab/autogenesis-windows",
         "package": "autogenesis-windows-mcp",
         "entrypoint": "autogenesis-windows-mcp = autogenesis_windows_mcp.cli:main",
         "arguments": {"--config", "--app", "--project-root"},

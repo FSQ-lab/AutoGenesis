@@ -1,6 +1,6 @@
 {
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
-  "name": "io.github.fsq-lab/autogenesis-windows",
+  "name": "io.github.FSQ-lab/autogenesis-windows",
   "title": "AutoGenesis Windows",
   "description": "BDD automation runtime for Windows desktop applications through pywinauto.",
   "repository": {
@@ -9,13 +9,13 @@
     "id": "1412652894",
     "subfolder": "pywinauto-mcp-server"
   },
-  "version": "0.3.0",
+  "version": "0.3.1",
   "packages": [
     {
       "registryType": "pypi",
       "registryBaseUrl": "https://pypi.org",
       "identifier": "autogenesis-windows-mcp",
-      "version": "0.3.0",
+      "version": "0.3.1",
       "runtimeHint": "uvx",
       "transport": {
         "type": "stdio"
