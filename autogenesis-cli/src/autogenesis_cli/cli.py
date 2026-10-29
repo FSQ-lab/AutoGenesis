@@ -12,6 +12,7 @@ from importlib import metadata, resources
 from pathlib import Path
 
 from autogenesis_agent_contract import load_contract
+from . import __version__
 
 SKILLS = ("autogenesis-setup", "autogenesis-run")
 EXPECTED = {
@@ -142,6 +143,7 @@ def install(skills_dir: Path) -> dict:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="autogenesis")
+    parser.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
     subparsers = parser.add_subparsers(dest="command", required=True)
     command = subparsers.add_parser("install", help="install the host bundle's canonical Skills")
     command.add_argument(

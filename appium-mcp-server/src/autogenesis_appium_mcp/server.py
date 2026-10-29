@@ -18,6 +18,7 @@ from autogenesis_agent_contract import (
 from mcp.server.fastmcp import FastMCP
 from mcp.server.fastmcp.exceptions import ToolError
 
+from . import __version__
 from .driver_session import DriverSessionManager
 from .tools.appium_driver_tool import register_appium_driver_tools
 from .tools.android_driver_tool import register_android_driver_tools
@@ -143,7 +144,8 @@ class RuntimeArgumentParser(argparse.ArgumentParser):
 
 
 def parse_args(argv=None):
-    parser = RuntimeArgumentParser(description="AutoGenesis Appium MCP runtime")
+    parser = RuntimeArgumentParser(prog="autogenesis-appium-mcp", description="AutoGenesis Appium MCP runtime")
+    parser.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
     parser.add_argument("--platform", choices=("ios", "android", "mac"), default="ios")
     parser.add_argument("--transport", choices=("stdio",), default="stdio")
     parser.add_argument("--config", help="Explicit JSON configuration; otherwise cwd/conf/appium_conf.json or packaged template")

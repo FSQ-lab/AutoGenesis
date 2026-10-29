@@ -11,6 +11,9 @@ python -m pip install autogenesis-cli==0.1.0
 autogenesis install
 ```
 
+`autogenesis --version` prints the installed CLI version without checking the
+host, packages, Contract, or Skill destination.
+
 The package manager, not `autogenesis install`, installs the host dependencies:
 
 | Host | Exact AutoGenesis dependencies |

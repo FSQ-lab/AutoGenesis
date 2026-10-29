@@ -56,6 +56,15 @@ The Python package installation resolves the supported host bundle:
 | macOS | Agent Contract 2.0.0 and Appium Runtime 0.4.0 |
 | Windows | Agent Contract 2.0.0, Appium Runtime 0.4.0, and Windows Runtime 0.4.0 |
 
+Check the installed command versions without starting a Runtime or reading
+business configuration:
+
+```bash
+autogenesis --version
+autogenesis-appium-mcp --version
+autogenesis-windows-mcp --version  # Windows only
+```
+
 `autogenesis install` does not invoke pip or uv. It verifies those already
 installed package versions and installs the canonical `autogenesis-setup` and
 `autogenesis-run` files under `~/.agents/skills`. Running it again with identical

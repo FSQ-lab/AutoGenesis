@@ -15,6 +15,7 @@ import anyio
 from autogenesis_agent_contract import ContractError
 from dotenv import load_dotenv
 
+from . import __version__
 from .config import ConfigurationError, load_app_config
 from .server import create_server
 from .utils.logger import configure_logging
@@ -161,7 +162,8 @@ def _client_disconnected(error):
 
 
 def main(argv=None, *, default_config=None, default_transport="stdio") -> int:
-    parser = _Parser(description="AutoGenesis Windows MCP runtime")
+    parser = _Parser(prog="autogenesis-windows-mcp", description="AutoGenesis Windows MCP runtime")
+    parser.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
     parser.add_argument("--app", help="Application profile; defaults to the first apps_config entry")
     parser.add_argument("--transport", choices=["stdio"], default=default_transport)
     parser.add_argument("--config", default=default_config, help="Path to UTF-8 application-profile JSON")

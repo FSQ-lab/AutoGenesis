@@ -92,3 +92,10 @@ def test_cli_emits_structured_error_without_payload(tmp_path, monkeypatch, capsy
         "error": "AUTOGENESIS_PLATFORM_UNSUPPORTED: native macOS or Windows is required",
         "status": "error",
     }
+
+
+def test_cli_version_is_available_without_a_subcommand(capsys):
+    with pytest.raises(SystemExit) as caught:
+        cli.main(["--version"])
+    assert caught.value.code == 0
+    assert capsys.readouterr() == ("autogenesis 0.1.0\n", "")
