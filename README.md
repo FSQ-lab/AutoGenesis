@@ -33,33 +33,52 @@ within the file for "TODO".
 
 AutoGenesis is an AI-powered automated testing framework based on Model Context Protocol (MCP), supporting multiple platforms including desktop applications (Windows/macOS) and mobile applications (iOS/Android).
 
-## Install AutoGenesis
+## Install AutoGenesis 2.0
 
 Native macOS and native Windows are supported; Linux and WSL are not. Python
-3.10 or newer is required.
+3.10 or newer is required. Do not run the Agent Install Prompt on an unsupported
+host; host rejection occurs when Setup runs, not before the Setup Skill is
+installed.
+
+### CLI-first
+
+Install the CLI through the Python environment and package index you choose:
+
+```bash
+python -m pip install autogenesis-cli==0.1.0
+autogenesis install
+```
+
+The Python package installation resolves the supported host bundle:
+
+| Host | Installed AutoGenesis dependencies |
+| --- | --- |
+| macOS | Agent Contract 2.0.0 and Appium Runtime 0.4.0 |
+| Windows | Agent Contract 2.0.0, Appium Runtime 0.4.0, and Windows Runtime 0.4.0 |
+
+`autogenesis install` does not invoke pip or uv. It verifies those already
+installed package versions and installs the canonical `autogenesis-setup` and
+`autogenesis-run` files under `~/.agents/skills`. Running it again with identical
+Skill files reports them as `unchanged`.
+
+The command does not install Appium Server, Appium Drivers, platform SDKs,
+project MCP configuration, or business configuration, and does not execute an
+application. Use `autogenesis-setup` afterward to inspect a concrete target and
+approve any additional machine or project preparation.
 
 ### Agent-first
 
 Copy [`agent-install-prompt.txt`](https://github.com/FSQ-lab/AutoGenesis/releases/download/agent-contract-v2.0.0/agent-install-prompt.txt)
-from the immutable Agent Contract 2.0.0 release into OMP, Pi, Codex CLI, or
-GitHub Copilot CLI. The prompt installs only the integrity-checked
-`autogenesis-setup` Skill; that Skill then shows and requests approval for the
-machine setup plan. The release also publishes `SHA256SUMS`.
+from the Agent Contract 2.0.0 release into OMP, Pi, Codex CLI, or GitHub Copilot
+CLI. The prompt verifies the published SHA-256, shows the selected scope and
+destination, requests approval, and persistently installs only
+`autogenesis-setup` through the Coding Agent's native Skill mechanism. A
+session-only trial is not supported in this release. Setup then proposes the
+host Runtime and project-readiness plan; it does not execute that plan without
+the user's approval.
 
-### CLI-first
-
-Install `autogenesis-cli` from the Python index and environment you choose, then
-run:
-
-```bash
-autogenesis install
-```
-
-The command verifies the host Runtime bundle and installs `autogenesis-setup`
-and `autogenesis-run` to `~/.agents/skills`. It does not install Appium Server,
-Drivers, SDKs, project MCP configuration, or execute an application. Low-level
-`autogenesis-appium-mcp` and `autogenesis-windows-mcp` packages remain usable
-without Skills for expert CLI/MCP consumers.
+Low-level `autogenesis-appium-mcp` and `autogenesis-windows-mcp` packages remain
+independently runnable without Skills for expert CLI/MCP consumers.
 
 ## Platform-Specific Documentation
 
