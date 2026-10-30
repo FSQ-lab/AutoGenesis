@@ -4,7 +4,7 @@ from ..safe_output import safe_error
 
 import logging
 import time
-from ..utils.element_util import fill_snapshot, find_element_by_kwargs
+from ..utils.element_util import fill_snapshot, find_element_by_kwargs, read_element_value
 from ..utils.logger import log_tool_call
 from ..utils.response_format import format_tool_response, init_tool_response
 from ..utils.gen_code import record_calls
@@ -349,7 +349,7 @@ def register_verify_tools(mcp, app_manager):
                 )
 
                 if exists:
-                    actual_value = element.get_value()
+                    actual_value = read_element_value(element)
                     if expected_value in actual_value:
                         resp["status"] = "success"
                     else:

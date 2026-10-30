@@ -5,6 +5,7 @@
 
 from autogenesis_agent_contract import resolve
 import os
+import re
 import psutil
 import time
 import logging
@@ -16,6 +17,25 @@ from pywinauto.findwindows import ElementNotFoundError
 
 logger = logging.getLogger(__name__)
             
+_WINDIR_REFERENCE = re.compile(r"%WINDIR%", re.IGNORECASE)
+
+
+def _expand_environment(value):
+    """Expand embedded environment references without mutating stored config."""
+    if isinstance(value, dict):
+        return {key: _expand_environment(child) for key, child in value.items()}
+    if isinstance(value, list):
+        return [_expand_environment(child) for child in value]
+    if isinstance(value, str):
+        # MCP stdio clients inherit SYSTEMROOT but may omit the equivalent
+        # WINDIR variable used by existing Windows application profiles.
+        system_root = os.environ.get("SYSTEMROOT")
+        if system_root and not os.environ.get("WINDIR"):
+            value = _WINDIR_REFERENCE.sub(lambda match: system_root, value)
+        return os.path.expandvars(value)
+    return value
+
+
 class AppSessionManager:
     def __init__(self, app_conf: dict):
         # Retain literals and SecretRefs only; resolve plaintext per operation.
@@ -37,7 +57,10 @@ class AppSessionManager:
         self.is_executing = False
 
     def runtime_config(self) -> dict:
-        return resolve(self.config)
+        return _expand_environment(resolve(self.config))
+
+    def runtime_launch_args(self) -> list[str]:
+        return _expand_environment(resolve(self.launch_args.copy()))
 
     def start_tool_execution(self, tool_name):
         if self.is_executing:
@@ -95,7 +118,7 @@ class AppSessionManager:
         if kill_existing == 1:
             await self.app_close()
 
-        args = resolve(self.launch_args.copy())
+        args = self.runtime_launch_args()
         is_new_launch = False
         try:
             if self._app:

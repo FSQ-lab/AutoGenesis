@@ -31,6 +31,140 @@ async def test_versioned_tool_names_and_secret_ref_schemas(app_config):
     assert not any("config" in name for name in actual)
 
 @pytest.mark.anyio
+async def test_launch_expands_environment_refs_without_mutating_config(monkeypatch):
+    from autogenesis_agent_contract import protect_config, serialize, tool_execution
+    from autogenesis_windows_mcp import app_session
+
+    monkeypatch.delenv("WINDIR", raising=False)
+    monkeypatch.setenv("SYSTEMROOT", r"C:\Windows")
+    monkeypatch.setenv("LOCALAPPDATA", r"C:\Users\acceptance\AppData\Local")
+    monkeypatch.setenv("AUTOGENESIS_TEST_SECRET", "resolved-secret")
+    protected = protect_config({
+        "exe": r"%WINDIR%\System32\notepad.exe",
+        "window_title_re": ".*AutoGenesis acceptance.*",
+        "launch_args": [
+            r"--state=%LOCALAPPDATA%\AutoGenesis",
+            "$AUTOGENESIS_TEST_SECRET",
+        ],
+    })
+    manager = app_session.AppSessionManager(protected)
+    start_calls = []
+
+    class FakeWindow:
+        def wait(self, state, timeout):
+            pass
+
+    class FakeApplication:
+        def __init__(self, backend):
+            assert backend == "uia"
+
+        def start(self, command):
+            start_calls.append(command)
+
+        def connect(self, **kwargs):
+            return self
+
+        def window(self, **kwargs):
+            return FakeWindow()
+
+    monkeypatch.setattr(app_session, "Application", FakeApplication)
+    monkeypatch.setattr(app_session.time, "sleep", lambda duration: None)
+    monkeypatch.setattr(manager, "kill_app_process_by_path", lambda: None)
+
+    def app_launch():
+        pass
+
+    with tool_execution(app_launch, (), {}):
+        assert await manager.app_launch() is True
+
+    assert start_calls == [
+        r"C:\Windows\System32\notepad.exe --state=C:\Users\acceptance\AppData\Local\AutoGenesis resolved-secret"
+    ]
+    assert serialize(manager.config) == {
+        "exe": r"%WINDIR%\System32\notepad.exe",
+        "window_title_re": ".*AutoGenesis acceptance.*",
+        "launch_args": [
+            r"--state=%LOCALAPPDATA%\AutoGenesis",
+            {"$secret": "env:AUTOGENESIS_TEST_SECRET"},
+        ],
+    }
+
+
+@pytest.mark.anyio
+async def test_document_input_and_value_assertion_use_uia_value_pattern(monkeypatch, app_config):
+    from autogenesis_windows_mcp.app_session import AppSessionManager
+    from autogenesis_windows_mcp.server import WindowsMCP
+    from autogenesis_windows_mcp.tools import common_tool, verify_tool
+
+    expected = "AutoGenesis Windows acceptance 20261030"
+
+    class ValuePattern:
+        CurrentIsReadOnly = False
+        CurrentValue = ""
+
+        def SetValue(self, value):
+            self.CurrentValue = value
+
+    class DocumentWrapper:
+        iface_value = ValuePattern()
+
+        def get_value(self):
+            raise AttributeError("UIAWrapper has no get_value")
+
+    class Element:
+        def wrapper_object(self):
+            return wrapper
+
+        def __getattr__(self, name):
+            return getattr(wrapper, name)
+
+    class AsyncioStub:
+        @staticmethod
+        async def sleep(duration):
+            pass
+
+    wrapper = DocumentWrapper()
+
+    async def find(*args, **kwargs):
+        return Element(), True, {}, {}
+
+    manager = AppSessionManager(app_config)
+    server = WindowsMCP("modern-notepad-regression")
+    common_tool.register_common_tools(server, manager)
+    verify_tool.register_verify_tools(server, manager)
+    monkeypatch.setattr(common_tool, "find_element_by_kwargs", find)
+    monkeypatch.setattr(verify_tool, "find_element_by_kwargs", find)
+    monkeypatch.setattr(common_tool, "asyncio", AsyncioStub())
+
+    async def call(name, arguments):
+        result = await server.call_tool(name, arguments)
+        content = result[0] if isinstance(result, tuple) else result
+        content = content[0] if isinstance(content, list) else content
+        return json.loads(content.text)
+
+    target = {
+        "caller": "test",
+        "control_framework": "pywinauto",
+        "control_type": "Document",
+        "automation_id": "",
+        "control_idx": 1,
+        "class_name": "RichEditD2DPT",
+        "need_snapshot": 0,
+    }
+    entered = await call("enter_text", {**target, "title": "", "content": expected})
+    verified = await call("verify_element_value", {
+        **target,
+        "name": "",
+        "element_value": "",
+        "expected_value": expected,
+    })
+
+    assert entered["status"] == "success"
+    assert wrapper.iface_value.CurrentValue == expected
+    assert verified["status"] == "success"
+
+
+@pytest.mark.anyio
 async def test_generation_destination_cannot_escape_business_project(app_config, tmp_path):
     server = runtime.create_server(app_config, business_root=tmp_path)
     outside = tmp_path.parent / f"{tmp_path.name}-outside" / "steps.py"
