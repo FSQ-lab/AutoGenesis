@@ -2,7 +2,7 @@ name: AutoGenesis CLI
 
 on:
   pull_request:
-    branches: [main, feature/agent-integration]
+    branches: [main, feature/agent-integration-v2]
     paths:
       - 'autogenesis-cli/**'
       - 'agent-contract/**'
@@ -11,7 +11,7 @@ on:
       - '.github/skills/autogenesis-*/SKILL.md'
       - '.github/workflows/autogenesis-cli.yml'
   push:
-    branches: [feature/agent-integration]
+    branches: [feature/agent-integration-v2]
     paths:
       - 'autogenesis-cli/**'
       - 'agent-contract/**'

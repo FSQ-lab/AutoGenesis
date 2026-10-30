@@ -91,7 +91,7 @@ Progress is measured by accepted capabilities, not code volume, commits, agent c
 
 ## Branches
 
-- `feature/agent-integration` is the integration branch for this effort.
+- `feature/agent-integration-v2` is the integration branch for post-2.0 capabilities.
 - Each Ready capability uses a dedicated branch and worktree.
 - Capability pull requests target the integration branch.
 - Only reviewed and accepted changes enter the integration branch.

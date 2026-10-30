@@ -12,7 +12,7 @@ from jsonschema import Draft202012Validator
 from jsonschema.exceptions import SchemaError, ValidationError
 
 from ._asset_io import MAX_MANIFEST_BYTES, AssetReadError, read_asset
-from ._layout import ASSET_PATHS, CONTRACT_VERSION, CORE_POLICY, SCHEMA_VERSION, WORKFLOWS
+from ._layout import ASSET_PATHS, CONTRACT_VERSION, CORE_POLICY, SCHEMA_VERSION, SKILLS, WORKFLOWS
 from ._release import MANIFEST_SHA256
 from .appendix import APPENDIX_PATH, ProjectAppendix
 from .errors import CONTRACT_INTEGRITY_ERROR, CONTRACT_MISMATCH, PROJECT_INSTRUCTIONS_INVALID, ContractError
@@ -80,6 +80,9 @@ class AgentContract:
     _workflows: Mapping[str, str] = field(repr=False)
     _schemas: Mapping[str, str] = field(repr=False)
 
+    _skill_bytes: Mapping[str, bytes] = field(repr=False)
+    _asset_bytes: Mapping[str, bytes] = field(repr=False)
+
     @property
     def identity(self) -> ContractIdentity:
         return self._identity
@@ -90,6 +93,18 @@ class AgentContract:
             _block("contract-identity", _data(self.identity.to_dict())),
             _block("core-policy", self._core),
         ))
+
+    def read_skill(self, name: str) -> bytes:
+        """Return held, verified canonical Skill bytes without filesystem access."""
+        if not isinstance(name, str) or name not in self._skill_bytes:
+            raise _integrity("unknown_skill")
+        return self._skill_bytes[name]
+
+    def _read_verified_asset(self, path: str) -> bytes:
+        """Return an outer-manifest asset retained by this verification pass."""
+        if not isinstance(path, str) or path not in self._asset_bytes:
+            raise _integrity("unknown_asset")
+        return self._asset_bytes[path]
 
     def render(
         self,
@@ -157,6 +172,8 @@ def load_contract(expected_identity: ContractIdentity | None = None) -> AgentCon
     if not isinstance(hashes, dict) or set(hashes) != set(ASSET_PATHS):
         raise _integrity("invalid_asset_inventory")
     assets = {}
+    skill_bytes: dict[str, bytes] = {}
+    asset_bytes: dict[str, bytes] = {}
     for path in ASSET_PATHS:
         try:
             raw = read_asset(root, path)
@@ -165,6 +182,10 @@ def load_contract(expected_identity: ContractIdentity | None = None) -> AgentCon
         if hashlib.sha256(raw).hexdigest() != hashes[path]:
             raise _integrity("asset_hash_mismatch")
         assets[path] = _text(raw)
+        asset_bytes[path] = raw
+        for name in SKILLS:
+            if path == f"skills/{name}/SKILL.md":
+                skill_bytes[name] = raw
     try:
         manifest_schema = _json(assets["schemas/manifest.schema.json"])
         argument_schemas = _json(assets["schemas/arguments.schema.json"])
@@ -192,4 +213,6 @@ def load_contract(expected_identity: ContractIdentity | None = None) -> AgentCon
     object.__setattr__(result, "_schemas", MappingProxyType({
         name: json.dumps(definitions[name]) for name in WORKFLOWS
     }))
+    object.__setattr__(result, "_skill_bytes", MappingProxyType(skill_bytes))
+    object.__setattr__(result, "_asset_bytes", MappingProxyType(asset_bytes))
     return result

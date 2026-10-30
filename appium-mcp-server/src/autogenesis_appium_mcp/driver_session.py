@@ -6,17 +6,23 @@
 from autogenesis_agent_contract import contains_credential_url, resolve, sanitize_result
 import time
 import logging
-import subprocess
-import os
+
 import threading
 from datetime import datetime
 from appium import webdriver
 from appium.options.ios import XCUITestOptions
 from appium.options.mac import Mac2Options  # Add this import for Mac automation
+from selenium.webdriver.remote.command import Command
 from appium.options.android import UiAutomator2Options  # Add this for Android if needed
 from .utils.logger import get_mcp_logger
 
 logger = get_mcp_logger()
+SESSION_CLOSE_TIMEOUT_SECONDS = 5
+
+
+class SessionCloseError(RuntimeError):
+    """The Runtime could not confirm destruction of its owned session."""
+
 
 
 class DriverSessionManager:
@@ -35,6 +41,11 @@ class DriverSessionManager:
         self._driver = None
         self.server_url = self.config["server_url"]
         self.is_executing = False
+        self._session_close_lock = threading.Lock()
+        self._session_close_thread = None
+        self._session_close_driver = None
+        self._session_close_failed = False
+
 
     def update_config(self, new_driver_configs: dict):
         """Update configuration dynamically without restarting"""
@@ -75,6 +86,7 @@ class DriverSessionManager:
             return False
 
     def app_launch(self, kill_existing: int = 0, arguments: list = None):
+        self._settle_session_close()
         # Normalize arguments: ensure it's a valid list or None
         if not isinstance(arguments, list) or not arguments:
             arguments = None
@@ -92,9 +104,9 @@ class DriverSessionManager:
             try:
                 self._driver.activate_app(package)
                 return self._driver
-            except Exception as e:
+            except Exception:
                 logger.warning("Operation diagnostic; private details omitted")
-                self._driver = None  # Reset the driver to create a new one
+                self.session_close()
 
         try:
             runtime_config = resolve(self.config)
@@ -146,9 +158,10 @@ class DriverSessionManager:
 
             return self._driver
 
-        except Exception as e:
+        except Exception:
             logger.error("Operation diagnostic; private details omitted")
-            self._driver = None  # Ensure driver is reset on failure
+            if self._driver is not None:
+                self.session_close()
             raise
 
     def app_package(self):
@@ -184,46 +197,69 @@ class DriverSessionManager:
         else:
             logger.warning("No app to close or driver session is invalid.")
 
-    def _force_kill_mac_app(self, package):
-        """Force kill a Mac app by bundle ID using osascript and kill -9"""
+    @staticmethod
+    def _destroy_session(driver):
+        """Delete one owned WebDriver session and validate the protocol response."""
+        executor = getattr(driver, "command_executor", None)
+        session_id = getattr(driver, "session_id", None)
+        if not isinstance(session_id, str) or not session_id or not hasattr(executor, "execute"):
+            driver.quit()
+            return
+
+        response = executor.execute(Command.QUIT, {"sessionId": session_id})
+        if not isinstance(response, dict) or response.get("status") not in (None, 0):
+            raise SessionCloseError("AUTOGENESIS_SESSION_CLOSE_FAILED")
+        value = response.get("value")
+        if isinstance(value, dict) and value.get("error"):
+            raise SessionCloseError("AUTOGENESIS_SESSION_CLOSE_FAILED")
+        driver.session_id = None
         try:
-            logger.info("Operation diagnostic; private details omitted")
-            cmd = ['osascript', '-e', f'tell application "System Events" to unix id of processes whose bundle identifier is "{package}"']
-            result = subprocess.run(cmd, capture_output=True, text=True, check=False, timeout=5)
-            if result.returncode == 0 and result.stdout.strip():
-                pids = result.stdout.strip().split(',')
-                for pid in pids:
-                    pid = pid.strip()
-                    if pid.isdigit():
-                        logger.info("Operation diagnostic; private details omitted")
-                        subprocess.run(['kill', '-9', pid], check=False, timeout=5)
-            else:
-                logger.info("Operation diagnostic; private details omitted")
-        except Exception as e:
-            logger.warning("Operation diagnostic; private details omitted")
+            driver.stop_client()
+        finally:
+            executor.close()
+
+    def _settle_session_close(self):
+        """Resolve a completed close attempt before a driver can be replaced."""
+        with self._session_close_lock:
+            close_thread = self._session_close_thread
+            if close_thread is None:
+                return
+            if close_thread.is_alive():
+                raise SessionCloseError("AUTOGENESIS_SESSION_CLOSE_IN_PROGRESS")
+            if self._session_close_failed:
+                raise SessionCloseError("AUTOGENESIS_SESSION_CLOSE_FAILED")
+            if self._driver is self._session_close_driver:
+                self._driver = None
+            self._session_close_thread = None
+            self._session_close_driver = None
 
     def session_close(self):
-        """Release even a stale driver, with a bounded shutdown wait."""
-        driver, self._driver = self._driver, None
-        if driver is None:
-            return
-        bundle_id = self.config.get("bundleId") if self.device == "mac" else None
-        package = bundle_id if isinstance(bundle_id, str) else None
+        """Destroy the Runtime-owned session without closing the application explicitly."""
+        with self._session_close_lock:
+            driver = self._driver
+            if driver is None:
+                return
+            if self._session_close_thread is None:
+                self._session_close_driver = driver
+                self._session_close_failed = False
 
-        def quit_driver():
-            try:
-                driver.quit()
-            except Exception:
-                logger.warning("Driver quit failed")
+                def quit_driver():
+                    try:
+                        self._destroy_session(driver)
+                    except Exception:
+                        self._session_close_failed = True
 
-        # A stuck remote endpoint must not prevent process exit.
-        quit_thread = threading.Thread(target=quit_driver, daemon=True)
-        quit_thread.start()
-        quit_thread.join(timeout=5)
-        if quit_thread.is_alive():
-            logger.warning("Driver quit timed out")
-            if package:
-                self._force_kill_mac_app(package)
+                self._session_close_thread = threading.Thread(target=quit_driver, daemon=True)
+                self._session_close_thread.start()
+            elif self._session_close_driver is not driver:
+                raise SessionCloseError("AUTOGENESIS_SESSION_CLOSE_IN_PROGRESS")
+            close_thread = self._session_close_thread
+
+        close_thread.join(timeout=SESSION_CLOSE_TIMEOUT_SECONDS)
+        if close_thread.is_alive():
+            raise SessionCloseError("AUTOGENESIS_SESSION_CLOSE_TIMEOUT")
+
+        self._settle_session_close()
 
     def get_app(self):
         if self._driver and self._is_session_valid():

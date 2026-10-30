@@ -48,12 +48,10 @@ Open VS Code Extensions (`Ctrl+Shift+X` / `Cmd+Shift+X`) → Search "BDD AI Tool
    
    Click **"Setup"** button to configure the selected platform
 
-   > **macOS users**: Before using Appium, you need to manually start the Appium server first. Run the provided script:
-   > ```bash
-   > cd appium-mcp-server/docs
-   > ./start_appium_on_mac.sh
-   > ```
-   > For detailed setup instructions, see [macOS Appium Setup Guide](../appium-mcp-server/docs/macOS_Appium_Setup_Guide.md).
+   > **Local Appium users**: invoke the canonical `autogenesis-setup` Skill.
+   > It verifies the pinned official Appium workflow, previews required Appium,
+   > Driver, SDK, Xcode, signing, trust, and permission changes, and waits for
+   > explicit approval before modifying the environment.
 
 4. **Configure Automation Platform**
    

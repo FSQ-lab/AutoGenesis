@@ -8,6 +8,7 @@ import argparse
 import hashlib
 import json
 import runpy
+from freeze_appium_skills import BUNDLE_RELATIVE, bundle_bytes
 from pathlib import Path
 
 from _files import atomic_write
@@ -25,7 +26,14 @@ def release_bytes(repo: Path) -> tuple[bytes, bytes]:
     asset_io = load_asset_io(repo)
     assets = package / "assets"
     inventory = {p.relative_to(assets).as_posix() for p in assets.rglob("*") if p.is_file()}
-    if inventory - {"manifest.json"} != set(layout["ASSET_PATHS"]):
+    expected_bundle, bundle_paths = bundle_bytes(repo)
+    bundle_manifest = f"{BUNDLE_RELATIVE}/manifest.json"
+    stored_bundle = asset_io["read_asset"](assets, bundle_manifest, asset_io["MAX_MANIFEST_BYTES"])
+    if stored_bundle != expected_bundle:
+        raise ValueError("Pinned Appium Skills assets differ from their snapshot manifest")
+    expected_inventory = set(layout["ASSET_PATHS"])
+    expected_inventory.update(f"{BUNDLE_RELATIVE}/{path}" for path in bundle_paths)
+    if inventory - {"manifest.json"} != expected_inventory:
         raise ValueError("Official asset inventory differs from the release layout")
     hashes = {}
     for name in sorted(layout["ASSET_PATHS"]):

@@ -4,10 +4,10 @@ on:
   pull_request:
     branches:
       - main
-      - feature/agent-integration
+      - feature/agent-integration-v2
   push:
     branches:
-      - feature/agent-integration
+      - feature/agent-integration-v2
   workflow_dispatch:
 
 permissions:

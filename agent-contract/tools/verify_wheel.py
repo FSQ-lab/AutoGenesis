@@ -17,9 +17,9 @@ def main() -> None:
     parser.add_argument("--mcp-version", choices=("1.23.0", "1.29.1"), required=True)
     parser.add_argument("--evidence-dir", type=Path, required=True)
     args = parser.parse_args()
-    wheels = sorted(args.wheel_dir.resolve(strict=True).glob("autogenesis_agent_contract-2.0.0-*.whl"))
+    wheels = sorted(args.wheel_dir.resolve(strict=True).glob("autogenesis_agent_contract-2.1.0-*.whl"))
     if len(wheels) != 1:
-        raise SystemExit("Supply a directory containing exactly one built contract 2.0.0 wheel.")
+        raise SystemExit("Supply a directory containing exactly one built contract 2.1.0 wheel.")
     args.evidence_dir.mkdir(parents=True, exist_ok=True)
     evidence = args.evidence_dir.resolve(strict=True)
     package_root = Path(__file__).resolve().parents[1]

@@ -3,7 +3,7 @@
 import argparse
 import json
 import os
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, contextmanager
 from pathlib import Path
 import signal
 import sys
@@ -19,7 +19,7 @@ from mcp.server.fastmcp import FastMCP
 from mcp.server.fastmcp.exceptions import ToolError
 
 from . import __version__
-from .driver_session import DriverSessionManager
+from .driver_session import DriverSessionManager, SessionCloseError
 from .tools.appium_driver_tool import register_appium_driver_tools
 from .tools.android_driver_tool import register_android_driver_tools
 from .tools.config_tool import register_config_tools
@@ -32,35 +32,48 @@ from .utils.logger import configure_logging
 
 from .stdio import cancellable_stdio
 REQUIREMENT = RuntimeContractRequirement(
-    "2.0.0", "4367a2e388d0d5cb41a415b25b6a58e25025f1da6749bfdffe87a37c60a0c9d3",
+    "2.1.0", "7ef4c25a1659505ff6dce335196c0516ca36709ca30424669b927fc5675d0094",
 )
 
 
+@contextmanager
+def ignored_shutdown_signals():
+    """Prevent repeated termination signals from corrupting cleanup state."""
+    if os.name != "posix" or threading.current_thread() is not threading.main_thread():
+        yield
+        return
+    previous = {name: signal.getsignal(name) for name in (signal.SIGTERM, signal.SIGINT)}
+    try:
+        for name in previous:
+            signal.signal(name, signal.SIG_IGN)
+        yield
+    finally:
+        for name, handler in previous.items():
+            signal.signal(name, handler)
 
 
 class AppiumMCP(FastMCP):
     def run(self, transport="stdio", mount_path=None):
         if transport != "stdio":
             raise ValueError("AUTOGENESIS_TRANSPORT_UNSUPPORTED: stdio is required")
-        if os.name != "posix":
+        if os.name != "posix" or threading.current_thread() is not threading.main_thread():
             return super().run(transport="stdio", mount_path=mount_path)
-        anyio.run(self._run_stdio_until_stopped)
+        previous = {name: signal.getsignal(name) for name in (signal.SIGTERM, signal.SIGINT)}
+        try:
+            for name in previous:
+                signal.signal(name, self._interrupt_blocking_call)
+            try:
+                anyio.run(self.run_stdio_async)
+            except KeyboardInterrupt:
+                pass
+        finally:
+            for name, handler in previous.items():
+                signal.signal(name, handler)
 
-    async def _run_stdio_until_stopped(self):
-        if threading.current_thread() is not threading.main_thread():
-            return await self.run_stdio_async()
-        with anyio.open_signal_receiver(signal.SIGTERM, signal.SIGINT) as signals:
-            with anyio.CancelScope() as stop:
-                async with anyio.create_task_group() as tasks:
-                    async def receive_stop():
-                        async for _ in signals:
-                            stop.cancel()
-                            return
-                    tasks.start_soon(receive_stop)
-                    try:
-                        await self.run_stdio_async()
-                    finally:
-                        tasks.cancel_scope.cancel()
+    @staticmethod
+    def _interrupt_blocking_call(signum, frame):
+        raise KeyboardInterrupt
+
 
     async def run_stdio_async(self):
         if os.name != "posix":
@@ -93,6 +106,7 @@ class Runtime:
         self.business_root = Path(business_root or Path.cwd()).resolve(strict=True)
         self.driver = None
         self._closed = False
+        self._close_error = None
         try:
             if not self.config.initial_loaded or platform not in self.config.get_config():
                 raise ConfigurationError("Selected platform configuration is unavailable")
@@ -129,13 +143,28 @@ class Runtime:
 
     def close(self):
         if self._closed:
+            if self._close_error is not None:
+                raise self._close_error
             return
-        self._closed = True
-        try:
-            self.config.stop_watching()
-        finally:
-            if self.driver is not None:
-                self.driver.session_close()
+        with ignored_shutdown_signals():
+            failure = None
+            session_failure = None
+            try:
+                self.config.stop_watching()
+            except Exception as error:
+                failure = error
+            try:
+                if self.driver is not None:
+                    self.driver.session_close()
+            except SessionCloseError as error:
+                session_failure = error
+            except Exception as error:
+                if failure is None:
+                    failure = error
+            self._close_error = session_failure or failure
+            self._closed = True
+            if self._close_error is not None:
+                raise self._close_error
 
 
 class RuntimeArgumentParser(argparse.ArgumentParser):
@@ -157,6 +186,7 @@ def main(argv=None, *, default_config=None):
     args = parse_args(argv)
     runtime = None
     exit_code = 0
+    shutdown_reported = False
     try:
         configure_logging()
         config_path = args.config
@@ -171,6 +201,10 @@ def main(argv=None, *, default_config=None):
     except ContractError as error:
         print(json.dumps(error.to_dict(), sort_keys=True), file=sys.stderr)
         exit_code = 1
+    except SessionCloseError:
+        print("AutoGenesis Appium shutdown failed.", file=sys.stderr)
+        shutdown_reported = True
+        exit_code = 1
     except Exception:
         # No caller-controlled paths, JSON, capabilities, or SDK exception bodies.
         print("AutoGenesis Appium startup or transport failed; check configuration and contract installation.", file=sys.stderr)
@@ -180,6 +214,8 @@ def main(argv=None, *, default_config=None):
             try:
                 runtime.close()
             except Exception:
-                print("AutoGenesis Appium shutdown failed.", file=sys.stderr)
+                if not shutdown_reported:
+                    print("AutoGenesis Appium shutdown failed.", file=sys.stderr)
+                    shutdown_reported = True
                 exit_code = 1
     return exit_code

@@ -2,13 +2,13 @@ name: Windows runtime package
 
 on:
   pull_request:
-    branches: [main, feature/agent-integration]
+    branches: [main, feature/agent-integration-v2]
     paths:
       - 'pywinauto-mcp-server/**'
       - 'agent-contract/**'
       - '.github/workflows/windows-package.yml'
   push:
-    branches: [feature/agent-integration]
+    branches: [feature/agent-integration-v2]
     paths:
       - 'pywinauto-mcp-server/**'
       - 'agent-contract/**'

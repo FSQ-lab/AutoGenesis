@@ -6,11 +6,11 @@
   "required": ["schema_version", "contract_version", "assets"],
   "properties": {
     "schema_version": {"const": 2},
-    "contract_version": {"const": "2.0.0"},
+    "contract_version": {"const": "2.1.0"},
     "assets": {
       "type": "object",
-      "minProperties": 10,
-      "maxProperties": 10,
+      "minProperties": 11,
+      "maxProperties": 11,
       "propertyNames": {
         "enum": [
           "core-policy.md",
@@ -22,7 +22,8 @@
           "schemas/manifest.schema.json",
           "schemas/identity.schema.json",
           "schemas/arguments.schema.json",
-          "schemas/secret-reference.schema.json"
+          "schemas/secret-reference.schema.json",
+          "skills/autogenesis-setup/references/appium-skills/manifest.json"
         ]
       },
       "additionalProperties": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
