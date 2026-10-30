@@ -123,10 +123,10 @@ configuration writes on unsupported hosts.
 
 ### 1. Give AutoGenesis to your Coding Agent
 
-Paste the verified
-[Agent Install Prompt](https://github.com/FSQ-lab/AutoGenesis/releases/download/agent-contract-v2.0.0/agent-install-prompt.txt)
-into the Coding Agent. It installs only `autogenesis-setup`, verifies the Skill
-identity, and stops before machine preparation.
+Copy the complete verified Agent Install Prompt below into the Coding Agent. It
+installs only `autogenesis-setup`, verifies the Skill identity, and stops before
+machine preparation. Do not substitute the older prompt bundled with the
+Contract 2.0.0 release.
 
 <details>
 <summary>Show the complete verified Agent Install Prompt</summary>
@@ -151,14 +151,22 @@ Skill name: autogenesis-setup
 
 </details>
 
-Prefer a terminal installer? Install the pinned CLI, then install the
-host-supported Runtime bundle and both canonical Skills without cloning this
-repository:
+Prefer a terminal installer? Use the Python environment and configured package
+index selected for this machine; do not bypass its mirror or trust policy. The
+pinned CLI installs the host-supported Runtime bundle and both canonical Skills
+without cloning this repository:
 
 ```bash
 python -m pip install autogenesis-cli==0.1.0
 autogenesis install
 ```
+
+Before invoking either installed Skill, ask the Coding Agent to reload Skill
+discovery, enumerate every visible `autogenesis-setup` and `autogenesis-run`,
+and prove that each resolved Skill matches the CLI-reported destination, exact
+bytes, and Contract version. Stop on a conflicting, shadowing, ambiguous, or
+uninspectable copy; do not report installation success from the destination
+files alone.
 
 ### 2. Prepare one concrete capability
 
