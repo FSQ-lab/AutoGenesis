@@ -151,6 +151,11 @@ defaults, array items and types:
   verify_element_value, verify_elements_order, verify_visual_task
 - before_gen_code, preview_code_changes, confirm_code_changes
 
+For modern UIA `Document` controls, `enter_text` uses a writable ValuePattern
+and confirms the resulting value before reporting success. `verify_element_value`
+reads the wrapper value when available, then falls back to UIA ValuePattern and
+TextPattern without changing the existing tool schema or containment assertion.
+
 Generated replay continues to use Behave and the business project's
 features.environment helpers. Default generation paths are relative to the
 business working directory under features/steps, never inside site-packages.

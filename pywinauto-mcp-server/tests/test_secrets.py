@@ -123,6 +123,81 @@ def test_password_control_snapshot_is_structural_not_global():
     assert search["value"] == "application"
     assert PRIVATE not in json.dumps(snapshot)
 
+@pytest.mark.windows
+@pytest.mark.skipif(sys.platform != "win32", reason="Windows driver modules")
+@pytest.mark.anyio
+async def test_sensitive_document_input_redacts_plaintext_from_default_snapshot(monkeypatch, app_config):
+    from autogenesis_windows_mcp.app_session import AppSessionManager
+    from autogenesis_windows_mcp.server import WindowsMCP
+    from autogenesis_windows_mcp.tools import common_tool
+
+    mirror = Element("", "", automation_id="ordinaryOutput", control_type="Text")
+    root = Element("Root", "public", children=[mirror])
+
+    class ValuePattern:
+        CurrentIsReadOnly = False
+        CurrentValue = ""
+
+        def SetValue(self, value):
+            self.CurrentValue = value
+            mirror._title = value
+            mirror._value = value
+
+    class DocumentWrapper:
+        iface_value = ValuePattern()
+
+        def get_value(self):
+            raise AttributeError("UIAWrapper has no get_value")
+
+    class ElementSpecification:
+        def wrapper_object(self):
+            return wrapper
+
+    class AsyncioStub:
+        @staticmethod
+        async def sleep(duration):
+            pass
+
+    wrapper = DocumentWrapper()
+
+    async def find(*args, **kwargs):
+        return ElementSpecification(), True, {}, {}
+
+    async def main_window(*args, **kwargs):
+        return root
+
+    manager = AppSessionManager(app_config)
+    server = WindowsMCP("sensitive-document-snapshot")
+    common_tool.register_common_tools(server, manager)
+    monkeypatch.setattr(common_tool, "find_element_by_kwargs", find)
+    monkeypatch.setattr(common_tool, "asyncio", AsyncioStub())
+    monkeypatch.setattr(manager, "get_main_window", main_window)
+
+    result = await server.call_tool("enter_text", {
+        "caller": "test",
+        "control_framework": "pywinauto",
+        "title": "Password",
+        "content": PRIVATE,
+        "control_type": "Document",
+        "automation_id": "passwordDocument",
+        "class_name": "RichEditD2DPT",
+    })
+    content = result[0] if isinstance(result, tuple) else result
+    content = content[0] if isinstance(content, list) else content
+    payload = json.loads(content.text)
+
+    assert payload["status"] == "success"
+    assert PRIVATE not in json.dumps(payload)
+    assert payload["data"]["snapshot"]["snapshot_pywinauto"]["children"][0] == {
+        "title": "[REDACTED]",
+        "control_type": "Text",
+        "automation_id": "ordinaryOutput",
+        "class_name": "Edit",
+        "rectangle": {"left": 0, "top": 0, "right": 10, "bottom": 10},
+        "children": [],
+        "value": "[REDACTED]",
+    }
+
 
 def test_unbound_generation_value_requires_explicit_ref(monkeypatch):
     plan = {
