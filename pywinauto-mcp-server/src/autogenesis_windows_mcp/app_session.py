@@ -4,6 +4,7 @@
 # tools/app_manager.py
 
 from autogenesis_agent_contract import resolve
+from .launch_errors import LaunchErrorCode, LaunchFailure
 from dataclasses import dataclass
 from enum import IntEnum
 import asyncio
@@ -39,14 +40,29 @@ class _LaunchState(IntEnum):
     BOUND = 7
 
 
-class _LaunchTimeout(RuntimeError):
+def _timeout_error_code(deepest_state: _LaunchState) -> LaunchErrorCode:
+    if deepest_state is _LaunchState.PROCESS_STARTED:
+        return LaunchErrorCode.WINDOW_NOT_FOUND
+    if deepest_state in (_LaunchState.WINDOW_FOUND, _LaunchState.CONNECTED):
+        return LaunchErrorCode.WINDOW_BIND_FAILED
+    if deepest_state is _LaunchState.EXISTS:
+        return LaunchErrorCode.WINDOW_NOT_VISIBLE
+    if deepest_state is _LaunchState.VISIBLE:
+        return LaunchErrorCode.WINDOW_NOT_ENABLED
+    return LaunchErrorCode.WINDOW_BIND_FAILED
+
+
+class _LaunchTimeout(LaunchFailure):
+    __slots__ = ("deepest_state",)
+
     def __init__(self, deepest_state: _LaunchState):
         self.deepest_state = deepest_state
-        super().__init__("The application did not become ready before the launch deadline.")
+        super().__init__(_timeout_error_code(deepest_state))
 
 
-class _WindowAmbiguous(RuntimeError):
-    pass
+class _WindowAmbiguous(LaunchFailure):
+    def __init__(self):
+        super().__init__(LaunchErrorCode.WINDOW_AMBIGUOUS)
 
 
 @dataclass(frozen=True)
@@ -59,11 +75,19 @@ class _WindowBinding:
     window: object
 
 
-class _WindowConnectionLost(RuntimeError):
-    pass
+class _WindowConnectionLost(LaunchFailure):
+    def __init__(self):
+        super().__init__(LaunchErrorCode.WINDOW_CONNECTION_LOST)
 
 
 
+def _winerror(error: BaseException) -> int | None:
+    value = getattr(error, "winerror", None)
+    if isinstance(value, int):
+        return value
+    if error.args and isinstance(error.args[0], int):
+        return error.args[0]
+    return None
 
 def _expand_environment(value):
     """Expand embedded environment references without mutating stored config."""
@@ -238,14 +262,14 @@ class AppSessionManager:
             or binding is None
             or binding.generation != self._session_generation
         ):
-            raise _WindowConnectionLost("No verified application window is bound.")
+            raise _WindowConnectionLost()
 
         try:
             binding.window.wrapper_object()
             return binding.window
         except Exception:
             self._invalidate_binding()
-            raise _WindowConnectionLost("The verified application window is unavailable.") from None
+            raise _WindowConnectionLost() from None
 
 
     async def _new_launch(self, args: list[str]):
@@ -260,19 +284,31 @@ class AppSessionManager:
         cmd = subprocess.list2cmdline([valid_exe_path, *args])
         deadline = _monotonic() + self.launch_timeout_seconds
         logger.info('[AppManager] Launching new [redacted]: [redacted]')
-        process_handle, thread_handle, launched_process_id, _ = win32process.CreateProcess(
-            None,
-            cmd,
-            None,
-            None,
-            False,
-            0,
-            None,
-            None,
-            win32process.STARTUPINFO(),
-        )
+        try:
+            process_handle, thread_handle, launched_process_id, _ = win32process.CreateProcess(
+                None,
+                cmd,
+                None,
+                None,
+                False,
+                0,
+                None,
+                None,
+                win32process.STARTUPINFO(),
+            )
+        except Exception as error:
+            code = (
+                LaunchErrorCode.ELEVATION_REQUIRED
+                if _winerror(error) == 740
+                else LaunchErrorCode.PROCESS_START_FAILED
+            )
+            raise LaunchFailure(code) from None
         thread_handle.Close()
-        launched_created_at = win32process.GetProcessTimes(process_handle)["CreationTime"].timestamp()
+        try:
+            launched_created_at = win32process.GetProcessTimes(process_handle)["CreationTime"].timestamp()
+        except Exception:
+            process_handle.Close()
+            raise LaunchFailure(LaunchErrorCode.PROCESS_START_FAILED) from None
         deepest_state = _LaunchState.PROCESS_STARTED
         try:
             while _monotonic() < deadline:
@@ -293,9 +329,7 @@ class AppSessionManager:
                         )
                     ]
                     if len(trusted) > 1:
-                        raise _WindowAmbiguous(
-                            "The application profile matched multiple windows from this launch."
-                        )
+                        raise _WindowAmbiguous()
                     if trusted:
                         wrapper = trusted[0]
                         deepest_state = max(deepest_state, _LaunchState.WINDOW_FOUND)
@@ -409,7 +443,7 @@ class AppSessionManager:
             return self._get_bound_window()
         except _WindowConnectionLost:
             logger.error("Verified main window binding is unavailable.")
-            raise RuntimeError("Verified main window binding is unavailable.") from None
+            raise
     
     
     def get_screenshot_window(self):
@@ -417,7 +451,7 @@ class AppSessionManager:
             main_window = self._get_bound_window()
         except _WindowConnectionLost:
             logger.error('No verified app window binding found for screenshot.')
-            raise RuntimeError("Verified main window binding is unavailable.") from None
+            raise
 
         screenshot_window = main_window.child_window(
             title="",

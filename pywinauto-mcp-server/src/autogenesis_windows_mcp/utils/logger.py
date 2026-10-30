@@ -3,6 +3,7 @@
 """Metadata-only logging; no package-directory writes or exception tracebacks."""
 
 from autogenesis_agent_contract import GenerationCommitError, SecretReferenceError, sanitize_result, tool_execution
+from ..launch_errors import is_launch_failure_payload
 import json
 from mcp.server.fastmcp.exceptions import ToolError
 import logging
@@ -59,6 +60,8 @@ def log_tool_call(func):
                         pass
                 logger.info("Tool finished")
                 sanitized = sanitize_result(result)
+                if is_launch_failure_payload(result):
+                    sanitized["error"] = result["error"]
                 return json.dumps(sanitized, ensure_ascii=False) if string_result and not isinstance(sanitized, str) else sanitized
             except (GenerationCommitError, SecretReferenceError) as error:
                 raise ToolError(str(error)) from None

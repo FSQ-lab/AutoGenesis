@@ -27,6 +27,9 @@ def format_tool_response(
         response["info"] = response_dict["info"]
     if "error" in response_dict and response_dict["error"]:
         response["error"] = response_dict["error"]
+    for field in ("error_code", "stage", "retryable"):
+        if field in response_dict:
+            response[field] = response_dict[field]
 
     response["data"] = response_dict.get("data", {})
     
