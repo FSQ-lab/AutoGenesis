@@ -61,6 +61,18 @@ def test_selected_profile_preserves_recursive_environment_refs(tmp_path, app_con
     assert serialize(load_app_config("unused", path))["exe"] == {"$secret": "env:AUTOGENESIS_TEST_UNSET"}
 
 
+@pytest.mark.parametrize("value", [1, 15, 120])
+def test_launch_timeout_accepts_inclusive_integer_range(tmp_path, app_config, value):
+    profile = {**app_config, "launch_timeout_seconds": value}
+    assert load_app_config(None, write_config(tmp_path, {"app": profile})) == profile
+
+
+@pytest.mark.parametrize("value", [True, 0, 1.5, 121, "15"])
+def test_launch_timeout_rejects_values_outside_integer_range(tmp_path, app_config, value):
+    profile = {**app_config, "launch_timeout_seconds": value}
+    with pytest.raises(ConfigurationError, match="AUTOGENESIS_CONFIG_INVALID"):
+        load_app_config(None, write_config(tmp_path, {"app": profile}))
+
 @pytest.mark.parametrize("profile", [
     None, [], {}, {"exe": "x"}, {"exe": "x", "window_title_re": ""},
     {"exe": "x", "window_title_re": ".*", "launch_args": "--bad"},

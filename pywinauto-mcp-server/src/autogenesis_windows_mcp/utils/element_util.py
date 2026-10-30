@@ -17,6 +17,19 @@ total_size = 0
 total_size_break = False
 
 
+def read_element_value(element):
+    """Read text through the wrapper or its supported UIA patterns."""
+    try:
+        return element.get_value()
+    except AttributeError:
+        pass
+
+    try:
+        return element.iface_value.CurrentValue
+    except Exception:
+        return element.iface_text.DocumentRange.GetText(-1)
+
+
 async def extract_element_info_async(element, max_root_depth=10, web_depth=0, limited_page_length=15, in_limited_page=False):
     """
     Extracts information from a UI element and its children recursively.

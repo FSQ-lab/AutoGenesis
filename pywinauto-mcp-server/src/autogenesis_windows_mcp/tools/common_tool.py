@@ -1,5 +1,6 @@
-from autogenesis_agent_contract import SecretInput, require_sensitive_target
+from autogenesis_agent_contract import SecretInput, mark_secret, require_sensitive_target, sensitive_control
 from ..safe_output import safe_error
+from ..launch_errors import LaunchErrorCode, LaunchFailure, launch_failure_fields
 # Copyright (c) Microsoft Corporation.
 # Licensed under the MIT license.
 
@@ -10,7 +11,7 @@ import sys
 import time
 import inspect
 import asyncio
-from ..utils.element_util import fill_snapshot, find_element_by_kwargs
+from ..utils.element_util import fill_snapshot, find_element_by_kwargs, read_element_value
 from ..utils.logger import log_tool_call
 from ..utils.response_format import format_tool_response, init_tool_response
 from ..utils.gen_code import record_calls
@@ -42,15 +43,29 @@ def register_common_tools(mcp, app_manager):
         Returns:
             JSON response with app snapshot data and status information
         """
-        resp = init_tool_response()        
+        resp = init_tool_response()
         try:
             await app_manager.app_launch()
-            resp["status"] = "success"
-            await fill_snapshot(resp, app_manager, need_snapshot=need_snapshot)
-        except Exception as e:
+        except Exception as error:
             resp["status"] = "error"
-            resp["error"] = safe_error()
+            resp["data"] = {}
+            resp.update(launch_failure_fields(error))
             logger.error('Error launching app: [redacted]')
+            return format_tool_response(resp)
+
+        resp["status"] = "success"
+        try:
+            await fill_snapshot(resp, app_manager, need_snapshot=need_snapshot)
+        except Exception as error:
+            failure = (
+                error
+                if isinstance(error, LaunchFailure)
+                else LaunchFailure(LaunchErrorCode.SNAPSHOT_FAILED)
+            )
+            resp["status"] = "error"
+            resp["data"] = {}
+            resp.update(launch_failure_fields(failure))
+            logger.error('Error extracting app snapshot: [redacted]')
         return format_tool_response(resp)
     
     
@@ -394,6 +409,8 @@ def register_common_tools(mcp, app_manager):
 
         resp = init_tool_response()
         require_sensitive_target("content", title, control_type, automation_id, class_name)
+        if sensitive_control(title, control_type, automation_id, class_name):
+            mark_secret(content, "content")
         try:
             if control_framework == "pywinauto":
                 element, exists, search_kwargs, parent_search_kwargs = await find_element_by_kwargs(
@@ -411,10 +428,22 @@ def register_common_tools(mcp, app_manager):
 
                 if exists:
                     element = element.wrapper_object()
-                    element.click_input()
-                    element.type_keys('^a{BACKSPACE}', with_spaces=True)
-                    element.type_keys(content, with_spaces=True)
-                    await asyncio.sleep(2)
+                    use_value_pattern = False
+                    if control_type == "Document":
+                        try:
+                            use_value_pattern = not element.iface_value.CurrentIsReadOnly
+                        except Exception:
+                            pass
+                    if use_value_pattern:
+                        element.iface_value.SetValue(content)
+                        await asyncio.sleep(2)
+                        if read_element_value(element) != content:
+                            raise RuntimeError("Document text input could not be verified.")
+                    else:
+                        element.click_input()
+                        element.type_keys('^a{BACKSPACE}', with_spaces=True)
+                        element.type_keys(content, with_spaces=True)
+                        await asyncio.sleep(2)
                     resp["status"] = "success"
                 else:
                     resp["status"] = "failed"

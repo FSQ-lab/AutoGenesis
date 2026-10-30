@@ -62,7 +62,8 @@ profile names to application configurations:
         "app_name": "Notepad",
         "exe": "%WINDIR%/System32/notepad.exe",
         "window_title_re": ".*Notepad.*",
-        "launch_args": []
+        "launch_args": [],
+        "launch_timeout_seconds": 15
       },
       "business-app": {
         "app_name": "Business application",
@@ -83,6 +84,7 @@ in JSON insertion order is selected. Unknown profile names fail clearly.
 Each profile requires nonempty string exe and window_title_re fields.
 window_title_re must compile as a regular expression. Optional app_name is a
 string; launch_args is an array of strings and defaults to an empty array.
+launch_timeout_seconds is an integer from 1 through 120 and defaults to 15.
 Existing additional project/profile fields remain supported. All profiles are
 schema-validated before startup; only the selected profile has environment
 variables expanded. Unused profiles may reference unset variables.
@@ -97,7 +99,49 @@ exception bodies are excluded from diagnostic logs. No MCP config readback tool
 is exposed. Schema and argument errors do not echo supplied values.
 
 Executable paths and launch arguments are quoted with Windows command-line
-rules and passed to pywinauto's CreateProcess path without a shell.
+rules and passed to Windows `CreateProcess` without a shell. The retained
+launcher process handle authenticates title-matched windows to the original
+process incarnation or its transferred child, including after launcher exit.
+
+Process creation, trusted top-level window discovery, connection, visibility,
+enabled state and initial binding share one monotonic launch budget. The runtime
+polls readiness at an internal 500 ms interval and uses cancellable asynchronous
+waits; it does not add a probe or sleep after the configured deadline. Multiple
+title-matched windows belonging to the same launch are rejected as ambiguous
+rather than selecting one arbitrarily.
+
+`app_launch` failures have a fixed, secret-safe response contract. Alongside
+`status: "error"` and an empty `data` object, responses include `error_code`,
+`stage`, `retryable`, and a fixed `error` description. Exception text, process
+arguments, paths, titles, control content, and snapshot content are never copied
+into these fields. Unknown failures use `INTERNAL_ERROR` and are not retryable.
+
+| `error_code` | `stage` | `retryable` | Condition |
+| --- | --- | --- | --- |
+| `PROCESS_START_FAILED` | `process_start` | false | Process creation failed |
+| `ELEVATION_REQUIRED` | `process_start` | false | Windows returned elevation-required error 740 |
+| `WINDOW_NOT_FOUND` | `window_discovery` | true | No trusted matching window appeared before the deadline |
+| `WINDOW_AMBIGUOUS` | `window_discovery` | false | Multiple trusted matching windows appeared |
+| `WINDOW_NOT_VISIBLE` | `window_readiness` | true | The trusted window did not become visible |
+| `WINDOW_NOT_ENABLED` | `window_readiness` | true | The trusted window did not become enabled |
+| `WINDOW_BIND_FAILED` | `window_binding` | true | Connection or verified identity binding did not complete |
+| `WINDOW_CONNECTION_LOST` | `window_connection` | true | The verified binding disappeared or changed identity |
+| `SNAPSHOT_FAILED` | `snapshot` | true | Launch succeeded but initial snapshot extraction failed |
+| `INTERNAL_ERROR` | `internal` | false | An unclassified internal failure occurred |
+
+Callers may retry only when `retryable` is true, within the Agent Contract's
+operation attempt limit. Increase `launch_timeout_seconds` for an application
+that is known to need more than the 15-second default; do not retry nonretryable
+configuration, elevation, or ambiguity failures unchanged.
+After `app_launch` verifies that a matching top-level window exists, is visible
+and is enabled, the runtime pins that window's native handle, owning process ID,
+UI Automation runtime ID and original UIA element within the current session
+generation. The title expression is discovery-only: later operations resolve
+through the pinned UIA identity even if the title changes. A missing or
+reincarnated element, identity mismatch, or invalid generation invalidates the
+session and fails the operation; ordinary tools do not reconnect by title or
+restart the application. A subsequent explicit `app_launch` may establish a new
+session.
 
 ## Source execution
 
@@ -150,6 +194,11 @@ defaults, array items and types:
 - verify_element_exists, verify_element_not_exist, verify_checkbox_state,
   verify_element_value, verify_elements_order, verify_visual_task
 - before_gen_code, preview_code_changes, confirm_code_changes
+
+For modern UIA `Document` controls, `enter_text` uses a writable ValuePattern
+and confirms the resulting value before reporting success. `verify_element_value`
+reads the wrapper value when available, then falls back to UIA ValuePattern and
+TextPattern without changing the existing tool schema or containment assertion.
 
 Generated replay continues to use Behave and the business project's
 features.environment helpers. Default generation paths are relative to the
