@@ -109,6 +109,30 @@ polls readiness at an internal 500 ms interval and uses cancellable asynchronous
 waits; it does not add a probe or sleep after the configured deadline. Multiple
 title-matched windows belonging to the same launch are rejected as ambiguous
 rather than selecting one arbitrarily.
+
+`app_launch` failures have a fixed, secret-safe response contract. Alongside
+`status: "error"` and an empty `data` object, responses include `error_code`,
+`stage`, `retryable`, and a fixed `error` description. Exception text, process
+arguments, paths, titles, control content, and snapshot content are never copied
+into these fields. Unknown failures use `INTERNAL_ERROR` and are not retryable.
+
+| `error_code` | `stage` | `retryable` | Condition |
+| --- | --- | --- | --- |
+| `PROCESS_START_FAILED` | `process_start` | false | Process creation failed |
+| `ELEVATION_REQUIRED` | `process_start` | false | Windows returned elevation-required error 740 |
+| `WINDOW_NOT_FOUND` | `window_discovery` | true | No trusted matching window appeared before the deadline |
+| `WINDOW_AMBIGUOUS` | `window_discovery` | false | Multiple trusted matching windows appeared |
+| `WINDOW_NOT_VISIBLE` | `window_readiness` | true | The trusted window did not become visible |
+| `WINDOW_NOT_ENABLED` | `window_readiness` | true | The trusted window did not become enabled |
+| `WINDOW_BIND_FAILED` | `window_binding` | true | Connection or verified identity binding did not complete |
+| `WINDOW_CONNECTION_LOST` | `window_connection` | true | The verified binding disappeared or changed identity |
+| `SNAPSHOT_FAILED` | `snapshot` | true | Launch succeeded but initial snapshot extraction failed |
+| `INTERNAL_ERROR` | `internal` | false | An unclassified internal failure occurred |
+
+Callers may retry only when `retryable` is true, within the Agent Contract's
+operation attempt limit. Increase `launch_timeout_seconds` for an application
+that is known to need more than the 15-second default; do not retry nonretryable
+configuration, elevation, or ambiguity failures unchanged.
 After `app_launch` verifies that a matching top-level window exists, is visible
 and is enabled, the runtime pins that window's native handle, owning process ID,
 UI Automation runtime ID and original UIA element within the current session

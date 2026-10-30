@@ -305,8 +305,9 @@ async def test_launch_preserves_the_window_that_passed_readiness(monkeypatch):
     assert window_queries == ["title", "identity", "identity"]
 
     verified_window.element_info = FakeElementInfo(101, 202, (42, 101))
-    with pytest.raises(RuntimeError, match="Verified main window binding is unavailable"):
+    with pytest.raises(app_session.LaunchFailure) as caught:
         await manager.get_main_window()
+    assert caught.value.code is app_session.LaunchErrorCode.WINDOW_CONNECTION_LOST
     assert manager._binding is None
     assert manager._app is None
     assert manager._session_generation > binding_generation
@@ -323,8 +324,9 @@ async def test_launch_preserves_the_window_that_passed_readiness(monkeypatch):
     assert manager._binding is None
     assert manager._app is None
     assert manager._session_generation > closing_generation
-    with pytest.raises(RuntimeError, match="Verified main window binding is unavailable"):
+    with pytest.raises(app_session.LaunchFailure) as caught:
         await manager.get_main_window()
+    assert caught.value.code is app_session.LaunchErrorCode.WINDOW_CONNECTION_LOST
 
 
 def test_launcher_provenance_survives_exit_but_rejects_pid_reincarnation(monkeypatch):

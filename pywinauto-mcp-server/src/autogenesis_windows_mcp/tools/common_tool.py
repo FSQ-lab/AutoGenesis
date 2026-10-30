@@ -1,5 +1,6 @@
 from autogenesis_agent_contract import SecretInput, mark_secret, require_sensitive_target, sensitive_control
 from ..safe_output import safe_error
+from ..launch_errors import LaunchErrorCode, LaunchFailure, launch_failure_fields
 # Copyright (c) Microsoft Corporation.
 # Licensed under the MIT license.
 
@@ -42,15 +43,29 @@ def register_common_tools(mcp, app_manager):
         Returns:
             JSON response with app snapshot data and status information
         """
-        resp = init_tool_response()        
+        resp = init_tool_response()
         try:
             await app_manager.app_launch()
-            resp["status"] = "success"
-            await fill_snapshot(resp, app_manager, need_snapshot=need_snapshot)
-        except Exception as e:
+        except Exception as error:
             resp["status"] = "error"
-            resp["error"] = safe_error()
+            resp["data"] = {}
+            resp.update(launch_failure_fields(error))
             logger.error('Error launching app: [redacted]')
+            return format_tool_response(resp)
+
+        resp["status"] = "success"
+        try:
+            await fill_snapshot(resp, app_manager, need_snapshot=need_snapshot)
+        except Exception as error:
+            failure = (
+                error
+                if isinstance(error, LaunchFailure)
+                else LaunchFailure(LaunchErrorCode.SNAPSHOT_FAILED)
+            )
+            resp["status"] = "error"
+            resp["data"] = {}
+            resp.update(launch_failure_fields(failure))
+            logger.error('Error extracting app snapshot: [redacted]')
         return format_tool_response(resp)
     
     
