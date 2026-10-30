@@ -49,13 +49,15 @@ Immutable source: {base}/{setup_filename}
 Expected SHA-256: {setup_digest}
 Skill name: autogenesis-setup
 
-1. Download the exact file and verify SHA-256 before interpreting or writing it.
-2. Stop if the digest differs.
-3. Use this Coding Agent's native Skill installation mechanism.
-4. If installation scope is unspecified, ask whether to install for the current project or user.
-5. Before writing, show the source, digest, scope, and destination and obtain explicit approval.
-6. Install only autogenesis-setup; do not install Runtime packages, Appium, Drivers, SDKs, MCP configuration, or autogenesis-run yet.
-7. Verify the Skill is discoverable, report how to invoke it, and stop.
+1. Identify the native host from available environment metadata. If a command is required, include it in the approval plan instead of running it yet. Stop on Linux, WSL, or any host other than native macOS or Windows.
+2. If installation scope is unspecified, ask whether to install for the current project or user.
+3. Show the source, digest, exact commands, network access, temporary destination, scope, final destination, and how every visible autogenesis-setup installation will be checked. Obtain explicit approval before process execution, network access, or filesystem writes. Stop and request fresh approval if any plan element changes.
+4. After approval, enumerate every visible autogenesis-setup installation before writing. Preserve different existing content and stop on conflict, shadowing, ambiguity, or an installation whose bytes or location cannot be inspected.
+5. Download the exact file and verify SHA-256 before interpreting or installing it. Stop if the digest differs.
+6. Use this Coding Agent's native Skill installation mechanism. Install only autogenesis-setup; do not install Runtime packages, Appium, Drivers, SDKs, MCP configuration, or autogenesis-run yet.
+7. Hash the exact installed file after writing. Stop if its digest or declared contract version differs from the approved source.
+8. Reload Skill discovery. Prove that the discovered autogenesis-setup resolves to the approved destination, digest, and contract version, with no higher-precedence or ambiguous copy. If the Coding Agent cannot prove this identity, stop instead of reporting success.
+9. Report the verified source, destination, digest, contract version, scope, and how to invoke the Skill, then stop.
 """.encode("utf-8")
     atomic_write(output, "agent-install-prompt.txt", prompt)
     print(f"Built Skill release assets for Contract {identity['contract_version']}.")

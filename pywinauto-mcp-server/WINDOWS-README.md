@@ -9,13 +9,14 @@ serving automation tools. Linux CI checks package metadata/imports only.
 
 ## Install in a business project
 
-Build artifacts must contain both the Windows runtime wheel and the merged
-Agent Contract 2.0.0 wheel. From any Windows business directory, without a
-checkout of AutoGenesis:
+No AutoGenesis checkout is needed. From a Windows business directory, create an
+isolated environment and use the machine's configured package index; do not
+bypass its mirror or trust policy. The pinned Runtime installs its exact Agent
+Contract dependency:
 
 ```powershell
 python -m venv .venv
-.venv/Scripts/python -m pip install C:/artifacts/autogenesis_agent_contract-2.0.0-py3-none-any.whl C:/artifacts/autogenesis_windows_mcp-0.4.0-py3-none-any.whl
+.venv/Scripts/python -m pip install autogenesis-windows-mcp==0.4.0
 .venv/Scripts/autogenesis-windows-mcp --config ./apps.json --app notepad --project-root .
 ```
 
@@ -25,17 +26,8 @@ does not create log files or write into the installed package. Close client
 stdin or send SIGINT (Ctrl+C) to stop the server. Disconnecting does not invoke
 the app_close automation tool or terminate the user's application.
 
-With uv installed, isolated execution from local artifacts is also supported:
-
-```powershell
-uvx --with C:/artifacts/autogenesis_agent_contract-2.0.0-py3-none-any.whl --from C:/artifacts/autogenesis_windows_mcp-0.4.0-py3-none-any.whl autogenesis-windows-mcp --config ./apps.json --app notepad --project-root .
-```
-
-After these versions are published to the configured package index:
-
-```powershell
-uvx --from autogenesis-windows-mcp==0.4.0 autogenesis-windows-mcp --config ./apps.json --app notepad --project-root .
-```
+Maintainers testing unpublished builds may substitute reviewed local Runtime and
+Contract wheels instead of package-index coordinates.
 
 The runtime depends exactly on autogenesis-agent-contract==2.0.0 and requires
 manifest SHA-256

@@ -1,0 +1,75 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1120 480" role="img" aria-labelledby="title desc">
+  <title id="title">Microsoft Edge browser product-line deployment results</title>
+  <desc id="desc">2.30 million test steps in a reported 30-day period, 3,193 hours saved monthly, four platforms, and 99.7 percent pass-rate consistency.</desc>
+  <defs>
+    <linearGradient id="panel" x1="0" y1="0" x2="1120" y2="480" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#071426"/>
+      <stop offset="0.52" stop-color="#0b1930"/>
+      <stop offset="1" stop-color="#10243a"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="56" y1="52" x2="1054" y2="420" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#35c1f1"/>
+      <stop offset="0.48" stop-color="#635bff"/>
+      <stop offset="1" stop-color="#36c752"/>
+    </linearGradient>
+    <linearGradient id="number" x1="60" y1="180" x2="1030" y2="292" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#72ddff"/>
+      <stop offset="0.48" stop-color="#9b91ff"/>
+      <stop offset="1" stop-color="#6ee787"/>
+    </linearGradient>
+    <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+      <path d="M40 0H0v40" fill="none" stroke="#8bb8dd" stroke-opacity="0.07"/>
+    </pattern>
+    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="18"/>
+    </filter>
+  </defs>
+
+  <rect width="1120" height="480" rx="30" fill="url(#panel)"/>
+  <rect x="1.5" y="1.5" width="1117" height="477" rx="28.5" fill="none" stroke="url(#accent)" stroke-width="3"/>
+  <rect width="1120" height="480" rx="30" fill="url(#grid)"/>
+  <circle cx="1040" cy="58" r="92" fill="#35c1f1" fill-opacity="0.12" filter="url(#glow)"/>
+  <circle cx="80" cy="428" r="88" fill="#635bff" fill-opacity="0.13" filter="url(#glow)"/>
+
+  <!-- Original browser/deployment glyph; not a Microsoft product icon. -->
+  <g transform="translate(48 24)">
+    <rect width="96" height="96" rx="24" fill="#ffffff" fill-opacity="0.08" stroke="url(#accent)" stroke-width="3"/>
+    <path d="M2 29h92" stroke="#d9edff" stroke-opacity="0.65" stroke-width="3"/>
+    <circle cx="18" cy="15" r="3.5" fill="#35c1f1"/>
+    <circle cx="32" cy="15" r="3.5" fill="#9b91ff"/>
+    <circle cx="46" cy="15" r="3.5" fill="#36c752"/>
+    <path d="m18 72 16-16 14 10 26-26" fill="none" stroke="url(#accent)" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="m65 40h9v9" fill="none" stroke="#6ee787" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+
+  <text x="170" y="62" fill="#87dfff" font-family="Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="16" font-weight="700" letter-spacing="2.4">PROVEN AT PRODUCTION SCALE</text>
+  <text x="170" y="103" fill="#f3f8ff" font-family="Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="27" font-weight="650">Microsoft Edge browser product line</text>
+  <text x="1058" y="70" text-anchor="end" fill="#a9b9ca" font-family="Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="14">Observed deployment results</text>
+  <path d="M56 136h1008" stroke="url(#accent)" stroke-opacity="0.65" stroke-width="2"/>
+
+  <text x="56" y="246" fill="url(#number)" font-family="Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="84" font-weight="760" letter-spacing="-4">2.30M</text>
+  <text x="56" y="282" fill="#f3f8ff" font-family="Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="18" font-weight="650" letter-spacing="0.7">TEST STEPS</text>
+  <text x="56" y="310" fill="#9fb0c2" font-family="Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="15">Executed in the reported 30-day period</text>
+
+  <path d="M560 168v146" stroke="#b8c7d8" stroke-opacity="0.22"/>
+
+  <text x="610" y="246" fill="url(#number)" font-family="Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="84" font-weight="760" letter-spacing="-4">3,193</text>
+  <text x="610" y="282" fill="#f3f8ff" font-family="Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="18" font-weight="650" letter-spacing="0.7">HOURS SAVED / MONTH</text>
+  <text x="610" y="310" fill="#9fb0c2" font-family="Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="15">Measured monthly operating impact</text>
+
+  <g transform="translate(56 350)">
+    <rect width="488" height="82" rx="16" fill="#ffffff" fill-opacity="0.055" stroke="#35c1f1" stroke-opacity="0.32"/>
+    <text x="24" y="53" fill="#72ddff" font-family="Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="42" font-weight="750">4</text>
+    <text x="80" y="34" fill="#f3f8ff" font-family="Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="17" font-weight="650">PLATFORMS</text>
+    <text x="80" y="58" fill="#9fb0c2" font-family="Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="14">Windows · macOS · iOS · Android</text>
+  </g>
+
+  <g transform="translate(576 350)">
+    <rect width="488" height="82" rx="16" fill="#ffffff" fill-opacity="0.055" stroke="#36c752" stroke-opacity="0.32"/>
+    <text x="24" y="53" fill="#6ee787" font-family="Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="42" font-weight="750">99.7%</text>
+    <text x="164" y="34" fill="#f3f8ff" font-family="Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="17" font-weight="650">PASS-RATE CONSISTENCY</text>
+    <text x="164" y="58" fill="#9fb0c2" font-family="Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="14">Reported operational consistency</text>
+  </g>
+
+  <text x="1064" y="462" text-anchor="end" fill="#8192a5" font-family="Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="11">Edge deployment · not a universal benchmark</text>
+</svg>

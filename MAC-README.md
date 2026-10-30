@@ -8,13 +8,15 @@ permissions for the application driving automation.
 
 ## Install from a business project
 
-Obtain the built runtime and Agent Contract wheels from the Integration Lead.
-No AutoGenesis checkout is needed. In an activated virtual environment:
+No AutoGenesis checkout is needed. Create an isolated environment and use the
+machine's configured package index; do not bypass its mirror or trust policy.
+The pinned Runtime installs its exact Agent Contract dependency:
 
 ```bash
-python -m pip install /absolute/wheels/autogenesis_agent_contract-2.0.0-py3-none-any.whl /absolute/wheels/autogenesis_appium_mcp-0.4.0-py3-none-any.whl
-python -c "from importlib.resources import files; from pathlib import Path; Path('appium.json').write_bytes(files('autogenesis_appium_mcp').joinpath('conf/appium_conf.template.json').read_bytes())"
-autogenesis-appium-mcp --platform mac --config /absolute/business/appium.json --project-root /absolute/business
+python -m venv .venv
+.venv/bin/python -m pip install autogenesis-appium-mcp==0.4.0
+.venv/bin/python -c "from importlib.resources import files; from pathlib import Path; Path('appium.json').write_bytes(files('autogenesis_appium_mcp').joinpath('conf/appium_conf.template.json').read_bytes())"
+.venv/bin/autogenesis-appium-mcp --platform mac --config /absolute/business/appium.json --project-root /absolute/business
 ```
 
 The default transport is **stdio**. The default platform is iOS, so pass
@@ -22,17 +24,8 @@ The default transport is **stdio**. The default platform is iOS, so pass
 Appium or a live application; automation calls create sessions when requested.
 stdout is reserved for MCP; diagnostics use stderr.
 
-With uvx and local artifacts:
-
-```bash
-uvx --from /absolute/wheels/autogenesis_appium_mcp-0.4.0-py3-none-any.whl --with /absolute/wheels/autogenesis_agent_contract-2.0.0-py3-none-any.whl autogenesis-appium-mcp --platform mac --config /absolute/business/appium.json --project-root /absolute/business
-```
-
-Once both packages are published to the configured index:
-
-```bash
-uvx --from autogenesis-appium-mcp==0.4.0 autogenesis-appium-mcp --platform mac --config /absolute/business/appium.json --project-root /absolute/business
-```
+Maintainers testing unpublished builds may substitute reviewed local Runtime and
+Contract wheels instead of package-index coordinates.
 
 Agent Contract is pinned to **2.0.0**, manifest SHA-256
 `4367a2e388d0d5cb41a415b25b6a58e25025f1da6749bfdffe87a37c60a0c9d3`.
