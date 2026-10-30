@@ -853,9 +853,11 @@ def _hold_node(value: str, expected_sha256: str, cwd: Path) -> _HeldNode:
             digest = hashlib.sha256(raw).hexdigest()
             _require_node_identity(raw[:4], digest, expected_sha256)
             return _HeldNode(str(path), digest, windows_handles=tuple(handles), windows_api=api)
-        except BaseException:
+        except BaseException as error:
             for handle in reversed(handles):
                 api.close(handle)
+            if isinstance(error, InstallError) and str(error) == _UNSAFE:
+                raise InstallError("AUTOGENESIS_NODE_UNSAFE") from None
             raise
     path = Path(value)
     if not path.is_absolute() or ".." in path.parts:

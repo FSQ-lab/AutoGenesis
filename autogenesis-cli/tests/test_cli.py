@@ -1,6 +1,7 @@
 import hashlib
 import json
 import os
+import sys
 from pathlib import Path, PureWindowsPath
 
 import pytest
@@ -62,7 +63,6 @@ def ready(monkeypatch, contract=None, bundle=None):
         return bundle
 
     monkeypatch.setattr(cli, "load_appium_skills", load_appium)
-    monkeypatch.setattr(cli.sys, "platform", "darwin")
     return contract, bundle, calls
 
 
@@ -186,6 +186,7 @@ def test_conflict_in_second_skill_prevents_first_skill_write(tmp_path, monkeypat
     assert not (root / "autogenesis-setup").exists()
 
 
+@pytest.mark.skipif(sys.platform == "win32", reason="POSIX descriptor race")
 def test_conflict_appearing_after_preflight_is_never_overwritten(tmp_path, monkeypatch):
     ready(monkeypatch)
     root = tmp_path / "skills"
@@ -209,6 +210,7 @@ def test_conflict_appearing_after_preflight_is_never_overwritten(tmp_path, monke
     assert not (root / "autogenesis-run").exists()
 
 
+@pytest.mark.skipif(sys.platform == "win32", reason="POSIX descriptor race")
 def test_ancestor_swap_is_rejected_and_held_target_is_rolled_back(tmp_path, monkeypatch):
     ready(monkeypatch)
     root = tmp_path / "skills"
@@ -234,6 +236,7 @@ def test_ancestor_swap_is_rejected_and_held_target_is_rolled_back(tmp_path, monk
     assert not (moved / "autogenesis-run").exists()
 
 
+@pytest.mark.skipif(sys.platform == "win32", reason="POSIX descriptor rollback")
 def test_failure_after_file_commit_rolls_back_current_file(tmp_path, monkeypatch):
     ready(monkeypatch)
     root = tmp_path / "skills"
@@ -248,6 +251,7 @@ def test_failure_after_file_commit_rolls_back_current_file(tmp_path, monkeypatch
     assert not (root / "autogenesis-run").exists()
 
 
+@pytest.mark.skipif(sys.platform == "win32", reason="POSIX descriptor rollback")
 def test_concurrent_replacement_during_rollback_is_preserved(tmp_path, monkeypatch):
     ready(monkeypatch)
     root = tmp_path / "skills"
@@ -271,6 +275,7 @@ def test_concurrent_replacement_during_rollback_is_preserved(tmp_path, monkeypat
     assert not (root / "autogenesis-run").exists()
 
 
+@pytest.mark.skipif(sys.platform == "win32", reason="POSIX descriptor rollback")
 def test_two_skill_transaction_rolls_back_first_on_second_failure(tmp_path, monkeypatch):
     ready(monkeypatch)
     root = tmp_path / "skills"
@@ -523,30 +528,36 @@ def test_node_identity_rejects_project_local_symlink_and_writable_paths(tmp_path
     linked.symlink_to(outside)
     with pytest.raises(cli.InstallError, match="NODE_UNSAFE"):
         cli._hold_node(str(linked), hashlib.sha256(outside.read_bytes()).hexdigest(), project)
-
-    unsafe = tmp_path / "unsafe"
-    unsafe.mkdir(mode=0o777)
-    unsafe.chmod(0o777)
-    unsafe_node = unsafe / "node"
-    unsafe_node.write_bytes(b"\x7fELFnode")
-    unsafe_node.chmod(0o755)
-    with pytest.raises(cli.InstallError, match="NODE_UNSAFE"):
-        cli._hold_node(str(unsafe_node), hashlib.sha256(unsafe_node.read_bytes()).hexdigest(), project)
+    if sys.platform != "win32":
+        unsafe = tmp_path / "unsafe"
+        unsafe.mkdir(mode=0o777)
+        unsafe.chmod(0o777)
+        unsafe_node = unsafe / "node"
+        unsafe_node.write_bytes(b"\x7fELFnode")
+        unsafe_node.chmod(0o755)
+        with pytest.raises(cli.InstallError, match="NODE_UNSAFE"):
+            cli._hold_node(
+                str(unsafe_node), hashlib.sha256(unsafe_node.read_bytes()).hexdigest(), project,
+            )
 
 
 def test_node_identity_materializes_held_bytes_after_path_swap_and_rejects_env_shebang(tmp_path):
     project = tmp_path / "project"
     project.mkdir()
     approved = tmp_path / "approved-node"
-    original = b"\x7fELFapproved"
+    original = b"MZapproved" if sys.platform == "win32" else b"\x7fELFapproved"
     approved.write_bytes(original)
     approved.chmod(0o755)
     held = cli._hold_node(str(approved), hashlib.sha256(original).hexdigest(), project)
     try:
         replacement = tmp_path / "replacement"
-        replacement.write_bytes(b"\x7fELFreplacement")
+        replacement.write_bytes(b"MZreplacement" if sys.platform == "win32" else b"\x7fELFreplacement")
         replacement.chmod(0o755)
-        replacement.replace(approved)
+        if sys.platform == "win32":
+            with pytest.raises(OSError):
+                replacement.replace(approved)
+        else:
+            replacement.replace(approved)
         root = tmp_path / "private"
         root.mkdir()
         materialized = Path(cli._materialize_held_node(held, root))
