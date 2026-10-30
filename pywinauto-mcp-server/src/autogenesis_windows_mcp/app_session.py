@@ -30,6 +30,7 @@ _monotonic = time.monotonic
 _sleep = asyncio.sleep
 
 
+
 class _LaunchState(IntEnum):
     PROCESS_STARTED = 1
     WINDOW_FOUND = 2

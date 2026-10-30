@@ -133,7 +133,6 @@ Callers may retry only when `retryable` is true, within the Agent Contract's
 operation attempt limit. Increase `launch_timeout_seconds` for an application
 that is known to need more than the 15-second default; do not retry nonretryable
 configuration, elevation, or ambiguity failures unchanged.
-
 After `app_launch` verifies that a matching top-level window exists, is visible
 and is enabled, the runtime pins that window's native handle, owning process ID,
 UI Automation runtime ID and original UIA element within the current session
