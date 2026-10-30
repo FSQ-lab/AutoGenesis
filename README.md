@@ -106,10 +106,9 @@ In the reported operating period, the Edge deployment executed **2.30 million te
 ## Get started
 
 > [!IMPORTANT]
-> AutoGenesis 1.1 is in pre-release acceptance. Its official Python packages and
-> immutable Skill release are not public yet. Do not resolve similarly named
-> packages from an index. Acceptance testers must use artifacts and SHA-256
-> values supplied by the Integration Lead.
+> AutoGenesis 1.1 packages and the immutable Setup Skill are published. Native
+> Windows and Coding Agent compatibility acceptance remain in progress; consult
+> the support status below before adopting AutoGenesis in a release workflow.
 
 ### What you need
 
@@ -124,7 +123,7 @@ configuration writes on unsupported hosts.
 
 ### 1. Give AutoGenesis to your Coding Agent
 
-After publication, paste the verified
+Paste the verified
 [Agent Install Prompt](https://github.com/FSQ-lab/AutoGenesis/releases/download/agent-contract-v2.0.0/agent-install-prompt.txt)
 into the Coding Agent. It installs only `autogenesis-setup`, verifies the Skill
 identity, and stops before machine preparation.
@@ -152,10 +151,14 @@ Skill name: autogenesis-setup
 
 </details>
 
-Prefer a terminal installer after publication? The pinned sequence will be
-`python -m pip install autogenesis-cli==0.1.0`, followed by
-`autogenesis install`. The CLI installs the host-supported Runtime bundle and
-both canonical Skills without requiring a repository clone.
+Prefer a terminal installer? Install the pinned CLI, then install the
+host-supported Runtime bundle and both canonical Skills without cloning this
+repository:
+
+```bash
+python -m pip install autogenesis-cli==0.1.0
+autogenesis install
+```
 
 ### 2. Prepare one concrete capability
 
@@ -271,7 +274,10 @@ If this workflow is useful, [Star AutoGenesis](https://github.com/FSQ-lab/AutoGe
 Include the AutoGenesis version, host and target platforms, a sanitized Scenario or direct request, and the expected and actual outcome. Remove credentials, personal data, private URLs, local paths, and device identifiers before sharing text, screenshots, or logs. Report security issues through [Security](SECURITY.md), not a public issue.
 
 > [!IMPORTANT]
-> AutoGenesis 1.1 is pre-release software under acceptance. Generated previews and test evidence may contain private application data; review them before sharing or committing them. Public packages and the immutable Skill release are not available yet.
+> AutoGenesis 1.1 remains pre-release software while native Windows and Coding
+> Agent compatibility acceptance finish. Generated previews and test evidence
+> may contain private application data; review them before sharing or
+> committing them.
 
 ## Technical references
 
