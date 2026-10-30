@@ -1,6 +1,8 @@
 import json
+import os
 from pathlib import Path
 import runpy
+import signal
 import threading
 from unittest.mock import Mock
 
@@ -8,8 +10,10 @@ import anyio
 import pytest
 from watchdog.events import FileMovedEvent
 
+from autogenesis_agent_contract import tool_execution
 from autogenesis_appium_mcp import server
-from autogenesis_appium_mcp.driver_session import DriverSessionManager
+from autogenesis_appium_mcp import driver_session
+from autogenesis_appium_mcp.driver_session import DriverSessionManager, SessionCloseError
 from autogenesis_appium_mcp.utils.config_manager import ConfigFileHandler, ConfigManager
 from conftest import reference_server
 
@@ -192,6 +196,95 @@ def test_shutdown_quits_stale_driver_once(platform, config_path):
     assert runtime.driver._driver is None
 
 
+def test_session_close_timeout_is_bounded_without_closing_app(config_path, monkeypatch):
+    runtime = server.Runtime("mac", config_path)
+    release = threading.Event()
+    driver = Mock()
+    driver.quit.side_effect = lambda: release.wait(timeout=1)
+    runtime.driver._driver = driver
+    monkeypatch.setattr(driver_session, "SESSION_CLOSE_TIMEOUT_SECONDS", 0.01)
+
+    try:
+        with pytest.raises(SessionCloseError, match="AUTOGENESIS_SESSION_CLOSE_TIMEOUT"):
+            runtime.driver.session_close()
+        driver.quit.assert_called_once()
+        driver.terminate_app.assert_not_called()
+        assert runtime.driver._driver is driver
+    finally:
+        release.set()
+        runtime.driver.session_close()
+
+
+def test_timed_out_close_must_settle_before_replacing_driver(config_path, monkeypatch):
+    runtime = server.Runtime("mac", config_path)
+    release = threading.Event()
+    old_driver = Mock()
+    old_driver.quit.side_effect = lambda: release.wait(timeout=1)
+    runtime.driver._driver = old_driver
+    replacement = Mock(capabilities={})
+    remote = Mock(return_value=replacement)
+    monkeypatch.setattr(driver_session.webdriver, "Remote", remote)
+    monkeypatch.setattr(driver_session, "SESSION_CLOSE_TIMEOUT_SECONDS", 0.01)
+
+    with pytest.raises(SessionCloseError, match="AUTOGENESIS_SESSION_CLOSE_TIMEOUT"):
+        runtime.driver.session_close()
+    with pytest.raises(SessionCloseError, match="AUTOGENESIS_SESSION_CLOSE_IN_PROGRESS"):
+        runtime.driver.app_launch()
+    remote.assert_not_called()
+
+    release.set()
+    runtime.driver._session_close_thread.join(timeout=1)
+    with tool_execution(runtime.driver.app_launch, (), {}) as (args, kwargs):
+        assert runtime.driver.app_launch(*args, **kwargs) is replacement
+    old_driver.quit.assert_called_once()
+    runtime.close()
+    replacement.quit.assert_called_once()
+
+
+def test_session_close_failure_is_stable_and_preserves_owned_driver(config_path):
+    runtime = server.Runtime("mac", config_path)
+    driver = Mock()
+    driver.quit.side_effect = RuntimeError("private endpoint response")
+    runtime.driver._driver = driver
+
+    with pytest.raises(SessionCloseError, match="AUTOGENESIS_SESSION_CLOSE_FAILED") as caught:
+        runtime.driver.session_close()
+    assert "private endpoint response" not in str(caught.value)
+    driver.quit.assert_called_once()
+    driver.terminate_app.assert_not_called()
+    assert runtime.driver._driver is driver
+
+def test_reuse_activation_failure_destroys_old_session_before_replacement(config_path, monkeypatch):
+    runtime = server.Runtime("ios", config_path)
+    old_driver = Mock()
+    old_driver.get_window_size.return_value = {"width": 1, "height": 1}
+    old_driver.activate_app.side_effect = RuntimeError("activation failed")
+    replacement = Mock(capabilities={})
+    remote = Mock(return_value=replacement)
+    monkeypatch.setattr(driver_session.webdriver, "Remote", remote)
+    runtime.driver._driver = old_driver
+
+    with tool_execution(runtime.driver.app_launch, (), {}) as (args, kwargs):
+        assert runtime.driver.app_launch(*args, **kwargs) is replacement
+    old_driver.quit.assert_called_once()
+    remote.assert_called_once()
+    assert runtime.driver._driver is replacement
+    runtime.close()
+    replacement.quit.assert_called_once()
+
+
+def test_post_creation_failure_destroys_new_owned_session(config_path, monkeypatch):
+    runtime = server.Runtime("mac", config_path)
+    created = Mock(capabilities={"private": "value"})
+    monkeypatch.setattr(driver_session.webdriver, "Remote", Mock(return_value=created))
+    monkeypatch.setattr(driver_session, "sanitize_result", Mock(side_effect=RuntimeError("sanitize failed")))
+    with tool_execution(runtime.driver.app_launch, (), {}) as (args, kwargs):
+        with pytest.raises(RuntimeError, match="sanitize failed"):
+            runtime.driver.app_launch(*args, **kwargs)
+    created.quit.assert_called_once()
+    created.terminate_app.assert_not_called()
+    assert runtime.driver._driver is None
+
 def test_constructor_registration_failure_closes_resources(config_path, monkeypatch):
     closed = Mock()
     monkeypatch.setattr(DriverSessionManager, "session_close", closed)
@@ -242,6 +335,44 @@ def test_cleanup_releases_driver_even_if_watcher_stop_fails(config_path):
     with pytest.raises(RuntimeError):
         runtime.close()
     runtime.driver.session_close.assert_called_once()
+
+
+def test_session_deletion_failure_outweighs_watcher_failure(config_path):
+    runtime = server.Runtime("ios", config_path)
+    runtime.config.stop_watching = Mock(side_effect=RuntimeError("Watcher stop failure"))
+    runtime.driver.session_close = Mock(side_effect=SessionCloseError("AUTOGENESIS_SESSION_CLOSE_FAILED"))
+
+    with pytest.raises(SessionCloseError, match="AUTOGENESIS_SESSION_CLOSE_FAILED"):
+        runtime.close()
+    runtime.driver.session_close.assert_called_once()
+    with pytest.raises(SessionCloseError, match="AUTOGENESIS_SESSION_CLOSE_FAILED"):
+        runtime.close()
+
+
+def test_interrupted_cleanup_remains_retryable(config_path):
+    runtime = server.Runtime("ios", config_path)
+    runtime.driver.session_close = Mock(side_effect=[KeyboardInterrupt(), None])
+
+    with pytest.raises(KeyboardInterrupt):
+        runtime.close()
+    assert not runtime._closed
+    runtime.close()
+    assert runtime._closed
+    assert runtime.driver.session_close.call_count == 2
+
+
+@pytest.mark.skipif(os.name != "posix", reason="POSIX signal lifecycle")
+def test_cleanup_masks_signals_during_session_state_transitions(config_path):
+    runtime = server.Runtime("ios", config_path)
+    observed = {}
+
+    def close_session():
+        observed["sigterm"] = signal.getsignal(signal.SIGTERM)
+        observed["sigint"] = signal.getsignal(signal.SIGINT)
+
+    runtime.driver.session_close = close_session
+    runtime.close()
+    assert observed == {"sigterm": signal.SIG_IGN, "sigint": signal.SIG_IGN}
 
 
 @pytest.mark.anyio
