@@ -35,9 +35,19 @@ For approved setup helpers only, preview the absolute Node path, exact version,
 lowercase SHA-256, helper/arguments, and each required non-secret environment
 value/hash. Run `autogenesis appium-tool --help` and invoke it with those exact
 values (`--allow-env NAME=SHA256` binds inherited values). The CLI rejects
-scripts/wrappers, copies native Node from its held handle, verifies identity and
-version with an empty process environment, and starts the held helper through a
-private bootstrap that adds only approved environment values.
+scripts/wrappers and verifies native Node through a retained handle and exact
+SHA-256. Windows executes a private copy of those held bytes. POSIX revalidates
+the retained file identity and executes its trusted original path so native
+loader-relative dependencies remain available. Both paths verify the reported
+Node version with an empty process environment and start the held helper through
+a private bootstrap that adds only approved environment values.
+On POSIX, every path component must be owned by root or the current user,
+non-symlink, and not world-writable. A group-writable component is accepted only
+when its group is one of the current process's effective or supplementary
+groups, which covers a standard local Homebrew installation. Root, the current
+user, and those groups are therefore inside the local execution trust boundary.
+The approved SHA-256 identifies the Node executable bytes; native dynamic
+dependencies remain governed by that local OS/package-manager trust boundary.
 
 Use `--skills-dir /absolute/path` to select another user-approved destination.
 Existing non-canonical Skill bytes are preserved and cause a conflict instead
