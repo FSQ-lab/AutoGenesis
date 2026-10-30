@@ -5,7 +5,8 @@
         "app_name": "Notepad",
         "exe": "%WINDIR%\\System32\\notepad.exe",
         "window_title_re": ".*Notepad.*",
-        "launch_args": []
+        "launch_args": [],
+        "launch_timeout_seconds": 15
       }
     }
   }

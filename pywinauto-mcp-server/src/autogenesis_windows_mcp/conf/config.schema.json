@@ -24,7 +24,8 @@
         "app_name": {"type": "string"},
         "exe": {"type": "string", "minLength": 1},
         "window_title_re": {"type": "string", "minLength": 1},
-        "launch_args": {"type": "array", "items": {"type": "string"}}
+        "launch_args": {"type": "array", "items": {"type": "string"}},
+        "launch_timeout_seconds": {"type": "integer", "minimum": 1, "maximum": 120}
       }
     }
   }

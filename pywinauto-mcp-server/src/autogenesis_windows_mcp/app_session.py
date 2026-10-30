@@ -5,6 +5,8 @@
 
 from autogenesis_agent_contract import resolve
 from dataclasses import dataclass
+from enum import IntEnum
+import asyncio
 import os
 import re
 import psutil
@@ -21,6 +23,31 @@ logger = logging.getLogger(__name__)
             
 _WINDIR_REFERENCE = re.compile(r"%WINDIR%", re.IGNORECASE)
 _PROCESS_TIME_TOLERANCE = 0.01
+_DEFAULT_LAUNCH_TIMEOUT_SECONDS = 15
+_POLL_INTERVAL_SECONDS = 0.5
+_monotonic = time.monotonic
+_sleep = asyncio.sleep
+
+
+class _LaunchState(IntEnum):
+    PROCESS_STARTED = 1
+    WINDOW_FOUND = 2
+    CONNECTED = 3
+    EXISTS = 4
+    VISIBLE = 5
+    ENABLED = 6
+    BOUND = 7
+
+
+class _LaunchTimeout(RuntimeError):
+    def __init__(self, deepest_state: _LaunchState):
+        self.deepest_state = deepest_state
+        super().__init__("The application did not become ready before the launch deadline.")
+
+
+class _WindowAmbiguous(RuntimeError):
+    pass
+
 
 @dataclass(frozen=True)
 class _WindowBinding:
@@ -61,6 +88,9 @@ class AppSessionManager:
         self.launch_args = self.config.get('launch_args', []).copy()
 
         self.app_name = self.config.get('app_name', "")
+        self.launch_timeout_seconds = self.config.get(
+            "launch_timeout_seconds", _DEFAULT_LAUNCH_TIMEOUT_SECONDS
+        )
         self._app = None  # Application instance
         self._binding: _WindowBinding | None = None
         self._session_generation = 0
@@ -228,6 +258,7 @@ class AppSessionManager:
         # CreateProcess receives one Windows-escaped command line and retains the
         # launcher handle so transferred children can be authenticated after exit.
         cmd = subprocess.list2cmdline([valid_exe_path, *args])
+        deadline = _monotonic() + self.launch_timeout_seconds
         logger.info('[AppManager] Launching new [redacted]: [redacted]')
         process_handle, thread_handle, launched_process_id, _ = win32process.CreateProcess(
             None,
@@ -242,9 +273,9 @@ class AppSessionManager:
         )
         thread_handle.Close()
         launched_created_at = win32process.GetProcessTimes(process_handle)["CreationTime"].timestamp()
+        deepest_state = _LaunchState.PROCESS_STARTED
         try:
-            for i in range(5):
-                time.sleep(2)
+            while _monotonic() < deadline:
                 try:
                     candidates = Desktop(backend="uia").windows(
                         title_re=config["window_title_re"],
@@ -252,7 +283,7 @@ class AppSessionManager:
                         visible_only=False,
                         enabled_only=False,
                     )
-                    wrapper = next(
+                    trusted = [
                         candidate for candidate in candidates
                         if self._belongs_to_launch(
                             int(candidate.element_info.process_id),
@@ -260,35 +291,55 @@ class AppSessionManager:
                             launched_created_at,
                             process_handle,
                         )
-                    )
-                    app = Application(backend="uia").connect(handle=int(wrapper.handle))
-                    handle = int(wrapper.handle)
-                    process_id = int(wrapper.element_info.process_id)
-                    runtime_id = self._runtime_id(wrapper.element_info)
-                    if handle <= 0 or process_id <= 0 or not runtime_id:
-                        raise RuntimeError("Unable to identify the discovered application window.")
-                    main_window = self._window_for_identity(
-                        app,
-                        handle,
-                        process_id,
-                        runtime_id,
-                        wrapper.element_info,
-                    )
-                    main_window.wait("exists", timeout=1)
-                    logger.info('[AppManager] Launching new [redacted] using pywinauto: exists done')
-                    main_window.wait("visible", timeout=1)
-                    logger.info('[AppManager] Launching new [redacted] using pywinauto: visible done')
-                    main_window.wait("enabled", timeout=1)
-                    self._bind_window(app, wrapper)
-                    logger.info('[AppManager] Launching new [redacted] using pywinauto: done')
-                    return
+                    ]
+                    if len(trusted) > 1:
+                        raise _WindowAmbiguous(
+                            "The application profile matched multiple windows from this launch."
+                        )
+                    if trusted:
+                        wrapper = trusted[0]
+                        deepest_state = max(deepest_state, _LaunchState.WINDOW_FOUND)
+                        app = Application(backend="uia").connect(handle=int(wrapper.handle))
+                        deepest_state = max(deepest_state, _LaunchState.CONNECTED)
+                        handle = int(wrapper.handle)
+                        process_id = int(wrapper.element_info.process_id)
+                        runtime_id = self._runtime_id(wrapper.element_info)
+                        if handle <= 0 or process_id <= 0 or not runtime_id:
+                            raise RuntimeError("Unable to identify the discovered application window.")
+                        main_window = self._window_for_identity(
+                            app,
+                            handle,
+                            process_id,
+                            runtime_id,
+                            wrapper.element_info,
+                        )
+                        if main_window.exists(timeout=0):
+                            deepest_state = max(deepest_state, _LaunchState.EXISTS)
+                            verified_wrapper = main_window.wrapper_object()
+                            if verified_wrapper.is_visible():
+                                deepest_state = max(deepest_state, _LaunchState.VISIBLE)
+                                if verified_wrapper.is_enabled():
+                                    deepest_state = max(deepest_state, _LaunchState.ENABLED)
+                                    self._bind_window(app, verified_wrapper)
+                                    deepest_state = _LaunchState.BOUND
+                                    if _monotonic() < deadline:
+                                        logger.info('[AppManager] Launching new [redacted] using pywinauto: done')
+                                        return
+                                    self._invalidate_binding()
+                except _WindowAmbiguous:
+                    raise
                 except Exception:
-                    logger.error('[AppManager] Launching new [redacted] the [redacted] time error: [redacted]')
+                    logger.error('[AppManager] Launching new [redacted] readiness probe error: [redacted]')
+
+                remaining = deadline - _monotonic()
+                if remaining <= 0:
+                    break
+                await _sleep(min(_POLL_INTERVAL_SECONDS, remaining))
         finally:
             process_handle.Close()
 
         self._invalidate_binding()
-        raise RuntimeError('[AppManager] Failed to launch [redacted]. Please check the app executable path and arguments.')
+        raise _LaunchTimeout(deepest_state)
 
     async def app_launch(
             self, 

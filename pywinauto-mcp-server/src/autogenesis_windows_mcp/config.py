@@ -35,7 +35,7 @@ def load_app_config(app_name: str | None, file_path: str | Path | None = None) -
     schema = json.loads(assets.joinpath("config.schema.json").read_text(encoding="utf-8"))
     if not Draft202012Validator(schema).is_valid(config):
         raise ConfigurationError(
-            "AUTOGENESIS_CONFIG_INVALID: PYWINAUTO_CONFIG.apps_config must contain profiles with nonempty exe and window_title_re strings; launch_args must be a string array and app_name a string."
+            "AUTOGENESIS_CONFIG_INVALID: PYWINAUTO_CONFIG.apps_config must contain profiles with nonempty exe and window_title_re strings; launch_args must be a string array, app_name a string, and launch_timeout_seconds an integer from 1 through 120."
         ) from None
     profiles = config["PYWINAUTO_CONFIG"]["apps_config"]
     selected = next(iter(profiles)) if not app_name else app_name
