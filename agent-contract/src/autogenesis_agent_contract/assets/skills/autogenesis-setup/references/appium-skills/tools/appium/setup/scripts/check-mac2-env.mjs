@@ -1,0 +1,52 @@
+#!/usr/bin/env node
+import { reportingOptions, writeReport } from "./reporting.mjs";
+const outputOptions = reportingOptions();
+
+import {
+  appiumDriverChecks,
+  driverDoctorStatus,
+  hostReport,
+  isMac,
+  run,
+  xcodeReport,
+} from "./env-check-helpers.mjs";
+
+const xcode = xcodeReport({
+  xcrunXcodebuild: run("xcrun", ["--find", "xcodebuild"], { timeout: 10000 }),
+});
+const appium = appiumDriverChecks("mac2", { doctorTimeout: 90000 });
+const appiumRequiredOk = appium.strictDoctorGateOk;
+
+const report = {
+  host: hostReport(),
+  xcode,
+  privacy: {
+    automationNote:
+      "This script does not modify Accessibility, Screen Recording, Automation, or Developer Tools privacy settings.",
+  },
+  appium: {
+    ...appium,
+    requiredOk: appiumRequiredOk,
+  },
+  summary: {
+    requiredOk:
+      isMac &&
+      xcode.checks.xcodebuildVersion.ok &&
+      xcode.checks.xcodeSelect.ok &&
+      xcode.checks.license.ok &&
+      xcode.checks.firstLaunch.ok &&
+      xcode.checks.xcrunXcodebuild.ok &&
+      appiumRequiredOk,
+    macHost: isMac,
+    xcodebuildOk: xcode.checks.xcodebuildVersion.ok,
+    xcodeSelectOk: xcode.checks.xcodeSelect.ok,
+    licenseOk: xcode.checks.license.ok,
+    firstLaunchOk: xcode.checks.firstLaunch.ok,
+    xcrunXcodebuildOk: xcode.checks.xcrunXcodebuild.ok,
+    appiumMajorAtLeast3: appium.appiumMajor !== null && appium.appiumMajor >= 3,
+    driverInstalled: appium.installed,
+    doctorRequiredOk: driverDoctorStatus(appium.checks.doctor).requiredOk,
+  },
+};
+
+writeReport(report, outputOptions);

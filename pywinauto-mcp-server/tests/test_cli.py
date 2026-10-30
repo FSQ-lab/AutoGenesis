@@ -41,7 +41,7 @@ def test_cli_version_does_not_load_configuration(capsys, monkeypatch):
     with pytest.raises(SystemExit) as caught:
         cli.main(["--version"])
     assert caught.value.code == 0
-    assert capsys.readouterr() == ("autogenesis-windows-mcp 0.4.0\n", "")
+    assert capsys.readouterr() == ("autogenesis-windows-mcp 0.5.0\n", "")
 
 
 def test_invalid_config_never_constructs_server(monkeypatch, tmp_path, caplog):

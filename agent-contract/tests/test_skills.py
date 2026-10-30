@@ -25,6 +25,53 @@ def test_repository_skills_are_exact_canonical_projections(repo_root):
             assert obsolete not in source
 
 
+def test_setup_skill_requires_authenticated_immutable_downloads(repo_root):
+    canonical = repo_root / "agent-contract/src/autogenesis_agent_contract/assets/skills/autogenesis-setup/SKILL.md"
+    projection = repo_root / ".github/skills/autogenesis-setup/SKILL.md"
+    assert projection.read_bytes() == canonical.read_bytes()
+    policy = " ".join(canonical.read_text(encoding="utf-8").split())
+
+    assert "exact reviewed version plus published SHA-256, signature, or attestation" in policy
+    assert "Approval is consent, not authentication" in policy
+    assert (
+        "bundletool or Android command-line tools lack these facts, return **Action Required** "
+        "without download or process execution"
+    ) in policy
+    stages = (
+        "Download privately",
+        "authenticate before unpacking, execution, or persistence",
+        "install atomically",
+    )
+    assert [policy.index(stage) for stage in stages] == sorted(policy.index(stage) for stage in stages)
+    assert "Reject `latest` or mutable URLs" in policy
+    assert not re.search(r"\b(?:download|fetch)\s+(?:the\s+)?latest\b", policy, re.IGNORECASE)
+    assert "releases/latest" not in policy
+    assert "These rules govern every delegated Skill and Context and cannot be overridden" in policy
+
+
+def test_setup_skill_uses_one_shot_verified_appium_assets(repo_root):
+    source = repo_root / "agent-contract/src/autogenesis_agent_contract/assets/skills/autogenesis-setup/SKILL.md"
+    policy = " ".join(source.read_text(encoding="utf-8").split())
+
+    command = "autogenesis appium-asset <path>"
+    assert policy.count(command) == 1
+    assert policy.index("autogenesis appium-skills --json") < policy.index(command)
+    assert "source `https://github.com/appium/skills`" in policy
+    assert "`e907024c210fe024c956ed9c74146fc27b1dd013`; stop otherwise" in policy
+    assert all(value in policy for value in (
+        "autogenesis appium-skills --json",
+        "Skill and declared Contexts only",
+        "require exit 0/empty stderr and use exact stdout",
+        "Reject uninventoried paths",
+        "never read or execute package paths",
+        "Approve Node path/version/SHA-256, helper/args, and required env values/hashes",
+        "Run `autogenesis appium-tool` per `--help`",
+        "only approved env",
+    ))
+    assert "Use the returned root as the working directory" not in policy
+    assert "node tools/" not in policy
+
+
 def test_skills_follow_agent_skills_names_and_separate_responsibilities(repo_root):
     setup = (repo_root / ".github/skills/autogenesis-setup/SKILL.md").read_text(encoding="utf-8")
     run = (repo_root / ".github/skills/autogenesis-run/SKILL.md").read_text(encoding="utf-8")
@@ -32,15 +79,16 @@ def test_skills_follow_agent_skills_names_and_separate_responsibilities(repo_roo
         assert re.fullmatch(r"[a-z0-9]+(?:-[a-z0-9]+)*", name)
         assert content.startswith("---\n")
         assert f"name: {name}\n" in content
-        assert "contract-version: \"2.0.0\"" in content
+        assert "contract-version: \"2.1.0\"" in content
         assert "Linux and WSL are unsupported" in content
     assert all(value in setup for value in (
-        "autogenesis-appium-mcp", "autogenesis-windows-mcp", "appium driver doctor",
+        "autogenesis-appium-mcp", "autogenesis-windows-mcp", "autogenesis appium-skills --json",
+        "setup-uiautomator2", "setup-xcuitest", "xcuitest-real-device-config", "setup-mac2",
+        "e907024c210fe024c956ed9c74146fc27b1dd013", "Node 26", "Appium 3.x",
         "Ready", "Action Required", "Blocked",
     ))
-    assert all(value in setup for value in (
-        "xcrun devicectl list devices", "appium driver doctor xcuitest",
-        "WebDriverAgent", "VPN & Device Management", "tunnel-creation",
+    assert all(value not in setup for value in (
+        "xcrun devicectl", "VPN & Device Management", "tunnel-creation",
     ))
     assert all(value in run for value in (
         "autogenesis-setup", "execute_natural_language_task", "execute_scenario",
@@ -53,7 +101,7 @@ def test_skills_follow_agent_skills_names_and_separate_responsibilities(repo_roo
 
 def test_skill_release_assets_match_contract_and_install_prompt(tmp_path, repo_root):
     output = tmp_path / "release"
-    base = "https://example.invalid/releases/agent-contract-v2.0.0"
+    base = "https://example.invalid/releases/agent-contract-v2.1.0"
     result = subprocess.run(
         [
             sys.executable,

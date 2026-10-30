@@ -1,0 +1,224 @@
+import { existsSync, statSync } from "node:fs";
+import os from "node:os";
+import path from "node:path";
+import { spawnSync } from "node:child_process";
+import { env as processEnvironment } from "node:process";
+import { commandInvocation } from "./windows-command.mjs";
+
+export const isWindows = process.platform === "win32";
+export const isMac = process.platform === "darwin";
+export const isLinux = process.platform === "linux";
+
+export function run(command, args = [], options = {}) {
+  let invocation;
+  try { invocation = commandInvocation(command, args); }
+  catch (error) { return { command: [command, ...args].join(" "), ok: false, status: null, stdout: "", stderr: "", error: error.message }; }
+  const result = spawnSync(invocation.executable, invocation.args, {
+    encoding: "utf8",
+    timeout: options.timeout ?? 15000,
+    maxBuffer: options.maxBuffer ?? 8 * 1024 * 1024,
+    shell: false,
+    windowsHide: true,
+    windowsVerbatimArguments: invocation.windowsVerbatimArguments,
+  });
+  return {
+    command: [command, ...args].join(" "),
+    ok: result.status === 0 && !result.error,
+    status: result.status,
+    signal: result.signal,
+    // Consumers must parse the captured output before presentation is shortened.
+    stdout: (result.stdout || "").trim(),
+    stderr: (result.stderr || "").trim(),
+    error: result.error?.message,
+    ...(result.error?.code === "ENOBUFS" ? { outputLimitExceeded: true } : {}),
+  };
+}
+
+export function commandPath(name) {
+  const result = isWindows
+    ? run("where", [name], { timeout: 5000 })
+    : run("sh", ["-lc", `command -v ${shellQuote(name)}`], { timeout: 5000 });
+  return result.ok ? result.stdout.split(/\r?\n/)[0] : "";
+}
+
+export function commandExists(name) {
+  const resolved = commandPath(name);
+  return { name, path: resolved, ok: Boolean(resolved) };
+}
+
+export function executable(file) {
+  if (!file || !existsSync(file)) {
+    return false;
+  }
+  try {
+    const stats = statSync(file);
+    return stats.isFile() && (isWindows || Boolean(stats.mode & 0o111));
+  } catch {
+    return false;
+  }
+}
+
+export function existingPaths(paths) {
+  return paths.filter((candidate) => candidate && existsSync(candidate));
+}
+
+export function environmentValues(names) {
+  return Object.fromEntries(
+    names.map((name) => [name, processEnvironment[name] || ""]),
+  );
+}
+
+export function parseMajor(versionText) {
+  const match = versionText.match(/v?(\d+)\./);
+  return match ? Number.parseInt(match[1], 10) : null;
+}
+
+export function parseDriverVersion(output, driverName) {
+  try {
+    const parsed = JSON.parse(output);
+    const candidate = parsed[driverName] || parsed.drivers?.[driverName];
+    if (typeof candidate === "string") {
+      return candidate;
+    }
+    if (candidate && typeof candidate === "object") {
+      return candidate.version || candidate.pkgVersion || "";
+    }
+  } catch {
+    // Fall through to text parsing.
+  }
+
+  const escaped = driverName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const match = output.match(new RegExp(`${escaped}[@\\s]+([0-9][^\\s,)]*)`, "i"));
+  return match ? match[1] : "";
+}
+
+export function driverInstalled(output, driverName) {
+  return Boolean(parseDriverVersion(output, driverName)) ||
+    new RegExp(`\\b${driverName}\\b`, "i").test(output);
+}
+
+export function doctorRequiredOk(output) {
+  return /0 required fixes needed/i.test(output);
+}
+
+export function driverDoctorStatus(result) {
+  const output = [result.stdout, result.stderr, result.error]
+    .filter(Boolean)
+    .join("\n");
+  return {
+    supported: Boolean(result.error) || !/not supported|does not support(?: the)? doctor|unknown command|unrecognized command/i.test(output),
+    requiredOk: result.ok && doctorRequiredOk(output),
+  };
+}
+
+export function resolveAppiumCommand(args = process.argv.slice(2)) {
+  let mode = "global";
+
+  for (let index = 0; index < args.length; index += 1) {
+    const argument = args[index];
+    if (argument === "--appium-mode") {
+      mode = args[index + 1] || "";
+      index += 1;
+    } else if (argument.startsWith("--appium-mode=")) {
+      mode = argument.slice("--appium-mode=".length);
+    }
+  }
+
+  if (!new Set(["global", "local"]).has(mode)) {
+    throw new Error("--appium-mode must be either 'global' or 'local'");
+  }
+
+  const executable = mode === "local" ? "npx" : "appium";
+  const prefixArgs = mode === "local" ? ["--no-install", "appium"] : [];
+  const display = [executable, ...prefixArgs].join(" ");
+
+  return { mode, executable, prefixArgs, display };
+}
+
+export function runAppium(appiumCommand, args = [], options = {}) {
+  return run(
+    appiumCommand.executable,
+    [...appiumCommand.prefixArgs, ...args],
+    options,
+  );
+}
+
+export function appiumDriverChecks(driverName, options = {}) {
+  const appiumCommand = options.appiumCommand || resolveAppiumCommand();
+  const appiumVersion = runAppium(appiumCommand, ["-v"], { timeout: 10000 });
+  const appiumMajor = parseMajor(appiumVersion.stdout);
+  const driverListJson = runAppium(
+    appiumCommand,
+    ["driver", "list", "--installed", "--json"],
+    { timeout: 20000 },
+  );
+  const driverList = driverListJson.ok
+    ? driverListJson
+    : runAppium(appiumCommand, ["driver", "list", "--installed"], { timeout: 20000 });
+  const doctor = runAppium(appiumCommand, ["driver", "doctor", driverName], {
+    timeout: options.doctorTimeout ?? 60000,
+  });
+  const version = parseDriverVersion(driverList.stdout, driverName);
+  const installed = driverList.ok && driverInstalled(driverList.stdout, driverName);
+  const doctorStatus = driverDoctorStatus(doctor);
+
+  return {
+    appiumMode: appiumCommand.mode,
+    appiumCommand: appiumCommand.display,
+    appiumMajor,
+    version,
+    installed,
+    strictDoctorGateOk:
+      appiumVersion.ok &&
+      appiumMajor !== null &&
+      appiumMajor >= 3 &&
+      installed &&
+      doctor.ok &&
+      doctorStatus.requiredOk,
+    checks: {
+      appiumVersion,
+      driverList,
+      doctor,
+    },
+  };
+}
+
+export function hostReport() {
+  const environment = environmentValues(["SHELL", "ComSpec"]);
+  return {
+    platform: process.platform,
+    release: os.release(),
+    arch: os.arch(),
+    shell: environment.SHELL || environment.ComSpec,
+  };
+}
+
+export function pathJoin(...parts) {
+  return path.join(...parts);
+}
+
+function shellQuote(value) {
+  return `'${String(value).replace(/'/g, "'\\''")}'`;
+}
+export function xcodeReport(extraChecks = {}) {
+  const xcodebuildVersion = run("xcodebuild", ["-version"], { timeout: 15000 });
+  const xcodeSelect = run("xcode-select", ["-p"], { timeout: 10000 });
+  const license = run("xcodebuild", ["-license", "check"], { timeout: 15000 });
+  const firstLaunch = run("xcodebuild", ["-checkFirstLaunchStatus"], { timeout: 15000 });
+
+  return {
+    macHost: isMac,
+    executables: {
+      xcodebuild: commandPath("xcodebuild"),
+      xcodeSelect: commandPath("xcode-select"),
+      xcrun: commandPath("xcrun"),
+    },
+    checks: {
+      xcodebuildVersion,
+      xcodeSelect,
+      license,
+      firstLaunch,
+      ...extraChecks,
+    },
+  };
+}

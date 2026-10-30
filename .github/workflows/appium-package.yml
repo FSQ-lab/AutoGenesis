@@ -2,7 +2,7 @@ name: Appium Package
 
 on:
   pull_request:
-    branches: [main, feature/agent-integration]
+    branches: [main, feature/agent-integration-v2]
     paths:
       - 'appium-mcp-server/**'
       - 'agent-contract/**'
@@ -10,7 +10,7 @@ on:
       - 'MOBILE-README.md'
       - '.github/workflows/appium-package.yml'
   push:
-    branches: [feature/agent-integration]
+    branches: [feature/agent-integration-v2]
     paths:
       - 'appium-mcp-server/**'
       - 'agent-contract/**'
