@@ -97,7 +97,19 @@ exception bodies are excluded from diagnostic logs. No MCP config readback tool
 is exposed. Schema and argument errors do not echo supplied values.
 
 Executable paths and launch arguments are quoted with Windows command-line
-rules and passed to pywinauto's CreateProcess path without a shell.
+rules and passed to Windows `CreateProcess` without a shell. The retained
+launcher process handle authenticates title-matched windows to the original
+process incarnation or its transferred child, including after launcher exit.
+
+After `app_launch` verifies that a matching top-level window exists, is visible
+and is enabled, the runtime pins that window's native handle, owning process ID,
+UI Automation runtime ID and original UIA element within the current session
+generation. The title expression is discovery-only: later operations resolve
+through the pinned UIA identity even if the title changes. A missing or
+reincarnated element, identity mismatch, or invalid generation invalidates the
+session and fails the operation; ordinary tools do not reconnect by title or
+restart the application. A subsequent explicit `app_launch` may establish a new
+session.
 
 ## Source execution
 
