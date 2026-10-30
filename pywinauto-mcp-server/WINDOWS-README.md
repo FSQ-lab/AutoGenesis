@@ -109,7 +109,6 @@ polls readiness at an internal 500 ms interval and uses cancellable asynchronous
 waits; it does not add a probe or sleep after the configured deadline. Multiple
 title-matched windows belonging to the same launch are rejected as ambiguous
 rather than selecting one arbitrarily.
-
 After `app_launch` verifies that a matching top-level window exists, is visible
 and is enabled, the runtime pins that window's native handle, owning process ID,
 UI Automation runtime ID and original UIA element within the current session

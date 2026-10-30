@@ -48,7 +48,6 @@ class _LaunchTimeout(RuntimeError):
 class _WindowAmbiguous(RuntimeError):
     pass
 
-
 @dataclass(frozen=True)
 class _WindowBinding:
     handle: int
