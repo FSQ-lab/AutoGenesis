@@ -1,22 +1,22 @@
 # AutoGenesis Agent Contract
 
-Canonical Python distribution `autogenesis-agent-contract`, contract `2.0.0`,
+Canonical Python distribution `autogenesis-agent-contract`, contract `2.1.0`,
 manifest schema `2`, Python >=3.10, MCP SDK >=1.23,<2. Requirement and frozen
-interface: [issue #26](https://github.com/FSQ-lab/AutoGenesis/issues/26).
+interface: [issue #30](https://github.com/FSQ-lab/AutoGenesis/issues/30).
 
 ## Consumer interface
 
 ```python
 from autogenesis_agent_contract import (
-    ContractIdentity, RuntimeContractRequirement, SecretRef, load_contract,
-    load_project_appendix, register_mcp,
+    ContractIdentity, RuntimeContractRequirement, SecretRef, load_appium_skills,
+    load_contract, load_project_appendix, register_mcp,
 )
 from mcp.server.fastmcp import FastMCP
 
 # These pins belong to the runtime release, independently of the installed wheel.
 required = RuntimeContractRequirement(
-    contract_version="2.0.0",
-    manifest_sha256="4367a2e388d0d5cb41a415b25b6a58e25025f1da6749bfdffe87a37c60a0c9d3",
+    contract_version="2.1.0",
+    manifest_sha256="7ef4c25a1659505ff6dce335196c0516ca36709ca30424669b927fc5675d0094",
 )
 contract = load_contract(ContractIdentity(required.contract_version, required.manifest_sha256))
 appendix = load_project_appendix("/absolute/business-project")
@@ -26,8 +26,14 @@ register_mcp(server, contract, appendix, required)
 
 - `load_contract(expected_identity: ContractIdentity | None = None) -> AgentContract`
   verifies the pinned manifest and every asset before returning an immutable snapshot.
+- `AgentContract.read_skill(name: str) -> bytes` returns held verified bytes for
+  exactly `autogenesis-setup` or `autogenesis-run`; it never rereads package paths.
 - `AgentContract.identity -> ContractIdentity` has `contract_version`,
   `manifest_sha256`, and `schema_version` (current `2`); `to_dict()` returns metadata.
+- `load_appium_skills(contract: AgentContract | None = None) -> AppiumSkillsBundle`
+  verifies the nested immutable `appium/skills` snapshot. The bundle exposes source
+  identity, a read-only digest inventory, and `read_asset(relative) -> bytes` backed
+  by the bytes retained during that verification pass, not a mutable filesystem root.
 - `AgentContract.instructions -> str` contains the identity and fixed Core Policy.
 - `AgentContract.render(workflow_id: str, arguments: Mapping[str, str],
   appendix: ProjectAppendix | None = None) -> str` always emits identity, Core
@@ -157,21 +163,36 @@ Published `1.0.0` bytes remain immutable. Contract `1.1.0` added the versioned
 SecretRef schema; contract `1.2.0` added project-scoped, preview-bound atomic
 generation commits. Contract `2.0.0` replaces the platform-split camel-case
 Skills with Agent Skills-compliant `autogenesis-setup` and unified
-`autogenesis-run`. Later changes require a new version and schema review as appropriate.
+`autogenesis-run`. Contract `2.1.0` pins the official Appium Skills bundle and
+routes supported local Appium setup through its verified root. Later changes
+require a new version and schema review as appropriate.
+
+First check out the immutable upstream Appium Skills commit separately. The
+verifier checks its Git commit, tree object, and origin when Git metadata is
+present, then compares the explicit provenance inventory byte-for-byte:
 
 ```bash
+git clone https://github.com/appium/skills.git /path/to/appium-skills
+git -C /path/to/appium-skills checkout --detach e907024c210fe024c956ed9c74146fc27b1dd013
+python3 agent-contract/tools/freeze_appium_skills.py --upstream-root /path/to/appium-skills --write
 python3 agent-contract/tools/freeze_assets.py --write
 python3 agent-contract/tools/sync_skills.py
 ```
 
-The first tool deterministically materializes the manifest and release pin. The
-second verifies those bytes and atomically copies the two canonical thin Skills
-to their owned repository paths. Neither follows output symlinks. No other
-repository Skill or runtime source is changed. Skill sync uses the shared bounded
-regular-file reader for manifest, pin, assets, and projection comparisons; unsafe
-inputs fail before any projection is written. Read-only drift checks:
+The first tool rejects a missing external tree, the wrong commit/repository,
+unsafe, extra, missing, or transformed allowlisted files, and provenance digest
+drift. It freezes only bytes proven equal to the pinned upstream inventory. The
+recorded subset digest is reproducible: SHA-256 starts with
+`AutoGenesis Appium Skills subset v1\0`, then for each inventory path in sorted
+order hashes its UTF-8 path prefixed by a four-byte big-endian length and its
+exact content prefixed by an eight-byte big-endian length. The second tool
+materializes the outer Contract manifest and release pin. The third
+atomically projects the two public Skills. None follows output symlinks. No
+Runtime source is changed. All tools use bounded regular-file reads; unsafe or
+drifting inputs fail before projection. Read-only checks are:
 
 ```bash
+python3 agent-contract/tools/freeze_appium_skills.py --upstream-root /path/to/appium-skills
 python3 agent-contract/tools/freeze_assets.py
 python3 agent-contract/tools/sync_skills.py --check
 ```
@@ -186,6 +207,7 @@ must be available (`python3 -m pip install 'build>=1.2,<2'`). No repository-wide
 checks are required.
 
 ```bash
+python3 agent-contract/tools/freeze_appium_skills.py
 python3 agent-contract/tools/freeze_assets.py
 python3 agent-contract/tools/sync_skills.py --check
 python3 -m build --wheel --outdir /tmp/autogenesis-contract-wheel agent-contract

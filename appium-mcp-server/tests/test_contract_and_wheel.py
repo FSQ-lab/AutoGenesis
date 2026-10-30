@@ -12,15 +12,15 @@ from autogenesis_agent_contract import ContractError, RuntimeContractRequirement
 
 from autogenesis_appium_mcp import server
 
-VERSION = "2.0.0"
-DIGEST = "4367a2e388d0d5cb41a415b25b6a58e25025f1da6749bfdffe87a37c60a0c9d3"
+VERSION = "2.1.0"
+DIGEST = "7ef4c25a1659505ff6dce335196c0516ca36709ca30424669b927fc5675d0094"
 PROMPTS = {"execute_scenario", "generate_scenario_test", "execute_natural_language_task"}
 URI = "autogenesis://agent-contract/identity"
 
 
 def test_installed_console_and_exact_contract_requirement():
     distribution = metadata.distribution("autogenesis-appium-mcp")
-    assert distribution.version == "0.4.0"
+    assert distribution.version == "0.5.0"
     entrypoints = [item for item in distribution.entry_points if item.group == "console_scripts"]
     assert [(item.name, item.value) for item in entrypoints] == [
         ("autogenesis-appium-mcp", "autogenesis_appium_mcp.server:main"),
@@ -28,7 +28,7 @@ def test_installed_console_and_exact_contract_requirement():
     assert entrypoints[0].load() is server.main
     assert not inspect.iscoroutinefunction(server.main)
     dependencies = [item.lower().replace(" ", "") for item in distribution.requires]
-    assert "autogenesis-agent-contract==2.0.0" in dependencies
+    assert "autogenesis-agent-contract==2.1.0" in dependencies
     assert not any(item.startswith("browserstack-sdk") for item in dependencies)
     assert server.REQUIREMENT == RuntimeContractRequirement(VERSION, DIGEST)
     manifest = resources.files("autogenesis_agent_contract").joinpath("assets/manifest.json").read_bytes()

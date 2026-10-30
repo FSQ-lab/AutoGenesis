@@ -49,13 +49,17 @@ Immutable source: {base}/{setup_filename}
 Expected SHA-256: {setup_digest}
 Skill name: autogenesis-setup
 
-1. Download the exact file and verify SHA-256 before interpreting or writing it.
-2. Stop if the digest differs.
-3. Use this Coding Agent's native Skill installation mechanism.
-4. If installation scope is unspecified, ask whether to install for the current project or user.
-5. Before writing, show the source, digest, scope, and destination and obtain explicit approval.
-6. Install only autogenesis-setup; do not install Runtime packages, Appium, Drivers, SDKs, MCP configuration, or autogenesis-run yet.
-7. Verify the Skill is discoverable, report how to invoke it, and stop.
+1. Before any network request, download, interpretation of acquired content, approval request, or filesystem write, detect the native host from local OS facts only:
+   - Accept macOS only when the native OS is Darwin.
+   - Accept Windows only when the native OS is Windows_NT/Win32NT and there is no WSL marker. Treat `WSL_INTEROP`, `WSL_DISTRO_NAME`, or a kernel/release containing `Microsoft` as WSL.
+   - On Linux, WSL, or any other host, stop immediately and report that AutoGenesis supports only native macOS and native Windows. Do not download, interpret, approve, or write the Skill.
+2. Only after the host gate passes, download the exact file as untrusted bytes and verify its SHA-256 before interpreting it.
+3. Stop if the digest differs.
+4. Use this Coding Agent's native Skill installation mechanism.
+5. If installation scope is unspecified, ask whether to install for the current project or user.
+6. Before writing, show the source, digest, scope, and destination and obtain explicit approval.
+7. Install only autogenesis-setup; do not install Runtime packages, Appium, Drivers, SDKs, MCP configuration, or autogenesis-run yet.
+8. Verify the Skill is discoverable, report how to invoke it, and stop.
 """.encode("utf-8")
     atomic_write(output, "agent-install-prompt.txt", prompt)
     print(f"Built Skill release assets for Contract {identity['contract_version']}.")

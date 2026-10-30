@@ -2,7 +2,7 @@ name: Registry metadata
 
 on:
   pull_request:
-    branches: [main, feature/agent-integration]
+    branches: [main, feature/agent-integration-v2]
     paths:
       - 'agent-contract/**'
       - 'appium-mcp-server/pyproject.toml'
@@ -15,7 +15,7 @@ on:
       - 'tools/verify_registry_metadata.py'
       - '.github/workflows/registry-metadata.yml'
   push:
-    branches: [main, feature/agent-integration]
+    branches: [main, feature/agent-integration-v2]
     paths:
       - 'agent-contract/**'
       - 'appium-mcp-server/pyproject.toml'

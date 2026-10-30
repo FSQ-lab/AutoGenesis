@@ -36,16 +36,16 @@ AutoGenesis is an AI-powered automated testing framework based on Model Context 
 ## Install AutoGenesis 1.1
 
 Native macOS and native Windows are supported; Linux and WSL are not. Python
-3.10 or newer is required. Do not run the Agent Install Prompt on an unsupported
-host; host rejection occurs when Setup runs, not before the Setup Skill is
-installed.
+3.10 or newer is required. The Agent Install Prompt detects the native host from
+local OS facts first and stops on Linux, WSL, or any other unsupported host
+before any download, acquired-content interpretation, approval request, or write.
 
 ### CLI-first
 
 Install the CLI through the Python environment and package index you choose:
 
 ```bash
-python -m pip install autogenesis-cli==0.1.0
+python -m pip install autogenesis-cli==0.2.0
 autogenesis install
 ```
 
@@ -53,8 +53,8 @@ The Python package installation resolves the supported host bundle:
 
 | Host | Installed AutoGenesis dependencies |
 | --- | --- |
-| macOS | Agent Contract 2.0.0 and Appium Runtime 0.4.0 |
-| Windows | Agent Contract 2.0.0, Appium Runtime 0.4.0, and Windows Runtime 0.4.0 |
+| macOS | Agent Contract 2.1.0 and Appium Runtime 0.5.0 |
+| Windows | Agent Contract 2.1.0, Appium Runtime 0.5.0, and Windows Runtime 0.5.0 |
 
 Check the installed command versions without starting a Runtime or reading
 business configuration:
@@ -75,12 +75,19 @@ project MCP configuration, or business configuration, and does not execute an
 application. Use `autogenesis-setup` afterward to inspect a concrete target and
 approve any additional machine or project preparation.
 
+For local Appium readiness, Setup loads the immutable official Appium Skills
+snapshot pinned by Agent Contract 2.1.0. `autogenesis appium-skills --json`
+verifies its identity and inventory, and `autogenesis appium-asset <relative>`
+returns only bytes held by that verification pass without trusting a mutable path.
+
 ### Agent-first
 
-Copy [`agent-install-prompt.txt`](https://github.com/FSQ-lab/AutoGenesis/releases/download/agent-contract-v2.0.0/agent-install-prompt.txt)
-from the Agent Contract 2.0.0 release into OMP, Pi, Codex CLI, or GitHub Copilot
-CLI. The prompt verifies the published SHA-256, shows the selected scope and
-destination, requests approval, and persistently installs only
+Copy [`agent-install-prompt.txt`](https://github.com/FSQ-lab/AutoGenesis/releases/download/agent-contract-v2.1.0/agent-install-prompt.txt)
+from the Agent Contract 2.1.0 release into OMP, Pi, Codex CLI, or GitHub Copilot
+CLI. Before acquisition, the prompt requires native Darwin or native Windows
+and rejects Linux and WSL. Only after that gate passes does it download the
+Setup Skill as untrusted bytes, verify the published SHA-256, show the selected
+scope and destination, request approval, and persistently install only
 `autogenesis-setup` through the Coding Agent's native Skill mechanism. A
 session-only trial is not supported in this release. Setup then proposes the
 host Runtime and project-readiness plan; it does not execute that plan without

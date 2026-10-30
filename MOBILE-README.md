@@ -11,7 +11,7 @@ No AutoGenesis checkout is needed. Until packages are published, obtain both
 built wheels from the Integration Lead. In an activated Python virtual environment:
 
 ```bash
-python -m pip install /absolute/wheels/autogenesis_agent_contract-2.0.0-py3-none-any.whl /absolute/wheels/autogenesis_appium_mcp-0.4.0-py3-none-any.whl
+python -m pip install /absolute/wheels/autogenesis_agent_contract-2.1.0-py3-none-any.whl /absolute/wheels/autogenesis_appium_mcp-0.5.0-py3-none-any.whl
 python -c "from importlib.resources import files; from pathlib import Path; Path('appium.json').write_bytes(files('autogenesis_appium_mcp').joinpath('conf/appium_conf.template.json').read_bytes())"
 autogenesis-appium-mcp --platform android --config /absolute/business/appium.json --project-root /absolute/business
 ```
@@ -24,17 +24,17 @@ MCP client; diagnostics use stderr.
 With uv/uvx, launch directly from the same local artifacts:
 
 ```bash
-uvx --from /absolute/wheels/autogenesis_appium_mcp-0.4.0-py3-none-any.whl --with /absolute/wheels/autogenesis_agent_contract-2.0.0-py3-none-any.whl autogenesis-appium-mcp --platform android --config /absolute/business/appium.json --project-root /absolute/business
+uvx --from /absolute/wheels/autogenesis_appium_mcp-0.5.0-py3-none-any.whl --with /absolute/wheels/autogenesis_agent_contract-2.1.0-py3-none-any.whl autogenesis-appium-mcp --platform android --config /absolute/business/appium.json --project-root /absolute/business
 ```
 
 After both distributions are published to the configured index:
 
 ```bash
-uvx --from autogenesis-appium-mcp==0.4.0 autogenesis-appium-mcp --platform ios --config /absolute/business/appium.json --project-root /absolute/business
+uvx --from autogenesis-appium-mcp==0.5.0 autogenesis-appium-mcp --platform ios --config /absolute/business/appium.json --project-root /absolute/business
 ```
 
-The runtime pins Agent Contract **2.0.0**, manifest SHA-256
-`4367a2e388d0d5cb41a415b25b6a58e25025f1da6749bfdffe87a37c60a0c9d3`.
+The runtime pins Agent Contract **2.1.0**, manifest SHA-256
+`7ef4c25a1659505ff6dce335196c0516ca36709ca30424669b927fc5675d0094`.
 Mismatched or corrupt contract assets prevent startup.
 
 Standard MCP Registry metadata is `appium-mcp-server/server.json`. From a source
@@ -53,10 +53,11 @@ retain the last valid snapshot. Changes apply to the next driver session.
 `reload_config` requests a reload and `get_current_config` returns a masked view,
 including nested values and URLs. The bundled template does not need a watcher.
 
-For local devices, install Appium and its `uiautomator2` or `xcuitest` driver,
-then configure `server_url`, device capabilities, and app or bundle identifier.
-Local iOS automation needs macOS/Xcode; Android needs its SDK and a device or
-emulator. Keep `APPIUM_DRIVER_CONFIGS` as the top-level configuration key.
+For local devices, invoke `autogenesis-setup`. It verifies the pinned official
+Appium Skills snapshot and selects only `setup-uiautomator2` for Android or
+`setup-xcuitest` for iOS; physical iOS continues to its real-device workflow.
+Every installation, SDK, signing, trust, or device change requires approval.
+Keep `APPIUM_DRIVER_CONFIGS` as the top-level configuration key.
 
 BrowserStack connections use the Appium client directly; its SDK is not required.
 Upload the APK/IPA through App Automate, set `appium:app` to its returned URL, and
@@ -127,7 +128,7 @@ the target. Default generated output is business-local
 
 From the AutoGenesis repository root, in an activated development environment:
 ```bash
-python -m pip install /absolute/wheels/autogenesis_agent_contract-2.0.0-py3-none-any.whl -e ./appium-mcp-server
+python -m pip install /absolute/wheels/autogenesis_agent_contract-2.1.0-py3-none-any.whl -e ./appium-mcp-server
 python appium-mcp-server/simple_server.py --platform android --config /absolute/business/appium.json --project-root /absolute/business
 ```
 

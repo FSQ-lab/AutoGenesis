@@ -2,14 +2,14 @@ name: Agent Contract
 
 on:
   pull_request:
-    branches: [main, feature/agent-integration]
+    branches: [main, feature/agent-integration-v2]
     paths:
       - 'agent-contract/**'
       - '.github/skills/autogenesis-setup/SKILL.md'
       - '.github/skills/autogenesis-run/SKILL.md'
       - '.github/workflows/agent-contract.yml'
   push:
-    branches: [feature/agent-integration]
+    branches: [feature/agent-integration-v2]
     paths:
       - 'agent-contract/**'
       - '.github/skills/autogenesis-setup/SKILL.md'
@@ -47,12 +47,21 @@ jobs:
         run: git config --global core.autocrlf false
       - name: Checkout
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - name: Checkout pinned upstream Appium Skills
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          repository: appium/skills
+          ref: e907024c210fe024c956ed9c74146fc27b1dd013
+          path: upstream-appium-skills
+          fetch-depth: 1
+          persist-credentials: false
       - name: Setup Python
         uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with:
           python-version: ${{ matrix.python }}
       - name: Check release and generated Skills
         run: |
+          python agent-contract/tools/freeze_appium_skills.py --upstream-root upstream-appium-skills
           python agent-contract/tools/freeze_assets.py
           python agent-contract/tools/sync_skills.py --check
       - name: Install wheel builder
@@ -74,3 +83,30 @@ jobs:
             ${{ runner.temp }}/contract-wheel
             ${{ runner.temp }}/contract-evidence
           if-no-files-found: warn
+
+  appium-skills:
+    name: Official Appium Skills / ${{ matrix.os }} / Node ${{ matrix.node }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, macos-latest, windows-2022]
+        node: ['20', '22', '24']
+    defaults:
+      run:
+        working-directory: agent-contract/src/autogenesis_agent_contract/assets/skills/autogenesis-setup/references/appium-skills
+    steps:
+      - name: Preserve exact LF asset bytes
+        run: git config --global core.autocrlf false
+        working-directory: .
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - name: Setup Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: ${{ matrix.node }}
+      - name: Validate immutable upstream structure
+        run: node tools/validate-repository.mjs
+      - name: Run upstream helper tests
+        run: node --test tools/tests/helpers.test.mjs
