@@ -454,11 +454,7 @@ def test_appium_tool_binds_node_and_helper_bytes_without_shell_or_inherited_envi
     monkeypatch.setenv("PATH", approved_path)
     monkeypatch.setenv("NODE_OPTIONS", "--require=/untrusted/project/pwn.js")
     monkeypatch.setattr(cli, "_hold_node", lambda node, sha256, cwd: cli._HeldNode(node, sha256))
-    def materialize(_held, root):
-        target = root / "node"
-        target.write_bytes(b"native node")
-        return str(target)
-    monkeypatch.setattr(cli, "_materialize_held_node", materialize)
+    monkeypatch.setattr(cli, "_node_execution_path", lambda held, _root: held.command)
     roots = []
 
     def run(command, **options):
@@ -469,7 +465,7 @@ def test_appium_tool_binds_node_and_helper_bytes_without_shell_or_inherited_envi
             return type("Completed", (), {"returncode": 0, "stdout": "v24.22.1\n", "stderr": ""})()
         root = Path(command[3]).parents[4]
         roots.append(root)
-        assert command[0] == str(root / "node")
+        assert command[0] == "/verified/path/node"
         assert command[1] == str(root / "autogenesis-node-bootstrap.mjs")
         assert json.loads(cli.base64.urlsafe_b64decode(command[2])) == [["PATH", approved_path]]
         assert command[3:] == [str(root / script), "--format", "summary"]
@@ -539,6 +535,134 @@ def test_node_identity_rejects_project_local_symlink_and_writable_paths(tmp_path
             cli._hold_node(
                 str(unsafe_node), hashlib.sha256(unsafe_node.read_bytes()).hexdigest(), project,
             )
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="POSIX ownership policy")
+def test_node_identity_accepts_current_group_writable_ancestor(tmp_path):
+    project = tmp_path / "project"
+    project.mkdir()
+    trusted = tmp_path / "trusted"
+    trusted.mkdir()
+    trusted.chmod(0o775)
+    node = trusted / "node"
+    raw = b"\x7fELFapproved"
+    node.write_bytes(raw)
+    node.chmod(0o755)
+
+    held = cli._hold_node(str(node), hashlib.sha256(raw).hexdigest(), project)
+    held.close()
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="POSIX ownership policy")
+def test_posix_node_entry_rejects_world_writable_and_foreign_ownership():
+    trusted_gids = frozenset((*os.getgroups(), os.getegid()))
+    foreign_gid = max(trusted_gids) + 1
+
+    def entry(mode, uid, gid):
+        return os.stat_result((mode, 0, 0, 0, uid, gid, 0, 0, 0, 0))
+
+    assert cli._trusted_posix_node_entry(entry(0o775, os.geteuid(), os.getegid()), trusted_gids)
+    assert cli._trusted_posix_node_entry(entry(0o775, 0, os.getegid()), trusted_gids)
+    assert not cli._trusted_posix_node_entry(entry(0o777, os.geteuid(), os.getegid()), trusted_gids)
+    assert not cli._trusted_posix_node_entry(entry(0o775, os.geteuid(), foreign_gid), trusted_gids)
+    assert not cli._trusted_posix_node_entry(entry(0o775, os.geteuid() + 1, os.getegid()), trusted_gids)
+    assert not cli._trusted_posix_node_entry(entry(0o755, os.geteuid() + 1, os.getegid()), trusted_gids)
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="POSIX retained path execution")
+def test_posix_node_execution_path_rejects_same_size_in_place_mutation(tmp_path):
+    project = tmp_path / "project"
+    project.mkdir()
+    node = tmp_path / "approved-node"
+    original = b"\x7fELFapproved"
+    node.write_bytes(original)
+    node.chmod(0o755)
+    held = cli._hold_node(str(node), hashlib.sha256(original).hexdigest(), project)
+    try:
+        node.write_bytes(b"\x7fELFtampered")
+        with pytest.raises(cli.InstallError, match="NODE_IDENTITY_MISMATCH"):
+            cli._node_execution_path(held, tmp_path / "private")
+    finally:
+        held.close()
+
+
+def test_appium_tool_materializes_windows_node_once(monkeypatch):
+    script = "tools/appium/setup/scripts/check-mac2-env.mjs"
+    bundle = Bundle({script: b"export {};\n"})
+
+    class Api:
+        @staticmethod
+        def close(_handle):
+            pass
+
+    held = cli._HeldNode("C:/approved/node.exe", "a" * 64, windows_api=Api())
+    monkeypatch.setattr(cli, "_host_packages", lambda: None)
+    monkeypatch.setattr(cli, "_hold_node", lambda *_args: held)
+    executions = []
+
+    def execution_path(_held, _root):
+        executions.append(_held.command)
+        return _held.command
+
+    monkeypatch.setattr(cli, "_node_execution_path", execution_path)
+
+    def run(command, **_options):
+        if command[1:] == ["--version"]:
+            return type("Completed", (), {
+                "returncode": 0, "stdout": "v24.22.1\n", "stderr": "",
+            })()
+        return type("Completed", (), {"returncode": 0})()
+
+    monkeypatch.setattr(cli.subprocess, "run", run)
+    assert cli._run_appium_tool(
+        bundle, held.command, held.sha256, "v24.22.1", script, [], [],
+    ) == 0
+    assert executions == [held.command]
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="POSIX retained path execution")
+def test_posix_node_execution_path_rejects_replaced_ancestor_symlink(tmp_path):
+    project = tmp_path / "project"
+    project.mkdir()
+    trusted = tmp_path / "trusted"
+    trusted.mkdir()
+    node = trusted / "node"
+    original = b"\x7fELFapproved"
+    node.write_bytes(original)
+    node.chmod(0o755)
+    held = cli._hold_node(str(node), hashlib.sha256(original).hexdigest(), project)
+    try:
+        moved = tmp_path / "moved"
+        trusted.rename(moved)
+        trusted.symlink_to(moved, target_is_directory=True)
+        with pytest.raises(cli.InstallError, match="NODE_IDENTITY_MISMATCH"):
+            cli._node_execution_path(held, tmp_path / "private")
+    finally:
+        held.close()
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="POSIX retained path execution")
+def test_posix_node_execution_path_preserves_loader_path_and_rejects_replacement(tmp_path):
+    project = tmp_path / "project"
+    project.mkdir()
+    node = tmp_path / "approved-node"
+    original = b"\x7fELFapproved"
+    node.write_bytes(original)
+    node.chmod(0o755)
+    held = cli._hold_node(str(node), hashlib.sha256(original).hexdigest(), project)
+    try:
+        private = tmp_path / "private"
+        private.mkdir()
+        assert cli._node_execution_path(held, private) == str(node)
+
+        replacement = tmp_path / "replacement"
+        replacement.write_bytes(b"\x7fELFreplacement")
+        replacement.chmod(0o755)
+        replacement.replace(node)
+        with pytest.raises(cli.InstallError, match="NODE_IDENTITY_MISMATCH"):
+            cli._node_execution_path(held, private)
+    finally:
+        held.close()
 
 
 def test_node_identity_materializes_held_bytes_after_path_swap_and_rejects_env_shebang(tmp_path):

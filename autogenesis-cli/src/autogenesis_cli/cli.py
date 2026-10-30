@@ -796,6 +796,8 @@ class _HeldNode:
     command: str
     sha256: str
     descriptors: tuple[int, ...] = ()
+    posix_identity: tuple[int, ...] | None = None
+    posix_path_identities: tuple[tuple[int, ...], ...] = ()
     windows_handles: tuple[Any, ...] = ()
     windows_api: Any | None = None
 
@@ -816,6 +818,94 @@ def _require_node_identity(raw_prefix: bytes, actual_sha256: str, expected_sha25
         native_magic = raw_prefix[:2] == b"MZ"
     if not native_magic or actual_sha256 != expected_sha256:
         raise InstallError("AUTOGENESIS_NODE_IDENTITY_MISMATCH")
+
+
+def _trusted_posix_node_entry(
+    info: os.stat_result, trusted_gids: frozenset[int],
+) -> bool:
+    if info.st_uid not in (0, os.geteuid()) or info.st_mode & stat.S_IWOTH:
+        return False
+    if info.st_mode & stat.S_IWGRP:
+        return info.st_gid in trusted_gids
+    return True
+
+
+def _posix_node_identity(info: os.stat_result) -> tuple[int, ...]:
+    return (
+        info.st_dev, info.st_ino, info.st_mode, info.st_uid, info.st_gid,
+        info.st_size, info.st_mtime_ns, info.st_ctime_ns,
+    )
+
+
+def _posix_path_identity(info: os.stat_result) -> tuple[int, ...]:
+    return info.st_dev, info.st_ino, info.st_mode, info.st_uid, info.st_gid
+
+
+def _read_posix_node(descriptor: int) -> tuple[bytes, str, tuple[int, ...]]:
+    before = _posix_node_identity(os.fstat(descriptor))
+    position = os.lseek(descriptor, 0, os.SEEK_CUR)
+    digest = hashlib.sha256()
+    prefix = b""
+    try:
+        os.lseek(descriptor, 0, os.SEEK_SET)
+        while chunk := os.read(descriptor, 1024 * 1024):
+            if not prefix:
+                prefix = chunk[:4]
+            digest.update(chunk)
+    finally:
+        os.lseek(descriptor, position, os.SEEK_SET)
+    after = _posix_node_identity(os.fstat(descriptor))
+    if after != before:
+        raise InstallError("AUTOGENESIS_NODE_IDENTITY_MISMATCH")
+    return prefix, digest.hexdigest(), after
+
+
+def _open_trusted_posix_node(
+    path: Path, trusted_gids: frozenset[int],
+) -> tuple[list[int], int, tuple[tuple[int, ...], ...]]:
+    directory_flags = (
+        os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW
+        | getattr(os, "O_CLOEXEC", 0)
+    )
+    file_flags = os.O_RDONLY | os.O_NOFOLLOW | getattr(os, "O_CLOEXEC", 0)
+    directories: list[int] = []
+    descriptor: int | None = None
+    identities: list[tuple[int, ...]] = []
+    try:
+        parent = os.open(path.anchor, directory_flags)
+        info = os.fstat(parent)
+        if not stat.S_ISDIR(info.st_mode) or not _trusted_posix_node_entry(
+            info, trusted_gids,
+        ):
+            raise InstallError("AUTOGENESIS_NODE_UNSAFE")
+        directories.append(parent)
+        identities.append(_posix_path_identity(info))
+        for component in path.parts[1:-1]:
+            child = os.open(component, directory_flags, dir_fd=parent)
+            info = os.fstat(child)
+            if not stat.S_ISDIR(info.st_mode) or not _trusted_posix_node_entry(
+                info, trusted_gids,
+            ):
+                os.close(child)
+                raise InstallError("AUTOGENESIS_NODE_UNSAFE")
+            directories.append(child)
+            identities.append(_posix_path_identity(info))
+            parent = child
+        descriptor = os.open(path.parts[-1], file_flags, dir_fd=parent)
+        info = os.fstat(descriptor)
+        if (
+            not stat.S_ISREG(info.st_mode)
+            or not info.st_mode & 0o111
+            or not _trusted_posix_node_entry(info, trusted_gids)
+        ):
+            raise InstallError("AUTOGENESIS_NODE_UNSAFE")
+        return directories, descriptor, tuple(identities)
+    except BaseException:
+        if descriptor is not None:
+            os.close(descriptor)
+        for directory in reversed(directories):
+            os.close(directory)
+        raise
 
 def _hold_node(value: str, expected_sha256: str, cwd: Path) -> _HeldNode:
     if not isinstance(value, str) or not value:
@@ -868,36 +958,14 @@ def _hold_node(value: str, expected_sha256: str, cwd: Path) -> _HeldNode:
         pass
     else:
         raise InstallError("AUTOGENESIS_NODE_UNSAFE")
-    directory_flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW | getattr(os, "O_CLOEXEC", 0)
-    file_flags = os.O_RDONLY | os.O_NOFOLLOW | getattr(os, "O_CLOEXEC", 0)
-    directories: list[int] = []
+    trusted_gids = frozenset((*os.getgroups(), os.getegid()))
     descriptor: int | None = None
+    directories: list[int] = []
     try:
-        parent = os.open(path.anchor, directory_flags)
-        if os.fstat(parent).st_mode & 0o022:
-            raise InstallError("AUTOGENESIS_NODE_UNSAFE")
-        directories.append(parent)
-        for component in path.parts[1:-1]:
-            child = os.open(component, directory_flags, dir_fd=parent)
-            info = os.fstat(child)
-            if not stat.S_ISDIR(info.st_mode) or info.st_mode & 0o022:
-                os.close(child)
-                raise InstallError("AUTOGENESIS_NODE_UNSAFE")
-            directories.append(child)
-            parent = child
-        descriptor = os.open(path.parts[-1], file_flags, dir_fd=parent)
-        info = os.fstat(descriptor)
-        if not stat.S_ISREG(info.st_mode) or not info.st_mode & 0o111 or info.st_mode & 0o022:
-            raise InstallError("AUTOGENESIS_NODE_UNSAFE")
-        position = os.lseek(descriptor, 0, os.SEEK_CUR)
-        digest = hashlib.sha256()
-        prefix = b""
-        while chunk := os.read(descriptor, 1024 * 1024):
-            if not prefix:
-                prefix = chunk[:4]
-            digest.update(chunk)
-        os.lseek(descriptor, position, os.SEEK_SET)
-        actual_sha256 = digest.hexdigest()
+        directories, descriptor, path_identities = _open_trusted_posix_node(
+            path, trusted_gids,
+        )
+        prefix, actual_sha256, identity = _read_posix_node(descriptor)
         _require_node_identity(prefix, actual_sha256, expected_sha256)
     except InstallError:
         if descriptor is not None:
@@ -911,7 +979,10 @@ def _hold_node(value: str, expected_sha256: str, cwd: Path) -> _HeldNode:
         for directory in reversed(directories):
             os.close(directory)
     assert descriptor is not None
-    return _HeldNode(str(path), actual_sha256, descriptors=(descriptor,))
+    return _HeldNode(
+        str(path), actual_sha256, descriptors=(descriptor,),
+        posix_identity=identity, posix_path_identities=path_identities,
+    )
 
 def _materialize_held_node(held: _HeldNode, root: Path) -> str:
     target = root / ("node.exe" if sys.platform == "win32" else "node")
@@ -941,6 +1012,35 @@ def _materialize_held_node(held: _HeldNode, root: Path) -> str:
             raise InstallError("AUTOGENESIS_NODE_IDENTITY_MISMATCH")
     target.chmod(0o500)
     return str(target)
+
+
+def _node_execution_path(held: _HeldNode, root: Path) -> str:
+    if held.windows_api is not None:
+        return _materialize_held_node(held, root)
+    trusted_gids = frozenset((*os.getgroups(), os.getegid()))
+    directories: list[int] = []
+    reopened: int | None = None
+    try:
+        directories, reopened, path_identities = _open_trusted_posix_node(
+            Path(held.command), trusted_gids,
+        )
+        _, digest, retained_identity = _read_posix_node(held.descriptors[-1])
+        if (
+            held.posix_identity is None
+            or retained_identity != held.posix_identity
+            or _posix_node_identity(os.fstat(reopened)) != held.posix_identity
+            or path_identities != held.posix_path_identities
+            or digest != held.sha256
+        ):
+            raise InstallError("AUTOGENESIS_NODE_IDENTITY_MISMATCH")
+        return held.command
+    except (InstallError, OSError):
+        raise InstallError("AUTOGENESIS_NODE_IDENTITY_MISMATCH") from None
+    finally:
+        if reopened is not None:
+            os.close(reopened)
+        for directory in reversed(directories):
+            os.close(directory)
 
 _HELPER_ENVIRONMENT = frozenset({
     "ANDROID_HOME", "ANDROID_SDK_ROOT", "APPIUM_HOME", "COMSPEC", "DEVELOPER_DIR",
@@ -1013,7 +1113,7 @@ def _run_appium_tool(
                 target = root.joinpath(*asset.parts)
                 target.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
                 target.write_bytes(bundle.read_asset(name))
-            node = _materialize_held_node(held, root)
+            node = _node_execution_path(held, root)
             bootstrap = root / "autogenesis-node-bootstrap.mjs"
             bootstrap.write_bytes(_NODE_BOOTSTRAP)
             bootstrap.chmod(0o400)
@@ -1023,6 +1123,8 @@ def _run_appium_tool(
             )
             if observed.returncode or observed.stderr or observed.stdout.strip() != node_version:
                 raise InstallError("AUTOGENESIS_NODE_IDENTITY_MISMATCH")
+            if held.windows_api is None:
+                node = _node_execution_path(held, root)
             supplied = arguments[1:] if arguments[:1] == ["--"] else arguments
             payload = base64.urlsafe_b64encode(json.dumps(
                 sorted(approved_environment.items()), separators=(",", ":"), ensure_ascii=True,
