@@ -62,7 +62,8 @@ profile names to application configurations:
         "app_name": "Notepad",
         "exe": "%WINDIR%/System32/notepad.exe",
         "window_title_re": ".*Notepad.*",
-        "launch_args": []
+        "launch_args": [],
+        "launch_timeout_seconds": 15
       },
       "business-app": {
         "app_name": "Business application",
@@ -83,6 +84,7 @@ in JSON insertion order is selected. Unknown profile names fail clearly.
 Each profile requires nonempty string exe and window_title_re fields.
 window_title_re must compile as a regular expression. Optional app_name is a
 string; launch_args is an array of strings and defaults to an empty array.
+launch_timeout_seconds is an integer from 1 through 120 and defaults to 15.
 Existing additional project/profile fields remain supported. All profiles are
 schema-validated before startup; only the selected profile has environment
 variables expanded. Unused profiles may reference unset variables.
@@ -101,6 +103,12 @@ rules and passed to Windows `CreateProcess` without a shell. The retained
 launcher process handle authenticates title-matched windows to the original
 process incarnation or its transferred child, including after launcher exit.
 
+Process creation, trusted top-level window discovery, connection, visibility,
+enabled state and initial binding share one monotonic launch budget. The runtime
+polls readiness at an internal 500 ms interval and uses cancellable asynchronous
+waits; it does not add a probe or sleep after the configured deadline. Multiple
+title-matched windows belonging to the same launch are rejected as ambiguous
+rather than selecting one arbitrarily.
 After `app_launch` verifies that a matching top-level window exists, is visible
 and is enabled, the runtime pins that window's native handle, owning process ID,
 UI Automation runtime ID and original UIA element within the current session

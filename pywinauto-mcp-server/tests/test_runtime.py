@@ -58,8 +58,12 @@ async def test_launch_expands_environment_refs_without_mutating_config(monkeypat
 
         def wrapper_object(self):
             return self
-        def wait(self, state, timeout):
-            pass
+        def exists(self, timeout=0):
+            return True
+        def is_visible(self):
+            return True
+        def is_enabled(self):
+            return True
 
     class FakeApplication:
         def __init__(self, backend):
@@ -173,6 +177,13 @@ async def test_launch_preserves_the_window_that_passed_readiness(monkeypatch):
         def wrapper_object(self):
             return self
 
+
+        def is_visible(self):
+            return True
+
+        def is_enabled(self):
+            state["title_available"] = False
+            return True
     verified_window = FakeWindow()
 
     class StaleWindow:
