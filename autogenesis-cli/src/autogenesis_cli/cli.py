@@ -968,31 +968,16 @@ def _approved_helper_environment(specifications: list[str]) -> dict[str, str]:
     return approved
 
 
-def _redact_helper_text(value: str) -> str:
-    value = re.sub(r"(https?://)[^\s/@]+:[^\s/@]+@", r"\1<redacted>@", value)
-    value = re.sub(r"(Bearer\s+)\S+", r"\1<redacted>", value, flags=re.IGNORECASE)
-    return re.sub(
-        r"([?&](?:token|key|password|secret)=)[^&\s]+",
-        r"\1<redacted>",
-        value,
-        flags=re.IGNORECASE,
-    )
-
-
-def _sanitize_helper_report(value: Any) -> Any:
-    if isinstance(value, dict):
-        return {
-            key: _sanitize_helper_report(item)
-            for key, item in value.items()
-            if key not in {"diagnosticsPath", "logs", "registry", "stderr", "stdout"}
-        }
-    if isinstance(value, list):
-        return [_sanitize_helper_report(item) for item in value]
-    if isinstance(value, str):
-        return _redact_helper_text(value)
-    if value is None or isinstance(value, (bool, int, float)):
-        return value
-    raise InstallError("AUTOGENESIS_APPIUM_TOOL_OUTPUT_UNSAFE")
+def _sanitize_helper_report(value: Any) -> dict[str, Any]:
+    if not isinstance(value, dict) or not isinstance(value.get("summary"), dict):
+        raise InstallError("AUTOGENESIS_APPIUM_TOOL_OUTPUT_UNSAFE")
+    required_ok = value["summary"].get("requiredOk")
+    if type(required_ok) is not bool:
+        raise InstallError("AUTOGENESIS_APPIUM_TOOL_OUTPUT_UNSAFE")
+    return {
+        "status": "passed" if required_ok else "blocked",
+        "summary": {"requiredOk": required_ok},
+    }
 
 
 def _write_sanitized_helper_output(observed: subprocess.CompletedProcess[str]) -> None:
@@ -1004,7 +989,7 @@ def _write_sanitized_helper_output(observed: subprocess.CompletedProcess[str]) -
         _sanitize_helper_report(report), separators=(",", ":"), ensure_ascii=True,
     ) + "\n")
     if observed.stderr:
-        sys.stderr.write(_redact_helper_text(observed.stderr))
+        sys.stderr.write("AUTOGENESIS_APPIUM_TOOL_CHILD_DIAGNOSTIC\n")
 
 _NODE_BOOTSTRAP = b"""import { pathToFileURL } from 'node:url';
 const [encoded, helper, ...args] = process.argv.slice(2);

@@ -483,7 +483,7 @@ def test_appium_tool_binds_node_and_helper_bytes_without_shell_or_inherited_envi
             "returncode": 7,
             "stdout": json.dumps({
                 "status": "blocked",
-                "summary": {"registry": "https://user:password@registry.example/"},
+                "summary": {"requiredOk": False, "registry": "https://user:password@registry.example/"},
                 "checks": {"stdout": "raw secret", "message": "https://user:password@example/"},
             }),
             "stderr": "Bearer synthetic-token\n",
@@ -497,10 +497,8 @@ def test_appium_tool_binds_node_and_helper_bytes_without_shell_or_inherited_envi
     ]) == 7
     assert len(roots) == 1 and not roots[0].exists()
     output = capsys.readouterr()
-    assert json.loads(output.out) == {
-        "status": "blocked", "summary": {}, "checks": {"message": "https://<redacted>@example/"},
-    }
-    assert output.err == "Bearer <redacted>\n"
+    assert json.loads(output.out) == {"status": "blocked", "summary": {"requiredOk": False}}
+    assert output.err == "AUTOGENESIS_APPIUM_TOOL_CHILD_DIAGNOSTIC\n"
     assert "password" not in output.out and "synthetic-token" not in output.err
 
 

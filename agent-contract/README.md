@@ -1,7 +1,7 @@
 # AutoGenesis Agent Contract
 
 Canonical Python distribution `autogenesis-agent-contract`, contract `2.2.0`,
-manifest schema `2`, Python >=3.10, MCP SDK >=1.23,<2. Requirement and frozen
+manifest schema `2`, Python >=3.10, MCP SDK >=1.23,<1.30. Requirement and frozen
 interface: [issue #48](https://github.com/FSQ-lab/AutoGenesis/issues/48).
 
 ## Consumer interface
