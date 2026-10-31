@@ -247,9 +247,9 @@ def _verify_cli_wheel(repo: Path, wheel_dir: Path) -> None:
         raise VerificationError("Built AutoGenesis CLI entrypoint is unavailable")
     normalized = requirements.replace(" ", "").lower()
     for requirement in (
-        "autogenesis-agent-contract==2.1.0",
-        "autogenesis-appium-mcp==0.5.0;sys_platform==\"darwin\"orsys_platform==\"win32\"",
-        "autogenesis-windows-mcp==0.5.0;sys_platform==\"win32\"",
+        "autogenesis-agent-contract==2.2.0",
+        "autogenesis-appium-mcp==0.6.0;sys_platform==\"darwin\"orsys_platform==\"win32\"",
+        "autogenesis-windows-mcp==0.6.0;sys_platform==\"win32\"",
     ):
         if requirement not in normalized:
             raise VerificationError("AutoGenesis CLI host bundle dependencies drifted")

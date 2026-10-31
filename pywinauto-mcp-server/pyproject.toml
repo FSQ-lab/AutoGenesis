@@ -4,14 +4,14 @@ build-backend = "hatchling.build"
 
 [project]
 name = "autogenesis-windows-mcp"
-version = "0.5.0"
+version = "0.6.0"
 description = "AutoGenesis Windows desktop MCP runtime"
 readme = "WINDOWS-README.md"
 requires-python = ">=3.10"
 license = "MIT"
 classifiers = ["Operating System :: Microsoft :: Windows"]
 dependencies = [
-    "autogenesis-agent-contract==2.1.0",
+    "autogenesis-agent-contract==2.2.0",
     "mcp>=1.23.0,<2",
     "anyio>=4.9,<5",
     "jsonschema>=4.20,<5",

@@ -1,4 +1,4 @@
-"""Canonical AutoGenesis Agent Contract, release 2.1.0 / schema 2."""
+"""Canonical AutoGenesis Agent Contract, release 2.2.0 / schema 2."""
 
 from .appendix import ProjectAppendix, load_project_appendix
 from .appium_skills import AppiumSkillsBundle, load_appium_skills

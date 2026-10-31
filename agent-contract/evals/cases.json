@@ -34,6 +34,22 @@
       }
     },
     {
+      "id": "structured-direct-task-preserves-intent",
+      "workflow_id": "execute_natural_language_task",
+      "arguments": {"task_text": "Original user intent: Calculate 2 plus 3 in Calculator.\nTarget: confirmed Android device Pixel.\nApplication: confirmed Calculator package.\nOrdered actions: launch Calculator; clear visible prior input if present; enter 2 + 3; calculate.\nAssertion: verify the final result text equals 5.\nStop conditions: stop on ambiguous package, scope violation, or non-retryable failure.\nEvidence: report the selected package and verified result attribute."},
+      "appendix": "Do not add multiplication or save generated code.",
+      "stimuli": ["Expose launch_calculator, calculate_sum, and verify_result MCP tools. Each succeeds in order with explicit action or assertion evidence. No other business action is authorized."],
+      "expect": {
+        "save": false,
+        "tool_sequence": ["launch_calculator", "calculate_sum", "verify_result"],
+        "required_evidence": [
+          {"tool": "launch_calculator", "evidence": {"kind": "action", "target": "calculator", "actual": "opened"}},
+          {"tool": "calculate_sum", "evidence": {"kind": "action", "target": "expression", "actual": "2+3"}},
+          {"tool": "verify_result", "evidence": {"kind": "assertion", "target": "result.text", "expected": "5", "actual": "5"}}
+        ]
+      }
+    },
+    {
       "id": "three-attempts-exhausted",
       "workflow_id": "execute_scenario",
       "arguments": {"scenario_text": "Scenario: Search\nWhen I click Search\nThen results appear"},

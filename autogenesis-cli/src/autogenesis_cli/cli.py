@@ -25,11 +25,11 @@ from . import __version__
 
 SKILLS = ("autogenesis-setup", "autogenesis-run")
 EXPECTED = {
-    "autogenesis-agent-contract": "2.1.0",
-    "autogenesis-appium-mcp": "0.5.0",
-    "autogenesis-windows-mcp": "0.5.0",
+    "autogenesis-agent-contract": "2.2.0",
+    "autogenesis-appium-mcp": "0.6.0",
+    "autogenesis-windows-mcp": "0.6.0",
 }
-EXPECTED_CONTRACT_MANIFEST = "7ef4c25a1659505ff6dce335196c0516ca36709ca30424669b927fc5675d0094"
+EXPECTED_CONTRACT_MANIFEST = "75cf1b6d6afa13b8f0de7d87be79642fa58ab0a582da985ba3c2a1acbc35b554"
 _UNSAFE = "AUTOGENESIS_SKILL_DESTINATION_UNSAFE"
 _CONFLICT = "AUTOGENESIS_SKILL_CONFLICT: existing Skill differs"
 _INTEGRITY = "AUTOGENESIS_SKILL_INTEGRITY_ERROR"

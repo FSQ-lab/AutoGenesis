@@ -1,10 +1,11 @@
 # Independent prompt comparison
 
-`cases.json` contains thirteen fixed cases: Background/Scenario ordering,
-execute/generate separation, natural language execution, three total attempts,
-cancellation, approved generation, denied approval, changed previews, appendix
-and task injection, synthetic secret disclosure, scope violation, and missing
-runtime enforcement. All canaries are invented test sentinels, never credentials.
+`cases.json` contains fourteen fixed cases: Background/Scenario ordering,
+execute/generate separation, natural-language execution, structured direct-task
+intent preservation, three total attempts, cancellation, approved generation,
+denied approval, changed previews, appendix and task injection, synthetic secret
+disclosure, scope violation, and missing runtime enforcement. All canaries are
+invented test sentinels, never credentials.
 
 `baseline.json` records the prior extension defaults from an exact Git revision
 and source hash. The same historical scenario prompt served execution and
@@ -70,14 +71,14 @@ actual result, including failures. Do not mark screenshots or prose as verified
 tool results. Stable operation IDs prevent resetting retries by switching tools
 or renaming an operation. Harness fidelity requires independent review.
 
-The natural-language fixture requires exactly `open_app` followed by
-`verify_app_title`, with successful, separately matched call receipts. The
-first result supplies action evidence that the app opened. The second supplies
-assertion evidence with expected and actual title `Sandbox App`, target
-`app.title`, and kind `assertion`, as specified in `cases.json`. Two open actions,
-an unmatched/replayed receipt, a failed assertion, or a wrong/missing title
-result cannot satisfy this fixture. Evidence is normalized by the harness from
-actual tool results, never from agent claims.
+The natural-language fixtures require separately verified action and assertion
+receipts. The basic fixture requires exactly `open_app` then
+`verify_app_title`; the structured fixture requires `launch_calculator`,
+`calculate_sum`, then `verify_result`. Expected and actual values and targets
+are specified in `cases.json`. Added or reordered business actions,
+unmatched/replayed receipts, failed assertions, or wrong/missing results cannot
+satisfy these fixtures. Evidence is normalized by the harness from actual tool
+results, never from agent claims.
 
 Save the paired normalized trace files at the following paths, then compare:
 

@@ -45,11 +45,11 @@ jobs:
         run: >-
           python agent-contract/tools/build_skill_release.py
           --output-dir skill-release
-          --base-url https://github.com/FSQ-lab/AutoGenesis/releases/download/agent-contract-v2.1.0
+          --base-url https://github.com/FSQ-lab/AutoGenesis/releases/download/agent-contract-v2.2.0
       - name: Upload immutable Skill release assets
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: release-autogenesis-skills-2.1.0
+          name: release-autogenesis-skills-2.2.0
           path: skill-release
           if-no-files-found: error
       - name: Upload Agent Contract wheel
@@ -197,12 +197,12 @@ jobs:
       contents: write
     env:
       GH_TOKEN: ${{ github.token }}
-      RELEASE_TAG: agent-contract-v2.1.0
+      RELEASE_TAG: agent-contract-v2.2.0
     steps:
       - name: Download verified Skill assets
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
-          name: release-autogenesis-skills-2.1.0
+          name: release-autogenesis-skills-2.2.0
           path: skill-release
       - name: Create or verify immutable Skill release
         run: |
@@ -217,7 +217,7 @@ jobs:
             gh release create "$RELEASE_TAG" skill-release/* \
               --repo "$GITHUB_REPOSITORY" \
               --target "$GITHUB_SHA" \
-              --title "AutoGenesis Agent Contract 2.1.0" \
+              --title "AutoGenesis Agent Contract 2.2.0" \
               --notes "Canonical AutoGenesis Agent Skills and verified Agent Install Prompt."
           fi
 

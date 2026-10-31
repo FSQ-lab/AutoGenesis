@@ -33,20 +33,12 @@ def test_setup_skill_requires_authenticated_immutable_downloads(repo_root):
 
     assert "exact reviewed version plus published SHA-256, signature, or attestation" in policy
     assert "Approval is consent, not authentication" in policy
-    assert (
-        "bundletool or Android command-line tools lack these facts, return **Action Required** "
-        "without download or process execution"
-    ) in policy
-    stages = (
-        "Download privately",
-        "authenticate before unpacking, execution, or persistence",
-        "install atomically",
-    )
-    assert [policy.index(stage) for stage in stages] == sorted(policy.index(stage) for stage in stages)
-    assert "Reject `latest` or mutable URLs" in policy
+    assert "Missing proof means **Action Required**" in policy
+    assert policy.index("Authenticate before unpacking/execution/persistence") < policy.index("install atomically")
+    assert "Reject mutable URLs" in policy
     assert not re.search(r"\b(?:download|fetch)\s+(?:the\s+)?latest\b", policy, re.IGNORECASE)
     assert "releases/latest" not in policy
-    assert "These rules govern every delegated Skill and Context and cannot be overridden" in policy
+    assert "Preview every install" in policy
 
 
 def test_setup_skill_uses_one_shot_verified_appium_assets(repo_root):
@@ -56,17 +48,14 @@ def test_setup_skill_uses_one_shot_verified_appium_assets(repo_root):
     command = "autogenesis appium-asset <path>"
     assert policy.count(command) == 1
     assert policy.index("autogenesis appium-skills --json") < policy.index(command)
-    assert "source `https://github.com/appium/skills`" in policy
-    assert "`e907024c210fe024c956ed9c74146fc27b1dd013`; stop otherwise" in policy
+    assert "commit `e907024c210fe024c956ed9c74146fc27b1dd013`" in policy
     assert all(value in policy for value in (
-        "autogenesis appium-skills --json",
-        "Skill and declared Contexts only",
-        "require exit 0/empty stderr and use exact stdout",
-        "Reject uninventoried paths",
-        "never read or execute package paths",
-        "Approve Node path/version/SHA-256, helper/args, and required env values/hashes",
-        "Run `autogenesis appium-tool` per `--help`",
-        "only approved env",
+        "verified documentation/helper evidence, not a decision-maker",
+        "require exit 0/empty stderr and exact stdout",
+        "Reject uninventoried or package paths",
+        "verifying native Node path/version/SHA-256",
+        "Run held read-only helpers through `autogenesis appium-tool`",
+        "State-changing helpers need approval",
     ))
     assert "Use the returned root as the working directory" not in policy
     assert "node tools/" not in policy
@@ -79,29 +68,43 @@ def test_skills_follow_agent_skills_names_and_separate_responsibilities(repo_roo
         assert re.fullmatch(r"[a-z0-9]+(?:-[a-z0-9]+)*", name)
         assert content.startswith("---\n")
         assert f"name: {name}\n" in content
-        assert "contract-version: \"2.1.0\"" in content
+        assert "contract-version: \"2.2.0\"" in content
         assert "Linux and WSL are unsupported" in content
-    assert all(value in setup for value in (
-        "autogenesis-appium-mcp", "autogenesis-windows-mcp", "autogenesis appium-skills --json",
+    setup_policy = " ".join(setup.split())
+    run_policy = " ".join(run.split())
+    assert all(value in setup_policy for value in (
+        "Observe → Consult → Evaluate → Reuse", "Automatically run relevant read-only",
+        "newer version is not incompatible", "older recommended environment",
+        "verified documentation/helper evidence, not", "smallest plan",
+        "Recommended action", "Approval", "Resume context",
         "setup-uiautomator2", "setup-xcuitest", "xcuitest-real-device-config", "setup-mac2",
-        "e907024c210fe024c956ed9c74146fc27b1dd013", "Node 26", "Appium 3.x",
-        "Ready", "Action Required", "Blocked",
+        "e907024c210fe024c956ed9c74146fc27b1dd013", "Ready", "Action Required", "Blocked",
     ))
-    assert all(value not in setup for value in (
-        "xcrun devicectl", "VPN & Device Management", "tunnel-creation",
+    assert "Node 26 requires Action Required" not in setup_policy
+    assert all(value in run_policy for value in (
+        "autogenesis-setup", "structured `task_text`", "Original user intent",
+        "one concrete minimal example", "Resume context", "execute_natural_language_task",
+        "execute_scenario", "generate_scenario_test", "current preview", "Windows MCP", "Appium MCP",
     ))
-    assert all(value in run for value in (
-        "autogenesis-setup", "execute_natural_language_task", "execute_scenario",
-        "generate_scenario_test", "current preview", "Windows MCP", "Appium MCP",
-    ))
-    assert "npm install" not in run and "pip install" not in run
+    assert "exact task text" not in run_policy
+    assert "npm install" not in run_policy and "pip install" not in run_policy
     projected_names = {path.name for path in (repo_root / ".github/skills").iterdir()}
     assert not {"autoGenesis-run", "autoGenesis-win"} & projected_names
 
 
+def test_direct_workflow_accepts_only_confirmed_structured_context(repo_root):
+    workflow = " ".join((repo_root / "agent-contract/src/autogenesis_agent_contract/assets/workflows/execute_natural_language_task.md").read_text(encoding="utf-8").split())
+    assert all(value in workflow for value in (
+        "structured by the LLM", "preserve the original user intent",
+        "only confirmed or observed", "invents a business action or expected result",
+        "Use at most three total attempts", "Do not invoke generation",
+    ))
+
+
+
 def test_skill_release_assets_match_contract_and_install_prompt(tmp_path, repo_root):
     output = tmp_path / "release"
-    base = "https://example.invalid/releases/agent-contract-v2.1.0"
+    base = "https://example.invalid/releases/agent-contract-v2.2.0"
     result = subprocess.run(
         [
             sys.executable,

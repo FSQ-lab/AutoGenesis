@@ -608,4 +608,4 @@ def test_cli_version_is_available_without_a_subcommand(capsys):
     with pytest.raises(SystemExit) as caught:
         cli.main(["--version"])
     assert caught.value.code == 0
-    assert capsys.readouterr() == ("autogenesis 0.2.0\n", "")
+    assert capsys.readouterr() == ("autogenesis 0.3.0\n", "")

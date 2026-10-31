@@ -45,7 +45,7 @@ before any download, acquired-content interpretation, approval request, or write
 Install the CLI through the Python environment and package index you choose:
 
 ```bash
-python -m pip install autogenesis-cli==0.2.0
+python -m pip install autogenesis-cli==0.3.0
 autogenesis install
 ```
 
@@ -53,8 +53,8 @@ The Python package installation resolves the supported host bundle:
 
 | Host | Installed AutoGenesis dependencies |
 | --- | --- |
-| macOS | Agent Contract 2.1.0 and Appium Runtime 0.5.0 |
-| Windows | Agent Contract 2.1.0, Appium Runtime 0.5.0, and Windows Runtime 0.5.0 |
+| macOS | Agent Contract 2.2.0 and Appium Runtime 0.6.0 |
+| Windows | Agent Contract 2.2.0, Appium Runtime 0.6.0, and Windows Runtime 0.6.0 |
 
 Check the installed command versions without starting a Runtime or reading
 business configuration:
@@ -72,26 +72,28 @@ Skill files reports them as `unchanged`.
 
 The command does not install Appium Server, Appium Drivers, platform SDKs,
 project MCP configuration, or business configuration, and does not execute an
-application. Use `autogenesis-setup` afterward to inspect a concrete target and
-approve any additional machine or project preparation.
+application. Use `autogenesis-setup` for a concrete target. Setup automatically
+runs relevant read-only discovery and verified diagnostics, prefers a working
+existing environment, and asks once before a consolidated persistent or
+high-risk change plan.
 
-For local Appium readiness, Setup loads the immutable official Appium Skills
-snapshot pinned by Agent Contract 2.1.0. `autogenesis appium-skills --json`
-verifies its identity and inventory, and `autogenesis appium-asset <relative>`
-returns only bytes held by that verification pass without trusting a mutable path.
+For local Appium readiness, Setup uses the immutable official Appium Skills
+snapshot pinned by Agent Contract 2.2.0 as verified documentation and helper
+evidence. `autogenesis appium-skills --json` verifies its identity and inventory;
+`autogenesis appium-asset <relative>` returns held verified bytes.
 
 ### Agent-first
 
-Copy [`agent-install-prompt.txt`](https://github.com/FSQ-lab/AutoGenesis/releases/download/agent-contract-v2.1.0/agent-install-prompt.txt)
-from the Agent Contract 2.1.0 release into OMP, Pi, Codex CLI, or GitHub Copilot
+Copy [`agent-install-prompt.txt`](https://github.com/FSQ-lab/AutoGenesis/releases/download/agent-contract-v2.2.0/agent-install-prompt.txt)
+from the Agent Contract 2.2.0 release into OMP, Pi, Codex CLI, or GitHub Copilot
 CLI. Before acquisition, the prompt requires native Darwin or native Windows
 and rejects Linux and WSL. Only after that gate passes does it download the
 Setup Skill as untrusted bytes, verify the published SHA-256, show the selected
 scope and destination, request approval, and persistently install only
 `autogenesis-setup` through the Coding Agent's native Skill mechanism. A
-session-only trial is not supported in this release. Setup then proposes the
-host Runtime and project-readiness plan; it does not execute that plan without
-the user's approval.
+session-only trial is not supported in this release. Setup then inspects the
+target environment and lets the LLM recommend the smallest required preparation;
+it does not apply persistent or high-risk changes without approval.
 
 Low-level `autogenesis-appium-mcp` and `autogenesis-windows-mcp` packages remain
 independently runnable without Skills for expert CLI/MCP consumers.

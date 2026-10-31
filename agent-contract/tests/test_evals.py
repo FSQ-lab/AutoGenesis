@@ -30,7 +30,7 @@ def test_every_eval_fixture_renders_through_the_frozen_contract(cases, contract)
         prompt = contract.render(case["workflow_id"], case["arguments"], appendix)
         assert prompt.startswith(contract.instructions)
         assert prompt.count("<autogenesis-core-policy>") == 1
-    assert len(cases) == 13
+    assert len(cases) == 14
 
 
 def natural_case():
