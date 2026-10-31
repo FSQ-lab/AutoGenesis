@@ -52,10 +52,11 @@ def test_setup_skill_uses_one_shot_verified_appium_assets(repo_root):
     assert all(value in policy for value in (
         "verified documentation/helper evidence, not a decision-maker",
         "require exit 0/empty stderr and exact stdout",
-        "Reject uninventoried or package paths",
-        "verifying native Node path/version/SHA-256",
-        "Run held read-only helpers through `autogenesis appium-tool`",
-        "State-changing helpers need approval",
+        "Reject uninventoried/package paths",
+        "Before `autogenesis appium-tool`",
+        "every child executable's absolute path/version/SHA-256",
+        "Never pass `--report`",
+        "State-changing helpers need separate approval",
     ))
     assert "Use the returned root as the working directory" not in policy
     assert "node tools/" not in policy
@@ -74,8 +75,10 @@ def test_skills_follow_agent_skills_names_and_separate_responsibilities(repo_roo
     run_policy = " ".join(run.split())
     assert all(value in setup_policy for value in (
         "Observe → Consult → Evaluate → Reuse", "Automatically run relevant read-only",
+        "explicit engine exclusion", "blocks reuse and Ready until resolved",
         "newer version is not incompatible", "older recommended environment",
-        "verified documentation/helper evidence, not", "smallest plan",
+        "PATH-selected child", "every child executable's absolute path/version/SHA-256",
+        "Never pass `--report`", "verified documentation/helper evidence, not", "smallest plan",
         "Recommended action", "Approval", "Resume context",
         "setup-uiautomator2", "setup-xcuitest", "xcuitest-real-device-config", "setup-mac2",
         "e907024c210fe024c956ed9c74146fc27b1dd013", "Ready", "Action Required", "Blocked",

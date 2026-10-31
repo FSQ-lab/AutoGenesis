@@ -442,7 +442,7 @@ def test_appium_asset_rejects_non_inventory_and_traversal_paths(path, monkeypatc
     assert stdout == b""
     assert stderr == b"AUTOGENESIS_CONTRACT_INTEGRITY_ERROR\n"
 
-def test_appium_tool_binds_node_and_helper_bytes_without_shell_or_inherited_environment(monkeypatch):
+def test_appium_tool_binds_node_and_helper_bytes_without_shell_or_inherited_environment(monkeypatch, capsys):
     script = "tools/appium/setup/scripts/check-mac2-env.mjs"
     helper = "tools/appium/setup/scripts/reporting.mjs"
     bundle = Bundle({script: b"import './reporting.mjs';\n", helper: b"export {};\n"})
@@ -476,8 +476,18 @@ def test_appium_tool_binds_node_and_helper_bytes_without_shell_or_inherited_envi
         assert (root / "autogenesis-node-bootstrap.mjs").read_bytes() == cli._NODE_BOOTSTRAP
         assert (root / script).read_bytes() == bundle.read_asset(script)
         assert (root / helper).read_bytes() == bundle.read_asset(helper)
-        assert options == {"cwd": Path.cwd(), "check": False, "env": {}}
-        return type("Completed", (), {"returncode": 7})()
+        assert options == {
+            "cwd": Path.cwd(), "check": False, "capture_output": True, "text": True, "env": {},
+        }
+        return type("Completed", (), {
+            "returncode": 7,
+            "stdout": json.dumps({
+                "status": "blocked",
+                "summary": {"registry": "https://user:password@registry.example/"},
+                "checks": {"stdout": "raw secret", "message": "https://user:password@example/"},
+            }),
+            "stderr": "Bearer synthetic-token\n",
+        })()
 
     monkeypatch.setattr(cli.subprocess, "run", run)
     assert cli.main([
@@ -486,6 +496,23 @@ def test_appium_tool_binds_node_and_helper_bytes_without_shell_or_inherited_envi
         "--allow-env", f"PATH={path_digest}", script, "--", "--format", "summary",
     ]) == 7
     assert len(roots) == 1 and not roots[0].exists()
+    output = capsys.readouterr()
+    assert json.loads(output.out) == {
+        "status": "blocked", "summary": {}, "checks": {"message": "https://<redacted>@example/"},
+    }
+    assert output.err == "Bearer <redacted>\n"
+    assert "password" not in output.out and "synthetic-token" not in output.err
+
+
+def test_appium_tool_rejects_persistent_or_full_reports(monkeypatch):
+    script = "tools/appium/setup/scripts/check-node-env.mjs"
+    monkeypatch.setattr(cli, "_host_packages", lambda: None)
+    bundle = Bundle({script: b"export {};\n"})
+    for arguments in (["--report", "auto"], ["--report=/tmp/raw.json"], ["--format", "full"]):
+        with pytest.raises(cli.InstallError):
+            cli._run_appium_tool(
+                bundle, "/verified/node", "a" * 64, "v24.22.1", script, [], arguments,
+            )
 
 def test_appium_tool_rejects_unsupported_host_before_loading_assets(monkeypatch, capsys):
     monkeypatch.setattr(cli.sys, "platform", "linux")

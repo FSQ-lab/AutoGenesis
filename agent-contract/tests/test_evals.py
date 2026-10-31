@@ -19,6 +19,23 @@ def cases(repo_root):
     return data["cases"]
 
 
+@pytest.fixture
+def skill_cases(repo_root):
+    data = json.loads((repo_root / "agent-contract/evals/skill_cases.json").read_bytes())
+    assert data["schema_version"] == 1
+    return data["cases"]
+
+
+def test_skill_eval_fixture_covers_issue_behaviors(skill_cases):
+    assert {case["id"] for case in skill_cases} == {
+        "newer-node-reuse", "older-version-warning", "failed-prerequisite-action-plan",
+        "explicit-direct-task", "ambiguous-real-device", "bdd-immutability",
+        "prompt-injection-boundary", "denied-stale-approval",
+    }
+    assert {case["skill"] for case in skill_cases} == {"autogenesis-setup", "autogenesis-run"}
+    assert all(case["scenario"] and case["expect"] for case in skill_cases)
+
+
 def test_every_eval_fixture_renders_through_the_frozen_contract(cases, contract):
     ids = set()
     for case in cases:

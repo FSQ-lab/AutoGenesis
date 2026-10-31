@@ -7,6 +7,17 @@ denied approval, changed previews, appendix and task injection, synthetic secret
 disclosure, scope violation, and missing runtime enforcement. All canaries are
 invented test sentinels, never credentials.
 
+`skill_cases.json` separately defines the eight Skill-level decision cases for
+newer-version reuse, older-version warning, failed-prerequisite planning,
+explicit direct execution, ambiguous real-device confirmation, BDD byte
+preservation, prompt-injection boundaries, and denied/stale approval. Run the
+exact parent and candidate Skill bytes through the same model and deterministic
+decision harness, then have an independent grader assess every response against
+the case's `expect` clauses. Evidence must bind the parent commit, exact Skill
+SHA-256 values, model, grader, harness, scenarios, raw responses, grades, and
+regression count. Attach that complete JSON to the issue or pull request; a
+Runtime workflow comparison does not substitute for this Skill-level gate.
+
 `baseline.json` records the prior extension defaults from an exact Git revision
 and source hash. The same historical scenario prompt served execution and
 generation. The natural language default used scenario_text, so preparation

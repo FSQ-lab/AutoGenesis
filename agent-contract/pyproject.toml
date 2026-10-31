@@ -9,7 +9,7 @@ description = "Versioned AutoGenesis policy, workflows, and MCP prompt projectio
 readme = "README.md"
 requires-python = ">=3.10"
 license = "MIT"
-dependencies = ["mcp>=1.23,<2", "jsonschema>=4.20,<5", "pydantic>=2.7,<3"]
+dependencies = ["mcp>=1.23,<1.30", "jsonschema>=4.20,<5", "pydantic>=2.7,<3"]
 
 [project.urls]
 Repository = "https://github.com/FSQ-lab/AutoGenesis"

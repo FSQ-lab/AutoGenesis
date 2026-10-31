@@ -16,7 +16,7 @@ from mcp.server.fastmcp import FastMCP
 # These pins belong to the runtime release, independently of the installed wheel.
 required = RuntimeContractRequirement(
     contract_version="2.2.0",
-    manifest_sha256="75cf1b6d6afa13b8f0de7d87be79642fa58ab0a582da985ba3c2a1acbc35b554",
+    manifest_sha256="a1004bd4123d6485695a0be9a483b3f5c68fad82a9e9f64285bcf43ff0305e21",
 )
 contract = load_contract(ContractIdentity(required.contract_version, required.manifest_sha256))
 appendix = load_project_appendix("/absolute/business-project")

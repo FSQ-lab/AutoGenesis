@@ -12,7 +12,7 @@ license = "MIT"
 classifiers = ["Operating System :: Microsoft :: Windows"]
 dependencies = [
     "autogenesis-agent-contract==2.2.0",
-    "mcp>=1.23.0,<2",
+    "mcp>=1.23.0,<1.30",
     "anyio>=4.9,<5",
     "jsonschema>=4.20,<5",
     "python-dotenv>=1,<2",

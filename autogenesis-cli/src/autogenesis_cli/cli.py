@@ -29,7 +29,7 @@ EXPECTED = {
     "autogenesis-appium-mcp": "0.6.0",
     "autogenesis-windows-mcp": "0.6.0",
 }
-EXPECTED_CONTRACT_MANIFEST = "75cf1b6d6afa13b8f0de7d87be79642fa58ab0a582da985ba3c2a1acbc35b554"
+EXPECTED_CONTRACT_MANIFEST = "a1004bd4123d6485695a0be9a483b3f5c68fad82a9e9f64285bcf43ff0305e21"
 _UNSAFE = "AUTOGENESIS_SKILL_DESTINATION_UNSAFE"
 _CONFLICT = "AUTOGENESIS_SKILL_CONFLICT: existing Skill differs"
 _INTEGRITY = "AUTOGENESIS_SKILL_INTEGRITY_ERROR"
@@ -967,6 +967,45 @@ def _approved_helper_environment(specifications: list[str]) -> dict[str, str]:
         approved[name] = value
     return approved
 
+
+def _redact_helper_text(value: str) -> str:
+    value = re.sub(r"(https?://)[^\s/@]+:[^\s/@]+@", r"\1<redacted>@", value)
+    value = re.sub(r"(Bearer\s+)\S+", r"\1<redacted>", value, flags=re.IGNORECASE)
+    return re.sub(
+        r"([?&](?:token|key|password|secret)=)[^&\s]+",
+        r"\1<redacted>",
+        value,
+        flags=re.IGNORECASE,
+    )
+
+
+def _sanitize_helper_report(value: Any) -> Any:
+    if isinstance(value, dict):
+        return {
+            key: _sanitize_helper_report(item)
+            for key, item in value.items()
+            if key not in {"diagnosticsPath", "logs", "registry", "stderr", "stdout"}
+        }
+    if isinstance(value, list):
+        return [_sanitize_helper_report(item) for item in value]
+    if isinstance(value, str):
+        return _redact_helper_text(value)
+    if value is None or isinstance(value, (bool, int, float)):
+        return value
+    raise InstallError("AUTOGENESIS_APPIUM_TOOL_OUTPUT_UNSAFE")
+
+
+def _write_sanitized_helper_output(observed: subprocess.CompletedProcess[str]) -> None:
+    try:
+        report = json.loads(observed.stdout)
+    except (json.JSONDecodeError, TypeError):
+        raise InstallError("AUTOGENESIS_APPIUM_TOOL_OUTPUT_UNSAFE") from None
+    sys.stdout.write(json.dumps(
+        _sanitize_helper_report(report), separators=(",", ":"), ensure_ascii=True,
+    ) + "\n")
+    if observed.stderr:
+        sys.stderr.write(_redact_helper_text(observed.stderr))
+
 _NODE_BOOTSTRAP = b"""import { pathToFileURL } from 'node:url';
 const [encoded, helper, ...args] = process.argv.slice(2);
 for (const [name, value] of JSON.parse(Buffer.from(encoded, 'base64url').toString('utf8'))) process.env[name] = value;
@@ -1001,6 +1040,21 @@ def _run_appium_tool(
     if re.fullmatch(r"v[0-9]+\.[0-9]+\.[0-9]+", node_version) is None:
         raise InstallError("AUTOGENESIS_NODE_IDENTITY_MISMATCH")
     approved_environment = _approved_helper_environment(environment)
+    supplied = arguments[1:] if arguments[:1] == ["--"] else list(arguments)
+    summary_requested = False
+    for index, argument in enumerate(supplied):
+        if argument == "--report" or argument.startswith("--report="):
+            raise InstallError("AUTOGENESIS_APPIUM_TOOL_REPORT_FORBIDDEN")
+        if argument == "--format":
+            if index + 1 >= len(supplied) or supplied[index + 1] != "summary":
+                raise InstallError("AUTOGENESIS_APPIUM_TOOL_OUTPUT_UNSAFE")
+            summary_requested = True
+        elif argument.startswith("--format="):
+            if argument != "--format=summary":
+                raise InstallError("AUTOGENESIS_APPIUM_TOOL_OUTPUT_UNSAFE")
+            summary_requested = True
+    if not summary_requested:
+        supplied.extend(("--format", "summary"))
     held = _hold_node(node_path, node_sha256, Path.cwd())
     try:
         with tempfile.TemporaryDirectory(prefix="autogenesis-appium-tool-") as temporary:
@@ -1023,12 +1077,17 @@ def _run_appium_tool(
             )
             if observed.returncode or observed.stderr or observed.stdout.strip() != node_version:
                 raise InstallError("AUTOGENESIS_NODE_IDENTITY_MISMATCH")
-            supplied = arguments[1:] if arguments[:1] == ["--"] else arguments
+            # The held helper may execute inspected host tools, but it may not
+            # persist raw diagnostics or return them directly to the caller.
             payload = base64.urlsafe_b64encode(json.dumps(
                 sorted(approved_environment.items()), separators=(",", ":"), ensure_ascii=True,
             ).encode()).decode()
             command = [node, str(bootstrap), payload, str(root.joinpath(*path.parts)), *supplied]
-            return subprocess.run(command, cwd=Path.cwd(), check=False, env={}).returncode
+            helper_result = subprocess.run(
+                command, cwd=Path.cwd(), check=False, capture_output=True, text=True, env={},
+            )
+            _write_sanitized_helper_output(helper_result)
+            return helper_result.returncode
     finally:
         held.close()
 
