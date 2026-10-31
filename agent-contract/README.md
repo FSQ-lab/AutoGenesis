@@ -1,6 +1,6 @@
 # AutoGenesis Agent Contract
 
-Canonical Python distribution `autogenesis-agent-contract`, contract `2.2.0`,
+Canonical Python distribution `autogenesis-agent-contract`, contract `2.1.0`,
 manifest schema `2`, Python >=3.10, MCP SDK >=1.23,<1.30. Requirement and frozen
 interface: [issue #48](https://github.com/FSQ-lab/AutoGenesis/issues/48).
 
@@ -15,8 +15,8 @@ from mcp.server.fastmcp import FastMCP
 
 # These pins belong to the runtime release, independently of the installed wheel.
 required = RuntimeContractRequirement(
-    contract_version="2.2.0",
-    manifest_sha256="a1004bd4123d6485695a0be9a483b3f5c68fad82a9e9f64285bcf43ff0305e21",
+    contract_version="2.1.0",
+    manifest_sha256="ec097a569aa4d62da8211f3ad23fb00eccb95d9d9cee871e360af6ac05ca1dd6",
 )
 contract = load_contract(ContractIdentity(required.contract_version, required.manifest_sha256))
 appendix = load_project_appendix("/absolute/business-project")
@@ -164,7 +164,7 @@ SecretRef schema; contract `1.2.0` added project-scoped, preview-bound atomic
 generation commits. Contract `2.0.0` replaces the platform-split camel-case
 Skills with Agent Skills-compliant `autogenesis-setup` and unified
 `autogenesis-run`. Contract `2.1.0` pins the official Appium Skills bundle and
-routes supported local Appium setup through its verified root. Contract `2.2.0`
+routes supported local Appium setup through its verified root. Contract `2.1.0`
 makes those assets an evidence library, prioritizes observed capability and
 environment reuse, and permits confirmed structured direct tasks. Later changes
 require a new version and schema review as appropriate.

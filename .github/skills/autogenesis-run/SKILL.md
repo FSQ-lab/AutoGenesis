@@ -5,7 +5,7 @@ license: MIT
 compatibility: Requires native macOS or Windows plus a Ready capability from autogenesis-setup. Linux and WSL are unsupported.
 metadata:
   author: FSQ-lab
-  contract-version: "2.2.0"
+  contract-version: "2.1.0"
 ---
 
 # AutoGenesis Run

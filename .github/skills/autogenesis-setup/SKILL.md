@@ -5,7 +5,7 @@ license: MIT
 compatibility: Native macOS/Windows and Python 3.10+ required. Linux and WSL are unsupported.
 metadata:
   author: FSQ-lab
-  contract-version: "2.2.0"
+  contract-version: "2.1.0"
 ---
 
 # AutoGenesis Setup

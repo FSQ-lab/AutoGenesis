@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "autogenesis-appium-mcp"
-version = "0.6.0"
+version = "0.5.0"
 description = "Appium MCP Server for mobile automation testing"
 readme = "README.md"
 authors = [
@@ -12,7 +12,7 @@ authors = [
 ]
 requires-python = ">=3.10"
 dependencies = [
-    "autogenesis-agent-contract==2.2.0",
+    "autogenesis-agent-contract==2.1.0",
     "anyio>=4.5,<5",
     "pydantic>=2.7,<3",
     "requests>=2.31,<3",
@@ -25,7 +25,7 @@ dependencies = [
     "langchain-openai>=0.0.8",
     "langchain-anthropic>=0.0.8",  
     "langchain-google-genai>=0.0.8",
-    "pillow==12.2.0",
+    "pillow==12.1.0",
     "watchdog>=3.0.0",
 ]
 

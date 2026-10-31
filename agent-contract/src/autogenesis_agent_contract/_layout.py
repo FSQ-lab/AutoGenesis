@@ -1,6 +1,6 @@
 """Release layout shared by the loader and deterministic release tooling."""
 
-CONTRACT_VERSION = "2.2.0"
+CONTRACT_VERSION = "2.1.0"
 SCHEMA_VERSION = 2
 CORE_POLICY = "core-policy.md"
 WORKFLOWS = (

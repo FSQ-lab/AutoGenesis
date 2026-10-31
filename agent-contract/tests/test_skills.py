@@ -69,7 +69,7 @@ def test_skills_follow_agent_skills_names_and_separate_responsibilities(repo_roo
         assert re.fullmatch(r"[a-z0-9]+(?:-[a-z0-9]+)*", name)
         assert content.startswith("---\n")
         assert f"name: {name}\n" in content
-        assert "contract-version: \"2.2.0\"" in content
+        assert "contract-version: \"2.1.0\"" in content
         assert "Linux and WSL are unsupported" in content
     setup_policy = " ".join(setup.split())
     run_policy = " ".join(run.split())
@@ -107,7 +107,7 @@ def test_direct_workflow_accepts_only_confirmed_structured_context(repo_root):
 
 def test_skill_release_assets_match_contract_and_install_prompt(tmp_path, repo_root):
     output = tmp_path / "release"
-    base = "https://example.invalid/releases/agent-contract-v2.2.0"
+    base = "https://example.invalid/releases/agent-contract-v2.1.0"
     result = subprocess.run(
         [
             sys.executable,

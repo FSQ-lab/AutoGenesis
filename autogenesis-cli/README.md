@@ -1,13 +1,13 @@
 # AutoGenesis CLI
 
-`autogenesis-cli==0.3.0` is the installation entry for AutoGenesis-owned Python
+`autogenesis-cli==0.2.0` is the installation entry for AutoGenesis-owned Python
 Runtimes and canonical Agent Skills. Python 3.10+ and native macOS or Windows
 are required; Linux and WSL are unsupported.
 
 Install it through the Python environment and package index selected by the user:
 
 ```bash
-python -m pip install autogenesis-cli==0.3.0
+python -m pip install autogenesis-cli==0.2.0
 autogenesis install
 ```
 
@@ -18,8 +18,8 @@ The package manager, not `autogenesis install`, installs the host dependencies:
 
 | Host | Exact AutoGenesis dependencies |
 | --- | --- |
-| macOS | `autogenesis-agent-contract==2.2.0`, `autogenesis-appium-mcp==0.6.0` |
-| Windows | `autogenesis-agent-contract==2.2.0`, `autogenesis-appium-mcp==0.6.0`, `autogenesis-windows-mcp==0.6.0` |
+| macOS | `autogenesis-agent-contract==2.1.0`, `autogenesis-appium-mcp==0.5.0` |
+| Windows | `autogenesis-agent-contract==2.1.0`, `autogenesis-appium-mcp==0.5.0`, `autogenesis-windows-mcp==0.5.0` |
 
 `autogenesis install` verifies that the required package versions and Agent
 Contract are available, then copies `autogenesis-setup` and `autogenesis-run`

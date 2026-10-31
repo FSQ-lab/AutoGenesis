@@ -1,7 +1,7 @@
 # AutoGenesis Windows MCP package
 
-Issue #30 carries **autogenesis-windows-mcp** version 0.6.0 forward with the
-Agent Contract 2.2.0 identity. It remains importable as
+Issue #30 carries **autogenesis-windows-mcp** version 0.5.0 forward with the
+Agent Contract 2.1.0 identity. It remains importable as
 **autogenesis_windows_mcp** with command **autogenesis-windows-mcp**. Python
 3.10+ and Windows are required; Linux CI checks metadata/imports only.
 
@@ -9,13 +9,13 @@ Agent Contract 2.2.0 identity. It remains importable as
 
 ## Install in a business project
 
-Build artifacts must contain both the Windows Runtime 0.6.0 wheel and Agent
-Contract 2.2.0 wheel. From any Windows business directory, without a
+Build artifacts must contain both the Windows Runtime 0.5.0 wheel and Agent
+Contract 2.1.0 wheel. From any Windows business directory, without a
 checkout of AutoGenesis:
 
 ```powershell
 python -m venv .venv
-.venv/Scripts/python -m pip install C:/artifacts/autogenesis_agent_contract-2.2.0-py3-none-any.whl C:/artifacts/autogenesis_windows_mcp-0.6.0-py3-none-any.whl
+.venv/Scripts/python -m pip install C:/artifacts/autogenesis_agent_contract-2.1.0-py3-none-any.whl C:/artifacts/autogenesis_windows_mcp-0.5.0-py3-none-any.whl
 .venv/Scripts/autogenesis-windows-mcp --config ./apps.json --app notepad --project-root .
 ```
 
@@ -28,18 +28,18 @@ the app_close automation tool or terminate the user's application.
 With uv installed, isolated execution from local artifacts is also supported:
 
 ```powershell
-uvx --with C:/artifacts/autogenesis_agent_contract-2.2.0-py3-none-any.whl --from C:/artifacts/autogenesis_windows_mcp-0.6.0-py3-none-any.whl autogenesis-windows-mcp --config ./apps.json --app notepad --project-root .
+uvx --with C:/artifacts/autogenesis_agent_contract-2.1.0-py3-none-any.whl --from C:/artifacts/autogenesis_windows_mcp-0.5.0-py3-none-any.whl autogenesis-windows-mcp --config ./apps.json --app notepad --project-root .
 ```
 
 After these versions are published to the configured package index:
 
 ```powershell
-uvx --from autogenesis-windows-mcp==0.6.0 autogenesis-windows-mcp --config ./apps.json --app notepad --project-root .
+uvx --from autogenesis-windows-mcp==0.5.0 autogenesis-windows-mcp --config ./apps.json --app notepad --project-root .
 ```
 
-The runtime depends exactly on autogenesis-agent-contract==2.2.0 and requires
+The runtime depends exactly on autogenesis-agent-contract==2.1.0 and requires
 manifest SHA-256
-a1004bd4123d6485695a0be9a483b3f5c68fad82a9e9f64285bcf43ff0305e21.
+ec097a569aa4d62da8211f3ad23fb00eccb95d9d9cee871e360af6ac05ca1dd6.
 Missing, corrupt or incompatible contract assets fail startup.
 
 Standard MCP Registry metadata is `pywinauto-mcp-server/server.json`. From a

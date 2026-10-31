@@ -2,16 +2,16 @@
   "assets": {
     "core-policy.md": "d6f899b993b18baf9c15eb23d9f7ca7429d95f2115dc9abeb2c2766e89553e52",
     "schemas/arguments.schema.json": "50368fd1c689428fb063018a89fb85cb8db700093f50e2c00352a53c1273b899",
-    "schemas/identity.schema.json": "bf41563295cc9bd7845733aed1cd7559648ffd969674615f747f31da35498317",
-    "schemas/manifest.schema.json": "c09795a7cb913471f0182c6897c7d9a76e269a26d0b880c35708eaa10b3c962c",
+    "schemas/identity.schema.json": "f95e1f2e887cc0ee3877c00a4a96c4c9a6571bfebff47e439e3e50a68186bc4d",
+    "schemas/manifest.schema.json": "583491f9caae65e3f2474dffd04f804e331ad8d41f487958c3c8e55abf378a07",
     "schemas/secret-reference.schema.json": "163041e09fefed32640af4f785b0f29a1876666c210c8099a190cd3509f1404e",
-    "skills/autogenesis-run/SKILL.md": "88c395c1562bcd7c6dcc486171ca78978d9251700d279da846d8bf3b1acbc1b1",
-    "skills/autogenesis-setup/SKILL.md": "f6c65ff74665e216aefe8571a7a58fa8035c3fe13c063bac5b35a4e1aec24ea2",
+    "skills/autogenesis-run/SKILL.md": "f86fc964de164e4bfe1b6a0b6b0cadbc14a8717e3d394da876c8c0bb346a3925",
+    "skills/autogenesis-setup/SKILL.md": "7bf9ade7bb11c2f5e247a7bd70e79a9f8014d9b99a488045519e747530ca1649",
     "skills/autogenesis-setup/references/appium-skills/manifest.json": "c242664f604bd645f1b725eee0a51c2a9dd38d050fc5d012e6c874b1f5c7a11e",
     "workflows/execute_natural_language_task.md": "0d8351e01ffe5fa211edd07452f12f7b7045bde0d67851dc4aaf702104b7dd00",
     "workflows/execute_scenario.md": "e8c41dffcea6043f434e90460e0fdfa74a66465494aa52e8275e759450ef31c7",
     "workflows/generate_scenario_test.md": "65bcd4bcb04a16a8fae6364ad04142162223ac7a64c2b47f37371f0eb981930f"
   },
-  "contract_version": "2.2.0",
+  "contract_version": "2.1.0",
   "schema_version": 2
 }

@@ -12,7 +12,7 @@ Obtain the built runtime and Agent Contract wheels from the Integration Lead.
 No AutoGenesis checkout is needed. In an activated virtual environment:
 
 ```bash
-python -m pip install /absolute/wheels/autogenesis_agent_contract-2.2.0-py3-none-any.whl /absolute/wheels/autogenesis_appium_mcp-0.6.0-py3-none-any.whl
+python -m pip install /absolute/wheels/autogenesis_agent_contract-2.1.0-py3-none-any.whl /absolute/wheels/autogenesis_appium_mcp-0.5.0-py3-none-any.whl
 python -c "from importlib.resources import files; from pathlib import Path; Path('appium.json').write_bytes(files('autogenesis_appium_mcp').joinpath('conf/appium_conf.template.json').read_bytes())"
 autogenesis-appium-mcp --platform mac --config /absolute/business/appium.json --project-root /absolute/business
 ```
@@ -25,17 +25,17 @@ stdout is reserved for MCP; diagnostics use stderr.
 With uvx and local artifacts:
 
 ```bash
-uvx --from /absolute/wheels/autogenesis_appium_mcp-0.6.0-py3-none-any.whl --with /absolute/wheels/autogenesis_agent_contract-2.2.0-py3-none-any.whl autogenesis-appium-mcp --platform mac --config /absolute/business/appium.json --project-root /absolute/business
+uvx --from /absolute/wheels/autogenesis_appium_mcp-0.5.0-py3-none-any.whl --with /absolute/wheels/autogenesis_agent_contract-2.1.0-py3-none-any.whl autogenesis-appium-mcp --platform mac --config /absolute/business/appium.json --project-root /absolute/business
 ```
 
 Once both packages are published to the configured index:
 
 ```bash
-uvx --from autogenesis-appium-mcp==0.6.0 autogenesis-appium-mcp --platform mac --config /absolute/business/appium.json --project-root /absolute/business
+uvx --from autogenesis-appium-mcp==0.5.0 autogenesis-appium-mcp --platform mac --config /absolute/business/appium.json --project-root /absolute/business
 ```
 
-Agent Contract is pinned to **2.2.0**, manifest SHA-256
-`a1004bd4123d6485695a0be9a483b3f5c68fad82a9e9f64285bcf43ff0305e21`.
+Agent Contract is pinned to **2.1.0**, manifest SHA-256
+`ec097a569aa4d62da8211f3ad23fb00eccb95d9d9cee871e360af6ac05ca1dd6`.
 A mismatched or corrupt contract prevents startup.
 
 Standard MCP Registry metadata is `appium-mcp-server/server.json`. From a source
@@ -128,7 +128,7 @@ replaces the target. Default output is business-local
 
 From the AutoGenesis repository root, in an activated development environment:
 ```bash
-python -m pip install /absolute/wheels/autogenesis_agent_contract-2.2.0-py3-none-any.whl -e ./appium-mcp-server
+python -m pip install /absolute/wheels/autogenesis_agent_contract-2.1.0-py3-none-any.whl -e ./appium-mcp-server
 python appium-mcp-server/simple_server.py --platform mac --config /absolute/business/appium.json --project-root /absolute/business
 ```
 

@@ -54,7 +54,7 @@ def test_cli_version_does_not_start_runtime(capsys, monkeypatch):
     with pytest.raises(SystemExit) as caught:
         server.parse_args(["--version"])
     assert caught.value.code == 0
-    assert capsys.readouterr() == ("autogenesis-appium-mcp 0.6.0\n", "")
+    assert capsys.readouterr() == ("autogenesis-appium-mcp 0.5.0\n", "")
 
 
 def test_platform_transport_and_config_selection(config_path, tmp_path, monkeypatch):
