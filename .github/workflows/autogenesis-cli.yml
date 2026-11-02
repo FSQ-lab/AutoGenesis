@@ -61,11 +61,11 @@ jobs:
       - name: Run installed CLI tests
         run: python -I -m pytest --import-mode=importlib autogenesis-cli/tests -q
       - name: Install canonical Skills
-        run: autogenesis install --skills-dir '${{ runner.temp }}/skills' --json
+        run: autogenesis install --scope project --project-root '${{ runner.temp }}' --json
       - name: Verify installed Skill bytes
         shell: bash
         run: |
-          cmp "${RUNNER_TEMP}/skills/autogenesis/SKILL.md" agent-contract/src/autogenesis_agent_contract/assets/skills/autogenesis/SKILL.md
+          cmp "${RUNNER_TEMP}/.agents/skills/autogenesis/SKILL.md" agent-contract/src/autogenesis_agent_contract/assets/skills/autogenesis/SKILL.md
       - name: Upload built wheels
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4

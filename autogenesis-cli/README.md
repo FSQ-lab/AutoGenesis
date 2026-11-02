@@ -21,10 +21,11 @@ The package manager, not `autogenesis install`, installs the host dependencies:
 | macOS | `autogenesis-agent-contract==2.1.0`, `autogenesis-appium-mcp==0.5.0` |
 | Windows | `autogenesis-agent-contract==2.1.0`, `autogenesis-appium-mcp==0.5.0`, `autogenesis-windows-mcp==0.5.0` |
 
-`autogenesis install` verifies the required package versions and Agent Contract,
-then atomically installs one `autogenesis` Skill under `~/.agents/skills` by
-default. It fails rather than invoking pip or uv when a package is missing or
-incompatible; an identical rerun reports `unchanged`.
+`autogenesis install --scope user --project-root <absolute-business-project>`
+verifies the authenticated package bundle, rejects other canonical or legacy
+discovery copies, and atomically installs one `autogenesis` Skill. Use
+`--scope project` for `<project>/.agents/skills`. An identical rerun reports
+`unchanged`.
 
 `autogenesis appium-skills --json` verifies the internal supported Appium workflow
 snapshot. `autogenesis appium-workflow <id> --json` loads one authenticated
@@ -34,9 +35,9 @@ bytes only when the asset belongs to that exact selected workflow. This CLI
 does not expose a generic Appium helper executor: execution requires the
 authenticated, approval-bound Host capability interface tracked by Issue #50.
 
-Use `--skills-dir /absolute/path` to select another user-approved destination.
-Existing non-canonical Skill bytes are preserved and cause a conflict instead
-of being overwritten.
+The selected scope and project root determine the only accepted discovery path.
+Existing non-canonical bytes or a Skill in another discovery scope are preserved
+and cause a conflict instead of being overwritten.
 
 The command does not install Appium Server, Drivers, SDKs, register MCP, create
 business configuration, or execute an application. Invoke `autogenesis` for

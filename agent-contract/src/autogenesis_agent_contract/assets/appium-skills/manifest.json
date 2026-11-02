@@ -2,7 +2,7 @@
   "assets": {
     "LICENSE": "5cb791a45cafc4bdaef57f3ba49fb7691a98c756e8148467f9e241295728490f",
     "NOTICE": "9f1b771d4aabea681760a9413bf7420ca8e971abf45d3cd8741fb4343169dd41",
-    "SOURCE.json": "7dfd415cea156928ed720ece42792660819042a657a69a0fd81f51320a70cbff",
+    "SOURCE.json": "9e2c317c445b9cd41953a77441d320ca8fbfb5408147fee5e85725ccb6aea7fb",
     "contexts/platform/android/bundletool.md": "277672fdb0d4f5269772671fd3c0e81fc8a010a2ee204005b7e25dc7f1724ec9",
     "contexts/platform/android/decision-logic.md": "4a8a1575a26734529b2789b62dbd777ae37be6e33e7a4aebebd958f659dcf2f6",
     "contexts/platform/android/emulator-setup.md": "4663898e6cdf86b2db35ef8950adc8f6335808445e4730b7c07729461fe28d5f",
@@ -79,10 +79,7 @@
     "tools/appium/setup/scripts/check-xcuitest-env.mjs": "9c442182aba46c163afdb2ea9bfa662943697cb16656123147ed3d769f7e36e8",
     "tools/appium/setup/scripts/env-check-helpers.mjs": "c36089dde1195571c92aca9b63e4de029a83b7480c0ab90bf67e7cd4ae0c545f",
     "tools/appium/setup/scripts/reporting.mjs": "388c293e89cbdcfc20e972fe5673530e906b822e4bec9c6554251c5124542b74",
-    "tools/appium/setup/scripts/smoke-appium-server.mjs": "b2399b753c63dd402aa78836a1f92f428d7fd88331d24c9d6f885a036db36969",
-    "tools/appium/setup/scripts/smoke-chromium-session.mjs": "da9298cd3bc957832233b12ff34b607ec652e53d629ac6f26e52e2f72be2c45e",
-    "tools/appium/setup/scripts/windows-command.mjs": "a2cd7300cc305529175de5f58b813dae49ab4657b86f3288c52bb1fa59fd581f",
-    "tools/appium/setup/scripts/windows-job.mjs": "22b18f540212c6c8326a4a86b266826a91346cab3e1a087d2b1a4a62b72a867e"
+    "tools/appium/setup/scripts/windows-command.mjs": "a2cd7300cc305529175de5f58b813dae49ab4657b86f3288c52bb1fa59fd581f"
   },
   "commit": "e907024c210fe024c956ed9c74146fc27b1dd013",
   "license": "Apache-2.0",

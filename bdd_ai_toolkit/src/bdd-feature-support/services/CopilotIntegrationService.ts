@@ -156,42 +156,58 @@ export class CopilotIntegrationService {
     }
   }
 
-  /** Resolve only the canonical Skill bytes at the selected Feature's discovery scope. */
-  hasSkillAvailable(skillName: string, featureFilePath: string): boolean {
+  /** Hold canonical Skill bytes from the selected Feature's discovery scope. */
+  loadSkillContent(skillName: string, featureFilePath: string): string | null {
     const relative = ['.agents', 'skills', skillName, 'SKILL.md'];
-    const expectedSha256 = '837a83cb03ef5ca3670930510566147490d5cad808ad28b1d4a3f2a0103193a9';
+    const expectedSha256 = '54b23e8a55408cf41815a3dd06db107e5747d27a3473e33f98a04d752c943773';
     const selected = vscode.workspace.getWorkspaceFolder(vscode.Uri.file(featureFilePath));
     const projectSkill = selected && path.join(selected.uri.fsPath, ...relative);
     const userSkill = path.join(os.homedir(), ...relative);
 
-    const verified = (candidate: string): boolean => {
+    const held = (candidate: string): string | null => {
+      let descriptor: number | undefined;
       try {
-        const info = fs.lstatSync(candidate);
-        if (!info.isFile() || info.isSymbolicLink() || info.size <= 0 || info.size > 256 * 1024) {
-          return false;
-        }
-        return createHash('sha256').update(fs.readFileSync(candidate)).digest('hex') === expectedSha256;
+        if (process.platform === 'win32') return null;
+        const expected = fs.lstatSync(candidate);
+        if (!expected.isFile() || expected.isSymbolicLink() || expected.size <= 0 || expected.size > 256 * 1024) return null;
+        descriptor = fs.openSync(candidate, fs.constants.O_RDONLY | fs.constants.O_NOFOLLOW);
+        const opened = fs.fstatSync(descriptor);
+        if (opened.dev !== expected.dev || opened.ino !== expected.ino || opened.size !== expected.size) return null;
+        const raw = fs.readFileSync(descriptor);
+        const final = fs.fstatSync(descriptor);
+        if (final.dev !== opened.dev || final.ino !== opened.ino || final.size !== opened.size) return null;
+        if (createHash('sha256').update(raw).digest('hex') !== expectedSha256) return null;
+        return raw.toString('utf8');
       } catch {
-        return false;
+        return null;
+      } finally {
+        if (descriptor !== undefined) fs.closeSync(descriptor);
       }
     };
 
-    // A stale project copy shadows user scope and must fail closed rather than silently switch scope.
-    if (projectSkill && fs.existsSync(projectSkill)) {
-      return verified(projectSkill);
-    }
-    return verified(userSkill);
+    // A project copy shadows user scope; invalid bytes fail closed rather than switching scope.
+    if (projectSkill && fs.existsSync(projectSkill)) return held(projectSkill);
+    return held(userSkill);
   }
 
-  /** Generate an exact, unambiguous Skill invocation for a selected Scenario. */
+  /** Generate an invocation bound to the exact held canonical Skill bytes. */
   generateSkillCommand(
     skillName: string,
     scenarioName: string,
     featureFilePath: string,
-    lineNumber: number
+    lineNumber: number,
+    skillContent: string
   ): string {
-    const selection = JSON.stringify({ featureFilePath, lineNumber, scenarioName });
-    return `/${skillName} Execute the exact selected Scenario using this selection data: ${selection}`;
+    const encode = (value: unknown) => JSON.stringify(value).replace(/[<>&]/g, character =>
+      `\\u${character.charCodeAt(0).toString(16).padStart(4, '0')}`
+    );
+    const authenticated = encode({
+      name: skillName,
+      sha256: createHash('sha256').update(skillContent).digest('hex'),
+      content: skillContent,
+    });
+    const selection = encode({ featureFilePath, lineNumber, scenarioName });
+    return `Apply this authenticated AutoGenesis Skill snapshot exactly: ${authenticated}\nExecute only the selected Scenario data: ${selection}`;
   }
 
   /**

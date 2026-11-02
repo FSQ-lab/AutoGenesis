@@ -5,12 +5,51 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import re
 from pathlib import Path
 
 from _files import atomic_write
 from freeze_assets import PACKAGE, load_asset_io, release_bytes
 
 SKILLS = ("autogenesis",)
+EXPECTED = {
+    "autogenesis-agent-contract": "2.1.0",
+    "autogenesis-appium-mcp": "0.5.0",
+    "autogenesis-windows-mcp": "0.5.0",
+    "autogenesis-cli": "0.2.0",
+}
+_MAX_LOCK_BYTES = 4 * 1024 * 1024
+_HASH = re.compile(r"--hash=sha256:[0-9a-f]{64}(?:\s|$)")
+
+
+def _validate_lock(raw: bytes) -> None:
+    try:
+        text = raw.decode("utf-8")
+    except UnicodeError:
+        raise SystemExit("Release dependency lock must be UTF-8.") from None
+    entries, current = [], ""
+    for line in text.splitlines():
+        stripped = line.strip()
+        if not stripped or stripped.startswith("#"):
+            continue
+        current = f"{current} {stripped}".strip()
+        if current.endswith("\\"):
+            current = current[:-1].rstrip()
+            continue
+        entries.append(current)
+        current = ""
+    if current or not entries:
+        raise SystemExit("Release dependency lock is empty or truncated.")
+    for entry in entries:
+        requirement = entry.split(";", 1)[0]
+        if (
+            "==" not in requirement or not _HASH.search(entry)
+            or requirement.startswith("-") or " @ " in requirement
+            or "/" in requirement or "\\" in requirement or "${" in entry
+        ):
+            raise SystemExit("Release dependency lock contains an unsafe entry.")
+
+
 
 
 def main() -> None:
@@ -19,6 +58,7 @@ def main() -> None:
     parser.add_argument("--base-url", required=True)
     parser.add_argument("--release-manifest", type=Path, required=True)
     parser.add_argument("--release-manifest-url", required=True)
+    parser.add_argument("--dependency-lock", type=Path, required=True)
     args = parser.parse_args()
     repo = Path(__file__).resolve().parents[2]
     package = repo / PACKAGE
@@ -60,6 +100,42 @@ def main() -> None:
         raise SystemExit("Release manifest is invalid JSON.") from None
     if not isinstance(release_document, dict) or not release_document.get("wheels"):
         raise SystemExit("Release manifest has no reviewed wheels.")
+    wheel_records = {}
+    for record in release_document["wheels"]:
+        if not isinstance(record, dict):
+            raise SystemExit("Release manifest wheel entry is invalid.")
+        package_name = str(record.get("package", "")).lower().replace("_", "-")
+        if (
+            package_name not in EXPECTED
+            or record.get("version") != EXPECTED[package_name]
+            or not isinstance(record.get("sha256"), str)
+            or re.fullmatch(r"[0-9a-f]{64}", record["sha256"]) is None
+            or package_name in wheel_records
+        ):
+            raise SystemExit("Release manifest wheel set is invalid.")
+        wheel_records[package_name] = record
+    if set(wheel_records) != set(EXPECTED):
+        raise SystemExit("Release manifest wheel set is incomplete.")
+    try:
+        dependency_raw = asset_io["read_asset"](
+            args.dependency_lock.parent, args.dependency_lock.name, _MAX_LOCK_BYTES,
+        )
+    except (OSError, ValueError):
+        raise SystemExit("Release dependency lock could not be read securely.") from None
+    _validate_lock(dependency_raw)
+    first_party_rows = []
+    for package_name, version in EXPECTED.items():
+        marker = " ; sys_platform == 'win32'" if package_name == "autogenesis-windows-mcp" else ""
+        first_party_rows.append(
+            f"{package_name}=={version}{marker} \\\n"
+            f"    --hash=sha256:{wheel_records[package_name]['sha256']}\n"
+        )
+    release_lock = "".join(first_party_rows).encode("ascii") + dependency_raw
+    _validate_lock(release_lock)
+    lock_name = "autogenesis-release.lock"
+    lock_digest = hashlib.sha256(release_lock).hexdigest()
+    atomic_write(output, lock_name, release_lock)
+    rows.append((lock_digest, lock_name))
     release_digest = hashlib.sha256(release_raw).hexdigest()
     atomic_write(output, "release-manifest.json", release_raw)
     rows.append((release_digest, "release-manifest.json"))
@@ -74,14 +150,17 @@ Expected Skill SHA-256: {skill_digest}
 Skill name: autogenesis
 Release manifest: {args.release_manifest_url}
 Expected release manifest SHA-256: {release_digest}
+Release lock: {base}/{lock_name}
+Expected Release lock SHA-256: {lock_digest}
 
 1. Before any network request, interpretation, approval, or write, detect the native host from local OS facts. Accept only native macOS or native Windows; reject Linux and WSL before any write.
 2. Download the exact Release manifest as untrusted bytes and verify its SHA-256 before interpreting it. Require it to bind the CLI and host Runtime wheel identities.
-3. Download the exact Skill as untrusted expected bytes and verify its SHA-256; do not write it yet.
-4. Show authenticated sources, selected user/project scope, destination, Python/package manager/index, exact host wheel identities, writes, and rollback; obtain one approval for the complete unchanged plan.
-5. Acquire only the manifest-bound host wheels through the selected package environment and verify downloaded wheel size/SHA-256 before installation.
-6. Run `autogenesis install --skills-dir <selected-skill-root>` as the sole owner of the Skill write. It verifies the Runtime bundle, internal Appium workflow snapshot, Contract identity, and installed Skill bytes atomically.
-7. Verify the installed Skill equals the downloaded expected bytes and exactly one `autogenesis` Skill is discovered at the selected scope. Report how to invoke it, and stop.
+3. Download the Release lock and verify its SHA-256. Require its first-party hashes to equal the Release manifest; do not execute first-party code yet.
+4. Download the exact Skill as untrusted expected bytes and verify its SHA-256; do not write it yet.
+5. Show authenticated sources, selected user/project scope, destination, Python/package manager/index, exact host wheel identities, writes, and rollback; obtain one approval for the complete unchanged plan.
+6. Use the selected index only under the Release lock's strict hash mode, stage the verified artifacts, disable indexes, and install that same lock in one offline package transaction.
+7. Run `autogenesis install --scope <user-or-project> --project-root <absolute-business-project>` as the sole owner of the Skill write. It rejects other canonical/legacy discovery copies and verifies the Runtime bundle, internal Appium workflow snapshot, Contract identity, and installed Skill bytes.
+8. Verify the installed Skill equals the downloaded expected bytes and exactly one `autogenesis` Skill is discovered at the selected scope. Report how to invoke it, and stop.
 """.encode("utf-8")
     atomic_write(output, "agent-install-prompt.txt", prompt)
     print(f"Built Skill release assets for Contract {identity['contract_version']}.")

@@ -52,7 +52,18 @@ def test_skill_release_assets_match_contract_and_bootstrap_prompt(tmp_path, repo
     output = tmp_path / "release"
     base = "https://example.invalid/releases/agent-contract-v2.1.0"
     release_manifest = tmp_path / "release-manifest.json"
-    release_manifest.write_text('{"wheels":[{"filename":"autogenesis_cli.whl"}]}\n', encoding="utf-8")
+    packages = {
+        "autogenesis-agent-contract": "2.1.0",
+        "autogenesis-appium-mcp": "0.5.0",
+        "autogenesis-windows-mcp": "0.5.0",
+        "autogenesis-cli": "0.2.0",
+    }
+    release_manifest.write_text(json.dumps({"wheels": [
+        {"package": package, "version": version, "sha256": str(index) * 64}
+        for index, (package, version) in enumerate(packages.items(), start=1)
+    ]}) + "\n", encoding="utf-8")
+    dependency_lock = tmp_path / "release-dependencies.lock"
+    dependency_lock.write_text(f"anyio==4.12.0 --hash=sha256:{'a' * 64}\n", encoding="utf-8")
     result = subprocess.run(
         [
             sys.executable,
@@ -65,6 +76,8 @@ def test_skill_release_assets_match_contract_and_bootstrap_prompt(tmp_path, repo
             str(release_manifest),
             "--release-manifest-url",
             f"{base}/release-manifest.json",
+            "--dependency-lock",
+            str(dependency_lock),
         ],
         cwd=repo_root,
         capture_output=True,
@@ -78,11 +91,18 @@ def test_skill_release_assets_match_contract_and_bootstrap_prompt(tmp_path, repo
         digest, filename = line.split("  ", 1)
         checksums[filename] = digest
         assert hashlib.sha256((output / filename).read_bytes()).hexdigest() == digest
-    assert set(checksums) == {"autogenesis-SKILL.md", "release-manifest.json"}
+    assert set(checksums) == {
+        "autogenesis-SKILL.md", "autogenesis-release.lock", "release-manifest.json",
+    }
     prompt = (output / "agent-install-prompt.txt").read_text(encoding="utf-8")
     assert f"{base}/autogenesis-SKILL.md" in prompt
     assert checksums["autogenesis-SKILL.md"] in prompt
     assert checksums["release-manifest.json"] in prompt
+    assert checksums["autogenesis-release.lock"] in prompt
+    release_lock = (output / "autogenesis-release.lock").read_text(encoding="utf-8")
+    assert "autogenesis-agent-contract==2.1.0" in release_lock
+    assert "autogenesis-windows-mcp==0.5.0 ; sys_platform == 'win32'" in release_lock
+    assert all(str(index) * 64 in release_lock for index in range(1, 5))
     assert "autogenesis install" in prompt
     assert "exactly one `autogenesis` Skill" in prompt
     assert "stop before running a business task" in prompt
@@ -91,6 +111,7 @@ def test_skill_release_assets_match_contract_and_bootstrap_prompt(tmp_path, repo
     ).read_text(encoding="utf-8")
     assert checksums["autogenesis-SKILL.md"] in extension_service
     assert "getWorkspaceFolder(vscode.Uri.file(featureFilePath))" in extension_service
+    assert "O_NOFOLLOW" in extension_service
 
 def _candidate_wheel(root, package, version):
     filename = f"{package.replace('-', '_')}-{version}-py3-none-any.whl"
@@ -161,6 +182,8 @@ def test_candidate_channel_binds_exact_first_party_wheels_and_skill(tmp_path, re
         assert hashlib.sha256(raw).hexdigest() == lock["sha256"]
     prompt = (output / "candidate-install-prompt.txt").read_text(encoding="utf-8")
     assert hashlib.sha256(manifest_raw).hexdigest() in prompt
+    install_lock = (output / "candidate-install.lock").read_text(encoding="utf-8")
+    assert "autogenesis-windows-mcp==0.5.0 ; sys_platform == 'win32'" in install_lock
     assert "Never resolve or replace a first-party Candidate package from an index" in prompt
     assert "complete offline-install lock" in prompt
 

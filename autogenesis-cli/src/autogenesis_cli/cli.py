@@ -28,7 +28,7 @@ EXPECTED = {
     "autogenesis-appium-mcp": "0.5.0",
     "autogenesis-windows-mcp": "0.5.0",
 }
-EXPECTED_CONTRACT_MANIFEST = "cc8d75739906d6876a5a2500f1f911190e5128d761f14533853a3455d84bf0bf"
+EXPECTED_CONTRACT_MANIFEST = "dd88051a2b2440d4188b11eef41e41aa2c7dbfe3291f152a37a903ee17cb493f"
 _UNSAFE = "AUTOGENESIS_SKILL_DESTINATION_UNSAFE"
 _CONFLICT = "AUTOGENESIS_SKILL_CONFLICT: existing Skill differs"
 _INTEGRITY = "AUTOGENESIS_SKILL_INTEGRITY_ERROR"
@@ -748,14 +748,53 @@ def _filesystem(skills_dir: Any):
         return _WindowsTransaction(skills_dir)
     raise InstallError("AUTOGENESIS_PLATFORM_UNSUPPORTED: native macOS or Windows is required")
 
+_LEGACY_SKILLS = ("autogenesis-setup", "autogenesis-run")
 
-def install(skills_dir: Path) -> dict:
+
+def _entry_exists(path: Path) -> bool:
+    try:
+        path.lstat()
+    except FileNotFoundError:
+        return False
+    except OSError:
+        raise InstallError("AUTOGENESIS_SKILL_DISCOVERY_UNSAFE") from None
+    return True
+
+
+def _require_single_discovery_scope(selected: Path, roots: tuple[Path, ...]) -> None:
+    for root in roots:
+        for name in (*SKILLS, *_LEGACY_SKILLS):
+            if root == selected and name in SKILLS:
+                continue
+            if _entry_exists(root / name):
+                raise InstallError("AUTOGENESIS_SKILL_DISCOVERY_CONFLICT")
+
+
+def _selected_scope(scope: str, project_root: Path) -> tuple[Path, tuple[Path, ...]]:
+    if scope not in {"user", "project"} or not project_root.is_absolute():
+        raise InstallError("AUTOGENESIS_SKILL_SCOPE_INVALID")
+    try:
+        project_info = project_root.lstat()
+    except OSError:
+        raise InstallError("AUTOGENESIS_SKILL_SCOPE_INVALID") from None
+    if not stat.S_ISDIR(project_info.st_mode) or stat.S_ISLNK(project_info.st_mode):
+        raise InstallError("AUTOGENESIS_SKILL_SCOPE_INVALID")
+    user = Path.home() / ".agents" / "skills"
+    project = project_root / ".agents" / "skills"
+    selected = user if scope == "user" else project
+    return selected, (user, project)
+
+
+
+def install(skills_dir: Path, *, discovery_roots: tuple[Path, ...] = ()) -> dict:
     # Platform rejection and all package/Contract/Appium verification precede any
     # destination probe or filesystem mutation.
     packages, raw_skills = _install_bytes()
     transaction = _filesystem(skills_dir)
     plan: list[tuple[str, tuple[str, ...], bytes, str]] = []
     try:
+        if discovery_roots:
+            _require_single_discovery_scope(skills_dir, discovery_roots)
         for name in SKILLS:
             raw = raw_skills[name]
             relative = (name, "SKILL.md")
@@ -764,6 +803,8 @@ def install(skills_dir: Path) -> dict:
             if status == "pending":
                 transaction.create(relative, raw)
         transaction.verify(plan)
+        if discovery_roots:
+            _require_single_discovery_scope(skills_dir, discovery_roots)
         transaction.commit()
     except BaseException:
         transaction.rollback()
@@ -776,7 +817,8 @@ def install(skills_dir: Path) -> dict:
         }
         for name, _relative, raw, status in plan
     }
-    return {"status": "ready", "platform": sys.platform, "packages": packages, "skills": installed}
+    return {"status": "ready", "platform": sys.platform, "packages": packages, "skills": installed,
+            "discovery_root": str(skills_dir)}
 
 
 def _appium_metadata(bundle: Any) -> dict[str, Any]:
@@ -803,6 +845,14 @@ def _appium_workflow_metadata(bundle: Any, workflow_id: str) -> dict[str, Any]:
         "optional_contexts": list(workflow.optional_contexts),
         "tools": list(workflow.tools),
         "assets": dict(workflow.assets),
+        "host_operations": [
+            {
+                "operation_id": operation.operation_id,
+                "parameters": dict(operation.parameters),
+                "replaces_upstream_tool": operation.replaces_upstream_tool,
+            }
+            for operation in workflow.host_operations
+        ],
     }
 
 
@@ -811,12 +861,14 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="autogenesis")
     parser.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
     subparsers = parser.add_subparsers(dest="command", required=True)
-    command = subparsers.add_parser("install", help="install the host bundle's canonical Skills")
+    command = subparsers.add_parser("install", help="install the host bundle's canonical Skill")
     command.add_argument(
-        "--skills-dir",
-        type=Path,
-        default=Path.home() / ".agents" / "skills",
-        help="absolute Skill root (default: ~/.agents/skills)",
+        "--scope", choices=("user", "project"), default="user",
+        help="Skill discovery scope (default: user)",
+    )
+    command.add_argument(
+        "--project-root", type=Path, default=Path.cwd(),
+        help="absolute business project root used for discovery precedence",
     )
     command.add_argument("--json", action="store_true", help="emit machine-readable result")
     appium_skills = subparsers.add_parser(
@@ -837,7 +889,8 @@ def main(argv: list[str] | None = None) -> int:
     binary_result: bytes | None = None
     try:
         if args.command == "install":
-            result = install(args.skills_dir.expanduser())
+            selected, discovery_roots = _selected_scope(args.scope, args.project_root.expanduser())
+            result = install(selected, discovery_roots=discovery_roots)
         elif args.command == "appium-skills":
             result = _appium_metadata(load_appium_skills(_verified_contract()))
         elif args.command == "appium-workflow":

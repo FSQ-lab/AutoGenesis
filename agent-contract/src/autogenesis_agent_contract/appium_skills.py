@@ -32,6 +32,19 @@ SUPPORTED_WORKFLOWS = MappingProxyType({
 })
 _ASSET_REFERENCE = re.compile(r"(?<![A-Za-z0-9_.\-/])(?:contexts|tools)/[A-Za-z0-9_.\-/]+")
 _IMPORT_REFERENCE = re.compile(r"(?:from\s+|import\s*\(|import\s+|require\s*\()[\"']([^\"']+)[\"']")
+_UPSTREAM_SMOKE_TOOL = "tools/appium/setup/scripts/smoke-appium-server.mjs"
+_HOST_SMOKE_DRIVERS = MappingProxyType({
+    "setup-mac2": "mac2",
+    "setup-uiautomator2": "uiautomator2",
+    "setup-xcuitest": "xcuitest",
+})
+
+
+@dataclass(frozen=True, slots=True)
+class AppiumHostOperation:
+    operation_id: str
+    parameters: Mapping[str, str]
+    replaces_upstream_tool: str
 
 
 @dataclass(frozen=True, slots=True)
@@ -43,6 +56,7 @@ class AppiumWorkflow:
     optional_contexts: tuple[str, ...]
     tools: tuple[str, ...]
     assets: Mapping[str, str]
+    host_operations: tuple[AppiumHostOperation, ...]
 
 
 def _declared_contexts(text: str, key: str) -> tuple[str, ...]:
@@ -89,6 +103,7 @@ def _transitive_assets(bundle: "AppiumSkillsBundle", roots: tuple[str, ...]) -> 
                 if len(matches) != 1:
                     raise _integrity("invalid_appium_workflow_inventory")
                 references.add(matches[0])
+        references.discard(_UPSTREAM_SMOKE_TOOL)
         if any(path not in bundle._contents for path in references):
             raise _integrity("invalid_appium_workflow_inventory")
         for path in references:
@@ -108,12 +123,19 @@ def _load_workflow(bundle: "AppiumSkillsBundle", workflow_id: str) -> AppiumWork
         raise _integrity("invalid_appium_workflow_inventory") from None
     required = _declared_contexts(text, "renma.requires-context")
     optional = _declared_contexts(text, "renma.optional-context")
-    direct_tools = tuple(sorted({path.rstrip("`.,;:)") for path in _ASSET_REFERENCE.findall(text) if path.startswith("tools/")}))
+    referenced_tools = {path.rstrip("`.,;:)") for path in _ASSET_REFERENCE.findall(text) if path.startswith("tools/")}
+    direct_tools = tuple(sorted(referenced_tools - {_UPSTREAM_SMOKE_TOOL}))
     direct = (entrypoint, *required, *optional, *direct_tools)
     if len(direct) != len(set(direct)) or any(path not in bundle._contents for path in direct):
         raise _integrity("invalid_appium_workflow_inventory")
     selected = _transitive_assets(bundle, direct)
     tools = tuple(path for path in selected if path.startswith("tools/"))
+    driver = _HOST_SMOKE_DRIVERS.get(workflow_id)
+    host_operations = () if driver is None else (AppiumHostOperation(
+        operation_id="appium_server_smoke",
+        parameters=MappingProxyType({"driver": driver}),
+        replaces_upstream_tool=_UPSTREAM_SMOKE_TOOL,
+    ),)
     return AppiumWorkflow(
         workflow_id=workflow_id,
         entrypoint=entrypoint,
@@ -122,6 +144,7 @@ def _load_workflow(bundle: "AppiumSkillsBundle", workflow_id: str) -> AppiumWork
         optional_contexts=optional,
         tools=tools,
         assets=MappingProxyType({path: bundle.assets[path] for path in selected}),
+        host_operations=host_operations,
     )
 
 

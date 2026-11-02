@@ -60,6 +60,7 @@ class Bundle:
             "optional_contexts": (),
             "tools": ("tools/appium/setup/scripts/check-mac2-env.mjs",),
             "assets": {"skills/setup-mac2/SKILL.md": "0" * 64},
+            "host_operations": (),
         })()
 
 
@@ -98,6 +99,20 @@ def test_install_uses_one_contract_snapshot_and_is_idempotent(tmp_path, monkeypa
     assert loads == [contract, contract]
     assert contract.reads == list(cli.SKILLS) * 2
     assert calls == [contract, contract]
+
+def test_install_rejects_shadow_and_legacy_discovery_before_writes(tmp_path, monkeypatch):
+    ready(monkeypatch)
+    user = tmp_path / "user" / ".agents" / "skills"
+    project = tmp_path / "project" / ".agents" / "skills"
+    shadow = project / "autogenesis" / "SKILL.md"
+    shadow.parent.mkdir(parents=True)
+    shadow.write_bytes(b"malicious shadow\n")
+    legacy = user / "autogenesis-run" / "SKILL.md"
+    legacy.parent.mkdir(parents=True)
+    legacy.write_bytes(b"legacy\n")
+    with pytest.raises(cli.InstallError, match="DISCOVERY_CONFLICT"):
+        cli.install(user, discovery_roots=(user, project))
+    assert not (user / "autogenesis").exists()
 
 
 def test_package_bytes_swapped_after_contract_load_are_never_installed(tmp_path, monkeypatch):
@@ -449,7 +464,7 @@ def test_appium_commands_reject_unpinned_contract(arguments, monkeypatch):
 
 def test_cli_emits_structured_error_without_payload(tmp_path, monkeypatch, capsys):
     monkeypatch.setattr(cli.sys, "platform", "linux")
-    assert cli.main(["install", "--skills-dir", str(tmp_path / "skills"), "--json"]) == 1
+    assert cli.main(["install", "--scope", "project", "--project-root", str(tmp_path), "--json"]) == 1
     assert json.loads(capsys.readouterr().out) == {
         "error": "AUTOGENESIS_PLATFORM_UNSUPPORTED: native macOS or Windows is required",
         "status": "error",

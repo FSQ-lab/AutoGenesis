@@ -1,12 +1,12 @@
 {
   "assets": {
-    "appium-skills/manifest.json": "ba0226fb2687511d587cb992f4d37dea110795410f5305c9b2d8fca36a50e551",
+    "appium-skills/manifest.json": "eee4d197f70c9100a767755c95edf41067b6e1da4d6571517c2fc509a1c38f4a",
     "core-policy.md": "d6f899b993b18baf9c15eb23d9f7ca7429d95f2115dc9abeb2c2766e89553e52",
     "schemas/arguments.schema.json": "50368fd1c689428fb063018a89fb85cb8db700093f50e2c00352a53c1273b899",
     "schemas/identity.schema.json": "f95e1f2e887cc0ee3877c00a4a96c4c9a6571bfebff47e439e3e50a68186bc4d",
     "schemas/manifest.schema.json": "6daeaf317bbd3e954d665fbec087f93159a868fb910f12826d655ae15d3bd53c",
     "schemas/secret-reference.schema.json": "163041e09fefed32640af4f785b0f29a1876666c210c8099a190cd3509f1404e",
-    "skills/autogenesis/SKILL.md": "837a83cb03ef5ca3670930510566147490d5cad808ad28b1d4a3f2a0103193a9",
+    "skills/autogenesis/SKILL.md": "54b23e8a55408cf41815a3dd06db107e5747d27a3473e33f98a04d752c943773",
     "workflows/execute_natural_language_task.md": "6f8150bdbae57000cf72089ababb37c7e01b1050e6d95d248dc0ab6f018ffc16",
     "workflows/execute_scenario.md": "e8c41dffcea6043f434e90460e0fdfa74a66465494aa52e8275e759450ef31c7",
     "workflows/generate_scenario_test.md": "65bcd4bcb04a16a8fae6364ad04142162223ac7a64c2b47f37371f0eb981930f"

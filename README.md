@@ -42,12 +42,21 @@ before any download, acquired-content interpretation, approval request, or write
 
 ### CLI-first
 
-Install the CLI through the Python environment and package index you choose:
+Download the Release manifest and its generated strict-hash lock from the same
+immutable GitHub Release. Do not install AutoGenesis directly by version from an
+index. Use the package index or mirror you choose only under that lock:
 
 ```bash
-python -m pip install autogenesis-cli==0.2.0
-autogenesis install
+curl --proto '=https' --tlsv1.2 --fail --location --remote-name https://github.com/FSQ-lab/AutoGenesis/releases/download/agent-contract-v2.1.0/release-manifest.json
+curl --proto '=https' --tlsv1.2 --fail --location --remote-name https://github.com/FSQ-lab/AutoGenesis/releases/download/agent-contract-v2.1.0/autogenesis-release.lock
+python -m pip download --require-hashes --requirement autogenesis-release.lock --dest autogenesis-wheelhouse
+python -m pip install --no-index --find-links autogenesis-wheelhouse --require-hashes --requirement autogenesis-release.lock
+autogenesis install --scope user --project-root "$PWD"
 ```
+
+The Release workflow derives `autogenesis-release.lock` from the reviewed
+manifest wheel identities and a universal third-party dependency lock. Missing
+or changed bytes fail before any first-party AutoGenesis code executes.
 
 The Python package installation resolves the supported host bundle:
 
@@ -65,10 +74,10 @@ autogenesis-appium-mcp --version
 autogenesis-windows-mcp --version  # Windows only
 ```
 
-`autogenesis install` does not invoke pip or uv. It verifies the host bundle and
-installs one canonical `autogenesis` Skill under `~/.agents/skills` by default;
-`--skills-dir` selects an approved project scope. Re-running identical bytes is
-idempotent.
+`autogenesis install` does not invoke pip or uv. It verifies the authenticated
+host bundle and installs one canonical `autogenesis` Skill at the explicit
+`--scope`; `--project-root` binds discovery precedence. Re-running identical
+bytes is idempotent, while another canonical or legacy discovery copy fails.
 
 The command does not install Appium Server, Drivers, SDKs, project MCP, or
 business configuration. Invoke `autogenesis` for preparation, diagnosis, direct

@@ -16,7 +16,7 @@ from mcp.server.fastmcp import FastMCP
 # These pins belong to the runtime release, independently of the installed wheel.
 required = RuntimeContractRequirement(
     contract_version="2.1.0",
-    manifest_sha256="cc8d75739906d6876a5a2500f1f911190e5128d761f14533853a3455d84bf0bf",
+    manifest_sha256="dd88051a2b2440d4188b11eef41e41aa2c7dbfe3291f152a37a903ee17cb493f",
 )
 contract = load_contract(ContractIdentity(required.contract_version, required.manifest_sha256))
 appendix = load_project_appendix("/absolute/business-project")
@@ -32,8 +32,11 @@ register_mcp(server, contract, appendix, required)
   `manifest_sha256`, and `schema_version` (current `2`); `to_dict()` returns metadata.
 - `load_appium_skills(contract: AgentContract | None = None) -> AppiumSkillsBundle`
   verifies the internal supported `appium/skills` snapshot. `load_workflow(id)`
-  returns one authenticated official entrypoint with declared Context/tool inventory;
-  `read_asset(relative)` returns held bytes without trusting a mutable package path.
+  returns one authenticated official entrypoint with declared Context/tool inventory
+  plus constrained `host_operations`. Broad upstream smoke executables are excluded;
+  their accepted UiAutomator2/XCUITest/Mac2 step is represented by an exact driver
+  parameter for the Issue #50 Host. `read_asset(relative)` returns held bytes without
+  trusting a mutable package path.
 - `AgentContract.instructions -> str` contains the identity and fixed Core Policy.
 - `AgentContract.render(workflow_id: str, arguments: Mapping[str, str],
   appendix: ProjectAppendix | None = None) -> str` always emits identity, Core

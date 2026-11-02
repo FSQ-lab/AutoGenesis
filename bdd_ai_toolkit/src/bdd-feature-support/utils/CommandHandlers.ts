@@ -51,14 +51,16 @@ export class CommandHandlers {
       // Check if the canonical AutoGenesis skill exists in the workspace
       const skillName = 'autogenesis';
       let textToSend: string;
+      const skillContent = this.copilotService.loadSkillContent(skillName, uri.fsPath);
 
-      if (this.copilotService.hasSkillAvailable(skillName, uri.fsPath)) {
+      if (skillContent !== null) {
         // Bind the invocation to the exact Feature path and selected line.
         textToSend = this.copilotService.generateSkillCommand(
           skillName,
           scenarioName,
           uri.fsPath,
-          lineNumber
+          lineNumber,
+          skillContent
         );
       } else {
         // Fallback: generate full prompt text for Copilot

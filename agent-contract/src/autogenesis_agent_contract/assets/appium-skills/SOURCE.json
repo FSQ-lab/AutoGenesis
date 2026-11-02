@@ -85,10 +85,7 @@
     "tools/appium/setup/scripts/check-xcuitest-env.mjs",
     "tools/appium/setup/scripts/env-check-helpers.mjs",
     "tools/appium/setup/scripts/reporting.mjs",
-    "tools/appium/setup/scripts/smoke-appium-server.mjs",
-    "tools/appium/setup/scripts/smoke-chromium-session.mjs",
-    "tools/appium/setup/scripts/windows-command.mjs",
-    "tools/appium/setup/scripts/windows-job.mjs"
+    "tools/appium/setup/scripts/windows-command.mjs"
   ],
-  "upstream_tree_sha256": "05584285dc0823eb373df6f9aaa58f9eefe0e969981f3ba56373c17d7f0f8c40"
+  "upstream_tree_sha256": "ffc523105d9973f15dcd442f72a2869d72303e9577ff9f56179c59a05d57d613"
 }

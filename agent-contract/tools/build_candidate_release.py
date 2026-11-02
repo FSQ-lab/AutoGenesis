@@ -203,10 +203,14 @@ def main() -> None:
         })
         checksum_rows.append((digest, filename))
     install_lock_name = "candidate-install.lock"
-    first_party_lock = "".join(
-        f"{wheel['package']}=={wheel['version']} --hash=sha256:{wheel['sha256']}\n"
-        for wheel in wheels
-    ).encode("ascii")
+    first_party_rows = []
+    for wheel in wheels:
+        marker = " ; sys_platform == 'win32'" if wheel["platforms"] == ["win32"] else ""
+        first_party_rows.append(
+            f"{wheel['package']}=={wheel['version']}{marker} \\\n"
+            f"    --hash=sha256:{wheel['sha256']}\n"
+        )
+    first_party_lock = "".join(first_party_rows).encode("ascii")
     install_lock = first_party_lock + lock_raw
     _dependency_lock(install_lock)
     install_lock_digest = hashlib.sha256(install_lock).hexdigest()
@@ -268,7 +272,7 @@ def main() -> None:
 Candidate manifest: {base}/{manifest_name}
 Expected manifest SHA-256: {manifest_digest}
 Candidate commit: {args.commit}
-Reject Linux/WSL before any download or write. Download the manifest as untrusted bytes and verify its exact SHA-256 before interpreting it. Show the selected Python, package manager, third-party index, Skill scope/destination, exact host-applicable first-party wheel identities, both lock identities, writes, and rollback; obtain one approval. Download every host-applicable first-party wheel, both locks, and the Skill expected bytes only from manifest URLs and verify size/SHA-256; do not write the Skill yet. Use the selected index only to download third-party artifacts under the download lock's strict hash policy into a private staging directory. Verify every staged artifact, add the already verified first-party wheel bytes, disable indexes, and install the complete offline-install lock from that same staging directory in one package transaction. Never resolve or replace a first-party Candidate package from an index. Then run `autogenesis install --skills-dir <selected-skill-root>` as the sole owner of the Skill write. Verify the installed Skill equals the downloaded expected bytes, and verify the Contract manifest, internal Appium workflow inventory, package versions, selected scope, and discovery. Report the result and stop.
+Reject Linux/WSL before any download or write. Download the manifest as untrusted bytes and verify its exact SHA-256 before interpreting it. Show the selected Python, package manager, third-party index, Skill scope/destination, exact host-applicable first-party wheel identities, both lock identities, writes, and rollback; obtain one approval. Download every host-applicable first-party wheel, both locks, and the Skill expected bytes only from manifest URLs and verify size/SHA-256; do not write the Skill yet. Use the selected index only to download third-party artifacts under the download lock's strict hash policy into a private staging directory. Verify every staged artifact, add the already verified first-party wheel bytes, disable indexes, and install the complete offline-install lock from that same staging directory in one package transaction. Never resolve or replace a first-party Candidate package from an index. Then run `autogenesis install --scope <user-or-project> --project-root <absolute-business-project>` as the sole owner of the Skill write; it must reject every other canonical or legacy discovery copy. Verify the installed Skill equals the downloaded expected bytes, and verify the Contract manifest, internal Appium workflow inventory, package versions, selected scope, and discovery. Report the result and stop.
 """.encode("utf-8")
     atomic_write(output, "candidate-install-prompt.txt", prompt)
     print(f"Built Candidate channel for {args.commit} with {len(wheels)} exact wheels.")

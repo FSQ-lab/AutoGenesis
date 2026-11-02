@@ -42,10 +42,12 @@ Select one supported internal workflow from observed target evidence:
 - Existing supported session/command failure: `appium-troubleshooting`.
 
 Load the exact workflow with `autogenesis appium-workflow <id> --json`; follow its
-authenticated Skill and selected Contexts/tools. The LLM owns workflow and
-remediation decisions. Host executes only the submitted operation/plan and owns
-security enforcement and cleanup; it never chooses a workflow, fix, fallback,
-optional capability, business action, or next step.
+authenticated Skill and selected Contexts. Vendored command examples are guidance,
+not executable authority: submit only the returned `host_operations`; never invoke
+an upstream tool path directly. The LLM owns workflow and remediation decisions.
+Host executes only the submitted operation/plan and owns security enforcement and
+cleanup; it never chooses a workflow, fix, fallback, optional capability, business
+action, or next step.
 
 Approval covers one unchanged immutable plan. Any identity, argument, environment,
 destination, persistence, risk, or cleanup change invalidates it. Consent is not

@@ -66,7 +66,7 @@ def test_verified_snapshot_has_exact_identity_and_held_entrypoints(monkeypatch):
     assert bundle.node_majors == (20, 22, 24)
     assert bundle.commit == "e907024c210fe024c956ed9c74146fc27b1dd013"
     assert bundle.license == "Apache-2.0"
-    assert len(bundle.assets) == 83
+    assert len(bundle.assets) == 80
     expected = {
         name: resources.files("autogenesis_agent_contract").joinpath(
             f"assets/{implementation.APPIUM_SKILLS_ROOT}/{name}"
@@ -98,6 +98,22 @@ def test_supported_workflows_load_declared_held_assets():
     assert "tools/appium/setup/scripts/check-node-env.mjs" in android.assets
     assert "tools/appium/setup/scripts/check-android-env.mjs" in android.assets
     assert "contexts/platform/android/decision-logic.md" in android.assets
+    assert {
+        workflow_id: tuple(
+            operation.parameters["driver"]
+            for operation in bundle.load_workflow(workflow_id).host_operations
+        )
+        for workflow_id in ("setup-mac2", "setup-uiautomator2", "setup-xcuitest")
+    } == {
+        "setup-mac2": ("mac2",),
+        "setup-uiautomator2": ("uiautomator2",),
+        "setup-xcuitest": ("xcuitest",),
+    }
+    assert not {
+        "tools/appium/setup/scripts/smoke-appium-server.mjs",
+        "tools/appium/setup/scripts/smoke-chromium-session.mjs",
+        "tools/appium/setup/scripts/windows-job.mjs",
+    } & set(bundle.assets)
 
 
 @pytest.mark.parametrize("workflow_id", ["", "setup", "setup-espresso", "../setup-mac2", None])
@@ -142,7 +158,18 @@ def test_contract_snapshot_rejects_consistent_nested_manifest_and_asset_swap(cop
 def test_agent_install_prompt_gates_host_and_converges_on_shared_installer(tmp_path, repo_root):
     output = tmp_path / "release"
     release_manifest = tmp_path / "release-manifest.json"
-    release_manifest.write_text('{"wheels":[{"filename":"autogenesis_cli.whl"}]}\n')
+    packages = {
+        "autogenesis-agent-contract": "2.1.0",
+        "autogenesis-appium-mcp": "0.5.0",
+        "autogenesis-windows-mcp": "0.5.0",
+        "autogenesis-cli": "0.2.0",
+    }
+    release_manifest.write_text(json.dumps({"wheels": [
+        {"package": package, "version": version, "sha256": str(index) * 64}
+        for index, (package, version) in enumerate(packages.items(), start=1)
+    ]}) + "\n")
+    dependency_lock = tmp_path / "release-dependencies.lock"
+    dependency_lock.write_text(f"anyio==4.12.0 --hash=sha256:{'a' * 64}\n")
     result = subprocess.run(
         [
             sys.executable,
@@ -155,6 +182,8 @@ def test_agent_install_prompt_gates_host_and_converges_on_shared_installer(tmp_p
             str(release_manifest),
             "--release-manifest-url",
             "https://example.invalid/immutable/release-manifest.json",
+            "--dependency-lock",
+            str(dependency_lock),
         ],
         cwd=repo_root,
         capture_output=True,
@@ -168,11 +197,11 @@ def test_agent_install_prompt_gates_host_and_converges_on_shared_installer(tmp_p
     manifest = prompt.index("Download the exact Release manifest")
     acquire = prompt.index("Download the exact Skill")
     approve = prompt.index("obtain one approval")
-    install = prompt.index("autogenesis install --skills-dir")
+    install = prompt.index("autogenesis install --scope")
     assert gate < manifest < acquire < approve < install
     assert "Accept only native macOS or native Windows" in prompt
     assert "reject Linux and WSL before any write" in prompt
-    assert "manifest-bound host wheels" in prompt
+    assert "Release lock's strict hash mode" in prompt
     assert "exactly one `autogenesis` Skill" in prompt
 
 
@@ -188,7 +217,7 @@ def test_upstream_provenance_exact_pinned_subset_passes(snapshot_verifier, upstr
     assert provenance["commit"] == UPSTREAM_COMMIT
     assert provenance["upstream_git_tree"] == "26deb451d8c019ac0dbd70de832e6ae5be877383"
     assert provenance["upstream_tree_sha256"] == (
-        "05584285dc0823eb373df6f9aaa58f9eefe0e969981f3ba56373c17d7f0f8c40"
+        "ffc523105d9973f15dcd442f72a2869d72303e9577ff9f56179c59a05d57d613"
     )
     assert json.loads(manifest)["commit"] == UPSTREAM_COMMIT
 
