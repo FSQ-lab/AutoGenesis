@@ -16,7 +16,7 @@ from mcp.server.fastmcp import FastMCP
 # These pins belong to the runtime release, independently of the installed wheel.
 required = RuntimeContractRequirement(
     contract_version="2.1.0",
-    manifest_sha256="7ef4c25a1659505ff6dce335196c0516ca36709ca30424669b927fc5675d0094",
+    manifest_sha256="dd88051a2b2440d4188b11eef41e41aa2c7dbfe3291f152a37a903ee17cb493f",
 )
 contract = load_contract(ContractIdentity(required.contract_version, required.manifest_sha256))
 appendix = load_project_appendix("/absolute/business-project")
@@ -27,13 +27,16 @@ register_mcp(server, contract, appendix, required)
 - `load_contract(expected_identity: ContractIdentity | None = None) -> AgentContract`
   verifies the pinned manifest and every asset before returning an immutable snapshot.
 - `AgentContract.read_skill(name: str) -> bytes` returns held verified bytes for
-  exactly `autogenesis-setup` or `autogenesis-run`; it never rereads package paths.
+  exactly `autogenesis`; it never rereads package paths.
 - `AgentContract.identity -> ContractIdentity` has `contract_version`,
   `manifest_sha256`, and `schema_version` (current `2`); `to_dict()` returns metadata.
 - `load_appium_skills(contract: AgentContract | None = None) -> AppiumSkillsBundle`
-  verifies the nested immutable `appium/skills` snapshot. The bundle exposes source
-  identity, a read-only digest inventory, and `read_asset(relative) -> bytes` backed
-  by the bytes retained during that verification pass, not a mutable filesystem root.
+  verifies the internal supported `appium/skills` snapshot. `load_workflow(id)`
+  returns one authenticated official entrypoint with declared Context/tool inventory
+  plus constrained `host_operations`. Broad upstream smoke executables are excluded;
+  their accepted UiAutomator2/XCUITest/Mac2 step is represented by an exact driver
+  parameter for the Issue #50 Host. `read_asset(relative)` returns held bytes without
+  trusting a mutable package path.
 - `AgentContract.instructions -> str` contains the identity and fixed Core Policy.
 - `AgentContract.render(workflow_id: str, arguments: Mapping[str, str],
   appendix: ProjectAppendix | None = None) -> str` always emits identity, Core
@@ -158,14 +161,12 @@ module through their generation tools.
 
 ## Generated sources
 
-Only change official assets while authoring a new unreleased contract version.
-Published `1.0.0` bytes remain immutable. Contract `1.1.0` added the versioned
-SecretRef schema; contract `1.2.0` added project-scoped, preview-bound atomic
-generation commits. Contract `2.0.0` replaces the platform-split camel-case
-Skills with Agent Skills-compliant `autogenesis-setup` and unified
-`autogenesis-run`. Contract `2.1.0` pins the official Appium Skills bundle and
-routes supported local Appium setup through its verified root. Later changes
-require a new version and schema review as appropriate.
+Only change official assets while authoring an approved unreleased Contract.
+Published Contract bytes remain immutable. The current clean-room cutover replaces
+`autogenesis-setup` and `autogenesis-run` with one `autogenesis` Skill and limits
+the pinned official Appium snapshot to the reviewed UiAutomator2, XCUITest,
+real-device, Mac2, and troubleshooting dependency closure. A release still
+requires an explicit version decision and schema review as applicable.
 
 First check out the immutable upstream Appium Skills commit separately. The
 verifier checks its Git commit, tree object, and origin when Git metadata is

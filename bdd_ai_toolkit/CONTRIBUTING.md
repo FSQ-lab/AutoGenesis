@@ -75,9 +75,9 @@ This generates `bdd-ai-toolkit-<version>.vsix` that can be installed in VS Code.
 
 ### Local Appium setup
 
-Use the canonical `autogenesis-setup` Skill from the installed Agent Contract.
-Its verified official Appium Skills snapshot owns Appium, Driver, SDK, Xcode,
-doctor, and server-smoke preparation. Do not add a second extension-specific
-installer or startup script.
+Use the canonical `autogenesis` Skill. Its internal verified official Appium
+workflows own Appium, Driver, SDK, Xcode, doctor, and server-smoke guidance while
+AutoGenesis Host authenticates exact operations and cleanup. Do not add a second
+extension-specific installer or startup script.
 
 ---

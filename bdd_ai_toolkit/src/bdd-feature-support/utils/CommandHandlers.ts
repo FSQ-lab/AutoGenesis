@@ -48,13 +48,24 @@ export class CommandHandlers {
         .getBackgroundExtractor()
         .extractBackground(document);
 
-      // Check if the canonical autogenesis-run skill exists in the workspace
-      const skillName = 'autogenesis-run';
+      // Check if the canonical AutoGenesis skill exists in the workspace
+      const skillName = 'autogenesis';
       let textToSend: string;
+      const skill = this.copilotService.loadSkillContent(skillName, uri.fsPath);
 
-      if (this.copilotService.hasSkillInWorkspace(skillName)) {
-        // Use skill invocation command
-        textToSend = this.copilotService.generateSkillCommand(skillName, scenarioName);
+      if (skill.status === 'invalid') {
+        vscode.window.showErrorMessage('The discovered autogenesis Skill differs from the authenticated release. Run autogenesis install for one explicit scope.');
+        return;
+      }
+      if (skill.status === 'ready') {
+        // Bind the invocation to the exact Feature path and selected line.
+        textToSend = this.copilotService.generateSkillCommand(
+          skillName,
+          scenarioName,
+          uri.fsPath,
+          lineNumber,
+          skill.content
+        );
       } else {
         // Fallback: generate full prompt text for Copilot
         textToSend = await this.copilotService.generateScenarioText(

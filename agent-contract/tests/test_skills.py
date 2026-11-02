@@ -1,4 +1,5 @@
 import hashlib
+import json
 import os
 import re
 import runpy
@@ -6,102 +7,63 @@ import shutil
 import subprocess
 import sys
 from importlib import resources
+import zipfile
 
 import pytest
 
 from autogenesis_agent_contract._asset_io import MAX_ASSET_BYTES, MAX_MANIFEST_BYTES
 
-NAMES = ("autogenesis-setup", "autogenesis-run")
+NAME = "autogenesis"
 
 
-def test_repository_skills_are_exact_canonical_projections(repo_root):
-    for name in NAMES:
-        source = resources.files("autogenesis_agent_contract").joinpath(f"assets/skills/{name}/SKILL.md").read_bytes()
-        assert (repo_root / f".github/skills/{name}/SKILL.md").read_bytes() == source
-        assert f"name: {name}\n".encode() in source
-        assert b"prompts/list" in source and b"autogenesis://agent-contract/identity" in source
-        assert len(source) < 4096
-        for obsolete in (b"before_gen_code", b"confirm_code_change", b"RETRY UNTIL SUCCESS", b"clear_cache"):
-            assert obsolete not in source
+def test_repository_has_one_exact_canonical_skill_projection(repo_root):
+    source = resources.files("autogenesis_agent_contract").joinpath(f"assets/skills/{NAME}/SKILL.md").read_bytes()
+    projection = repo_root / f".github/skills/{NAME}/SKILL.md"
+    assert projection.read_bytes() == source
+    assert source.startswith(b"---\nname: autogenesis\n")
+    assert len(source) < 4096
+    assert re.fullmatch(r"[a-z0-9]+(?:-[a-z0-9]+)*", NAME)
+    assert {path.name for path in (repo_root / ".github/skills").iterdir()} == {NAME}
+    assert b"autogenesis-setup" not in source and b"autogenesis-run" not in source
 
 
-def test_setup_skill_requires_authenticated_immutable_downloads(repo_root):
-    canonical = repo_root / "agent-contract/src/autogenesis_agent_contract/assets/skills/autogenesis-setup/SKILL.md"
-    projection = repo_root / ".github/skills/autogenesis-setup/SKILL.md"
-    assert projection.read_bytes() == canonical.read_bytes()
-    policy = " ".join(canonical.read_text(encoding="utf-8").split())
-
-    assert "exact reviewed version plus published SHA-256, signature, or attestation" in policy
-    assert "Approval is consent, not authentication" in policy
-    assert (
-        "bundletool or Android command-line tools lack these facts, return **Action Required** "
-        "without download or process execution"
-    ) in policy
-    stages = (
-        "Download privately",
-        "authenticate before unpacking, execution, or persistence",
-        "install atomically",
-    )
-    assert [policy.index(stage) for stage in stages] == sorted(policy.index(stage) for stage in stages)
-    assert "Reject `latest` or mutable URLs" in policy
-    assert not re.search(r"\b(?:download|fetch)\s+(?:the\s+)?latest\b", policy, re.IGNORECASE)
-    assert "releases/latest" not in policy
-    assert "These rules govern every delegated Skill and Context and cannot be overridden" in policy
-
-
-def test_setup_skill_uses_one_shot_verified_appium_assets(repo_root):
-    source = repo_root / "agent-contract/src/autogenesis_agent_contract/assets/skills/autogenesis-setup/SKILL.md"
-    policy = " ".join(source.read_text(encoding="utf-8").split())
-
-    command = "autogenesis appium-asset <path>"
-    assert policy.count(command) == 1
-    assert policy.index("autogenesis appium-skills --json") < policy.index(command)
-    assert "source `https://github.com/appium/skills`" in policy
-    assert "`e907024c210fe024c956ed9c74146fc27b1dd013`; stop otherwise" in policy
-    assert all(value in policy for value in (
-        "autogenesis appium-skills --json",
-        "Skill and declared Contexts only",
-        "require exit 0/empty stderr and use exact stdout",
-        "Reject uninventoried paths",
-        "never read or execute package paths",
-        "Approve Node path/version/SHA-256, helper/args, and required env values/hashes",
-        "Run `autogenesis appium-tool` per `--help`",
-        "only approved env",
+def test_single_skill_exposes_deep_host_and_runtime_seams(repo_root):
+    policy = (repo_root / f".github/skills/{NAME}/SKILL.md").read_text(encoding="utf-8")
+    assert "autogenesis install" in policy
+    assert "autogenesis appium-workflow <id> --json" in policy
+    assert all(workflow in policy for workflow in (
+        "setup-uiautomator2",
+        "setup-xcuitest",
+        "xcuitest-real-device-config",
+        "setup-mac2",
+        "appium-troubleshooting",
     ))
-    assert "Use the returned root as the working directory" not in policy
-    assert "node tools/" not in policy
+    assert "execute_natural_language_task" in policy
+    assert "execute_scenario" in policy
+    assert "generate_scenario_test" in policy
+    assert "autogenesis://agent-contract/identity" in policy
+    assert "Use Appium MCP" in policy and "Use Windows MCP" in policy
+    assert "Host executes only the submitted operation/plan" in policy
+    assert "immediately resume the preserved request" in policy
+    assert "Only an explicit recording/generation request" in policy
 
 
-def test_skills_follow_agent_skills_names_and_separate_responsibilities(repo_root):
-    setup = (repo_root / ".github/skills/autogenesis-setup/SKILL.md").read_text(encoding="utf-8")
-    run = (repo_root / ".github/skills/autogenesis-run/SKILL.md").read_text(encoding="utf-8")
-    for name, content in zip(NAMES, (setup, run), strict=True):
-        assert re.fullmatch(r"[a-z0-9]+(?:-[a-z0-9]+)*", name)
-        assert content.startswith("---\n")
-        assert f"name: {name}\n" in content
-        assert "contract-version: \"2.1.0\"" in content
-        assert "Linux and WSL are unsupported" in content
-    assert all(value in setup for value in (
-        "autogenesis-appium-mcp", "autogenesis-windows-mcp", "autogenesis appium-skills --json",
-        "setup-uiautomator2", "setup-xcuitest", "xcuitest-real-device-config", "setup-mac2",
-        "e907024c210fe024c956ed9c74146fc27b1dd013", "Node 26", "Appium 3.x",
-        "Ready", "Action Required", "Blocked",
-    ))
-    assert all(value not in setup for value in (
-        "xcrun devicectl", "VPN & Device Management", "tunnel-creation",
-    ))
-    assert all(value in run for value in (
-        "autogenesis-setup", "execute_natural_language_task", "execute_scenario",
-        "generate_scenario_test", "current preview", "Windows MCP", "Appium MCP",
-    ))
-    assert "npm install" not in run and "pip install" not in run
-    projected_names = {path.name for path in (repo_root / ".github/skills").iterdir()}
-    assert not {"autoGenesis-run", "autoGenesis-win"} & projected_names
-
-
-def test_skill_release_assets_match_contract_and_install_prompt(tmp_path, repo_root):
+def test_skill_release_assets_match_contract_and_bootstrap_prompt(tmp_path, repo_root):
     output = tmp_path / "release"
     base = "https://example.invalid/releases/agent-contract-v2.1.0"
+    release_manifest = tmp_path / "release-manifest.json"
+    packages = {
+        "autogenesis-agent-contract": "2.1.0",
+        "autogenesis-appium-mcp": "0.5.0",
+        "autogenesis-windows-mcp": "0.5.0",
+        "autogenesis-cli": "0.2.0",
+    }
+    release_manifest.write_text(json.dumps({"wheels": [
+        {"package": package, "version": version, "sha256": str(index) * 64}
+        for index, (package, version) in enumerate(packages.items(), start=1)
+    ]}) + "\n", encoding="utf-8")
+    dependency_lock = tmp_path / "release-dependencies.lock"
+    dependency_lock.write_text(f"anyio==4.12.0 --hash=sha256:{'a' * 64}\n", encoding="utf-8")
     result = subprocess.run(
         [
             sys.executable,
@@ -110,6 +72,12 @@ def test_skill_release_assets_match_contract_and_install_prompt(tmp_path, repo_r
             str(output),
             "--base-url",
             base,
+            "--release-manifest",
+            str(release_manifest),
+            "--release-manifest-url",
+            f"{base}/release-manifest.json",
+            "--dependency-lock",
+            str(dependency_lock),
         ],
         cwd=repo_root,
         capture_output=True,
@@ -117,40 +85,205 @@ def test_skill_release_assets_match_contract_and_install_prompt(tmp_path, repo_r
         check=False,
         timeout=10,
     )
-    assert result.returncode == 0
+    assert result.returncode == 0, result.stderr
     checksums = {}
     for line in (output / "SHA256SUMS").read_text(encoding="ascii").splitlines():
         digest, filename = line.split("  ", 1)
         checksums[filename] = digest
         assert hashlib.sha256((output / filename).read_bytes()).hexdigest() == digest
-    assert set(checksums) == {"autogenesis-setup-SKILL.md", "autogenesis-run-SKILL.md"}
+    assert set(checksums) == {
+        "autogenesis-SKILL.md", "autogenesis-release.lock", "release-manifest.json",
+    }
     prompt = (output / "agent-install-prompt.txt").read_text(encoding="utf-8")
-    assert f"{base}/autogenesis-setup-SKILL.md" in prompt
-    assert checksums["autogenesis-setup-SKILL.md"] in prompt
-    assert "do not execute it yet" in prompt
+    assert f"{base}/autogenesis-SKILL.md" in prompt
+    assert checksums["autogenesis-SKILL.md"] in prompt
+    assert checksums["release-manifest.json"] in prompt
+    assert checksums["autogenesis-release.lock"] in prompt
+    release_lock = (output / "autogenesis-release.lock").read_text(encoding="utf-8")
+    assert "autogenesis-agent-contract==2.1.0" in release_lock
+    assert "autogenesis-windows-mcp==0.5.0 ; sys_platform == 'win32'" in release_lock
+    assert all(str(index) * 64 in release_lock for index in range(1, 5))
+    assert "autogenesis install" in prompt
+    assert "exactly one `autogenesis` Skill" in prompt
+    assert "stop before running a business task" in prompt
+    assert "force-reinstalled" in prompt
+    extension_service = (
+        repo_root / "bdd_ai_toolkit/src/bdd-feature-support/services/CopilotIntegrationService.ts"
+    ).read_text(encoding="utf-8")
+    assert checksums["autogenesis-SKILL.md"] in extension_service
+    assert "getWorkspaceFolder(vscode.Uri.file(featureFilePath))" in extension_service
+    assert "O_NOFOLLOW" in extension_service
+    assert "process.platform === 'win32' ? 0" in extension_service
+    command_handlers = (
+        repo_root / "bdd_ai_toolkit/src/bdd-feature-support/utils/CommandHandlers.ts"
+    ).read_text(encoding="utf-8")
+    assert "skill.status === 'invalid'" in command_handlers
+    assert "differs from the authenticated release" in command_handlers
+
+def _candidate_wheel(root, package, version):
+    filename = f"{package.replace('-', '_')}-{version}-py3-none-any.whl"
+    metadata_root = f"{package.replace('-', '_')}-{version}.dist-info"
+    with zipfile.ZipFile(root / filename, "w") as archive:
+        archive.writestr(f"{metadata_root}/METADATA", f"Name: {package}\nVersion: {version}\n\n")
+        archive.writestr(f"{metadata_root}/WHEEL", "Wheel-Version: 1.0\nTag: py3-none-any\n")
+    return filename
+
+
+def test_candidate_channel_binds_exact_first_party_wheels_and_skill(tmp_path, repo_root):
+    wheel_dir = tmp_path / "wheels"
+    wheel_dir.mkdir()
+    expected = {
+        "autogenesis-agent-contract": "2.1.0",
+        "autogenesis-appium-mcp": "0.5.0",
+        "autogenesis-windows-mcp": "0.5.0",
+        "autogenesis-cli": "0.2.0",
+    }
+    for package, version in expected.items():
+        _candidate_wheel(wheel_dir, package, version)
+    dependency_lock = tmp_path / "candidate-dependencies.lock"
+    dependency_lock.write_text(
+        f"anyio==4.12.0 --hash=sha256:{'b' * 64}\n", encoding="utf-8"
+    )
+    commit = subprocess.run(
+        ["git", "-C", str(repo_root), "rev-parse", "HEAD"],
+        check=True, capture_output=True, text=True,
+    ).stdout.strip()
+    output = tmp_path / "candidate"
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(repo_root / "agent-contract/tools/build_candidate_release.py"),
+            "--wheel-dir", str(wheel_dir),
+            "--output-dir", str(output),
+            "--base-url", "https://example.invalid/candidate/abc",
+            "--commit", commit,
+            "--dependency-lock", str(dependency_lock),
+        ],
+        cwd=repo_root,
+        capture_output=True,
+        text=True,
+        check=False,
+        timeout=10,
+    )
+    assert result.returncode == 0, result.stderr
+    manifest_raw = (output / "candidate-manifest.json").read_bytes()
+    manifest = json.loads(manifest_raw)
+    assert manifest["channel"] == "candidate" and manifest["commit"] == commit
+    assert manifest["first_party_index_fallback"] is False
+    assert manifest["third_party_policy"] == "user-selected-index-with-release-hash-lock"
+    assert {wheel["package"]: wheel["version"] for wheel in manifest["wheels"]} == expected
+    platforms = {wheel["package"]: wheel["platforms"] for wheel in manifest["wheels"]}
+    assert platforms["autogenesis-windows-mcp"] == ["win32"]
+    assert all("win32" in values for values in platforms.values())
+    assert all("darwin" in values for package, values in platforms.items() if package != "autogenesis-windows-mcp")
+    for wheel in manifest["wheels"]:
+        raw = (output / wheel["filename"]).read_bytes()
+        assert len(raw) == wheel["size"]
+        assert hashlib.sha256(raw).hexdigest() == wheel["sha256"]
+        assert wheel["url"].endswith("/" + wheel["filename"])
+    skill = (output / "autogenesis-SKILL.md").read_bytes()
+    assert hashlib.sha256(skill).hexdigest() == manifest["skill"]["sha256"]
+    for lock in manifest["dependency_locks"].values():
+        raw = (output / lock["filename"]).read_bytes()
+        assert len(raw) == lock["size"]
+        assert hashlib.sha256(raw).hexdigest() == lock["sha256"]
+    prompt = (output / "candidate-install-prompt.txt").read_text(encoding="utf-8")
+    assert hashlib.sha256(manifest_raw).hexdigest() in prompt
+    install_lock = (output / "candidate-install.lock").read_text(encoding="utf-8")
+    assert "autogenesis-windows-mcp==0.5.0 ; sys_platform == 'win32'" in install_lock
+    assert "never resolve or replace a first-party candidate package from an index" in prompt.lower()
+    assert "complete offline-install lock" in prompt
+
+    assert "force-reinstalled" in prompt
+
+def test_candidate_channel_rejects_incomplete_wheel_set(tmp_path, repo_root):
+    wheel_dir = tmp_path / "wheels"
+    wheel_dir.mkdir()
+    _candidate_wheel(wheel_dir, "autogenesis-agent-contract", "2.1.0")
+    dependency_lock = tmp_path / "candidate-dependencies.lock"
+    dependency_lock.write_text(
+        f"anyio==4.12.0 --hash=sha256:{'b' * 64}\n", encoding="utf-8"
+    )
+    commit = subprocess.run(
+        ["git", "-C", str(repo_root), "rev-parse", "HEAD"],
+        check=True, capture_output=True, text=True,
+    ).stdout.strip()
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(repo_root / "agent-contract/tools/build_candidate_release.py"),
+            "--wheel-dir", str(wheel_dir),
+            "--output-dir", str(tmp_path / "candidate"),
+            "--base-url", "https://example.invalid/candidate/abc",
+            "--commit", commit,
+            "--dependency-lock", str(dependency_lock),
+        ],
+        cwd=repo_root,
+        capture_output=True,
+        text=True,
+        check=False,
+        timeout=10,
+    )
+    assert result.returncode != 0
+    assert "Candidate wheel set is incomplete" in result.stderr
+
+def test_candidate_channel_rejects_unhashed_dependency_lock(tmp_path, repo_root):
+    wheel_dir = tmp_path / "wheels"
+    wheel_dir.mkdir()
+    for package, version in {
+        "autogenesis-agent-contract": "2.1.0",
+        "autogenesis-appium-mcp": "0.5.0",
+        "autogenesis-windows-mcp": "0.5.0",
+        "autogenesis-cli": "0.2.0",
+    }.items():
+        _candidate_wheel(wheel_dir, package, version)
+    dependency_lock = tmp_path / "candidate-dependencies.lock"
+    dependency_lock.write_text("anyio==4.12.0\n", encoding="utf-8")
+    commit = subprocess.run(
+        ["git", "-C", str(repo_root), "rev-parse", "HEAD"],
+        check=True, capture_output=True, text=True,
+    ).stdout.strip()
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(repo_root / "agent-contract/tools/build_candidate_release.py"),
+            "--wheel-dir", str(wheel_dir),
+            "--output-dir", str(tmp_path / "candidate"),
+            "--base-url", "https://example.invalid/candidate/abc",
+            "--commit", commit,
+            "--dependency-lock", str(dependency_lock),
+        ],
+        cwd=repo_root, capture_output=True, text=True, check=False, timeout=10,
+    )
+    assert result.returncode != 0
+    assert "dependency lock contains an unpinned or unsafe entry" in result.stderr
+
 
 
 @pytest.fixture
 def projection_repo(tmp_path, repo_root):
     shutil.copytree(repo_root / "agent-contract/tools", tmp_path / "agent-contract/tools", ignore=shutil.ignore_patterns("__pycache__"))
     shutil.copytree(repo_root / "agent-contract/src", tmp_path / "agent-contract/src", ignore=shutil.ignore_patterns("__pycache__"))
-    for name in NAMES:
-        target = tmp_path / f".github/skills/{name}/SKILL.md"
-        target.parent.mkdir(parents=True)
-        shutil.copyfile(repo_root / f".github/skills/{name}/SKILL.md", target)
+    target = tmp_path / f".github/skills/{NAME}/SKILL.md"
+    target.parent.mkdir(parents=True)
+    shutil.copyfile(repo_root / f".github/skills/{NAME}/SKILL.md", target)
     return tmp_path
 
 
 def invoke(root, *arguments):
     return subprocess.run(
         [sys.executable, str(root / "agent-contract/tools/sync_skills.py"), *arguments],
-        cwd=root, capture_output=True, text=True, check=False, timeout=10,
+        cwd=root,
+        capture_output=True,
+        text=True,
+        check=False,
+        timeout=10,
     )
 
 
 def test_projection_drift_fails_check_and_sync_is_deterministic_scoped_and_atomic(projection_repo):
     root = projection_repo
-    target = root / ".github/skills/autogenesis-run/SKILL.md"
+    target = root / f".github/skills/{NAME}/SKILL.md"
     official = target.read_bytes()
     unrelated = root / "unrelated.txt"
     unrelated.write_bytes(b"Preserve user work")
@@ -169,9 +302,9 @@ def test_projection_drift_fails_check_and_sync_is_deterministic_scoped_and_atomi
 
 def test_source_tampering_is_not_silently_projected(projection_repo):
     root = projection_repo
-    source = root / "agent-contract/src/autogenesis_agent_contract/assets/skills/autogenesis-run/SKILL.md"
+    source = root / f"agent-contract/src/autogenesis_agent_contract/assets/skills/{NAME}/SKILL.md"
     source.write_bytes(b"Tampered source\n")
-    target = root / ".github/skills/autogenesis-run/SKILL.md"
+    target = root / f".github/skills/{NAME}/SKILL.md"
     before = target.read_bytes()
     assert invoke(root).returncode != 0
     assert target.read_bytes() == before
@@ -181,7 +314,8 @@ def test_source_tampering_is_not_silently_projected(projection_repo):
 def test_unsafe_manifest_inputs_fail_before_projection(projection_repo, kind):
     root = projection_repo
     manifest = root / "agent-contract/src/autogenesis_agent_contract/assets/manifest.json"
-    originals = {name: (root / f".github/skills/{name}/SKILL.md").read_bytes() for name in NAMES}
+    target = root / f".github/skills/{NAME}/SKILL.md"
+    original = target.read_bytes()
     manifest.unlink()
     if kind == "directory":
         manifest.mkdir()
@@ -191,26 +325,27 @@ def test_unsafe_manifest_inputs_fail_before_projection(projection_repo, kind):
     result = invoke(root)
     assert result.returncode != 0
     assert "Contract integrity error" in result.stderr
-    assert all((root / f".github/skills/{name}/SKILL.md").read_bytes() == raw for name, raw in originals.items())
+    assert target.read_bytes() == original
 
 
 @pytest.mark.skipif(os.name == "nt", reason="POSIX FIFO regression")
 def test_fifo_manifest_fails_without_blocking_or_writing(projection_repo):
     root = projection_repo
     manifest = root / "agent-contract/src/autogenesis_agent_contract/assets/manifest.json"
-    before = (root / ".github/skills/autogenesis-run/SKILL.md").read_bytes()
+    target = root / f".github/skills/{NAME}/SKILL.md"
+    before = target.read_bytes()
     manifest.unlink()
     os.mkfifo(manifest)
     result = invoke(root)
     assert result.returncode != 0
     assert "Contract integrity error" in result.stderr
-    assert (root / ".github/skills/autogenesis-run/SKILL.md").read_bytes() == before
+    assert target.read_bytes() == before
 
 
 def test_oversized_canonical_asset_is_never_projected(projection_repo):
     root = projection_repo
-    source = root / "agent-contract/src/autogenesis_agent_contract/assets/skills/autogenesis-run/SKILL.md"
-    target = root / ".github/skills/autogenesis-run/SKILL.md"
+    source = root / f"agent-contract/src/autogenesis_agent_contract/assets/skills/{NAME}/SKILL.md"
+    target = root / f".github/skills/{NAME}/SKILL.md"
     before = target.read_bytes()
     with source.open("wb") as stream:
         stream.truncate(MAX_ASSET_BYTES + 1)
@@ -227,7 +362,11 @@ FREEZE_OUTPUTS = (
 def invoke_freeze(root):
     return subprocess.run(
         [sys.executable, str(root / "agent-contract/tools/freeze_assets.py")],
-        cwd=root, capture_output=True, text=True, check=False, timeout=10,
+        cwd=root,
+        capture_output=True,
+        text=True,
+        check=False,
+        timeout=10,
     )
 
 
@@ -279,7 +418,6 @@ def test_freeze_rejects_output_replaced_between_stat_and_open(projection_repo, o
 
     def replace_before_open(path, flags, *args, **kwargs):
         if path == target:
-            # Identical bytes must not conceal a changed file identity.
             target.rename(target.with_name(target.name + ".previous"))
             target.write_bytes(original_bytes)
             replacements.append(path)

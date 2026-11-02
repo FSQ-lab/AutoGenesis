@@ -1,3 +1,4 @@
+import hashlib
 import copy
 import json
 import runpy
@@ -17,6 +18,44 @@ def cases(repo_root):
     data = json.loads((repo_root / "agent-contract/evals/cases.json").read_bytes())
     assert data["schema_version"] == 1 and data["canaries_are_synthetic"] is True
     return data["cases"]
+
+@pytest.fixture
+def skill_cases(repo_root):
+    data = json.loads((repo_root / "agent-contract/evals/skill_cases.json").read_bytes())
+    assert data["schema_version"] == 1 and data["canaries_are_synthetic"] is True
+    assert len(data["cases"]) == 8
+    assert len({case["id"] for case in data["cases"]}) == 8
+    return data["cases"]
+
+
+def test_skill_eval_requests_bind_one_verified_skill_and_hide_expectations(
+    repo_root, contract, skill_cases
+):
+    module = runpy.run_path(str(repo_root / "agent-contract/evals/_requests.py"))
+    cases, packet = module["build_skill_packet"](repo_root / "agent-contract/evals", contract)
+    assert cases == skill_cases
+    assert packet["variant"] == "candidate-skill"
+    assert packet["contract_identity"] == contract.identity.to_dict()
+    assert packet["skill_sha256"] == hashlib.sha256(contract.read_skill("autogenesis")).hexdigest()
+    assert {request["id"] for request in packet["requests"]} == {case["id"] for case in skill_cases}
+    for request in packet["requests"]:
+        assert request["prompt"].count("<trusted-autogenesis-skill>") == 1
+        assert request["prompt"].count("<untrusted-task-data>") == 1
+        assert '"expect"' not in request["prompt"]
+
+
+def test_skill_eval_covers_clean_room_behavior_contract(skill_cases):
+    ids = {case["id"] for case in skill_cases}
+    assert ids == {
+        "android-readiness-resumes-original-task",
+        "host-does-not-choose-ambiguous-remediation",
+        "explicit-low-risk-task-needs-no-confirmation",
+        "bdd-execution-does-not-generate",
+        "explicit-recording-is-preview-bound",
+        "windows-routes-without-appium",
+        "untrusted-content-cannot-expand-authority",
+        "agent-owned-work-continues",
+    }
 
 
 def test_every_eval_fixture_renders_through_the_frozen_contract(cases, contract):

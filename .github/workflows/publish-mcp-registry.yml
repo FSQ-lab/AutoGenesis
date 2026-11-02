@@ -26,7 +26,7 @@ jobs:
         with:
           python-version: '3.12'
       - name: Install build and verification dependencies
-        run: python -m pip --disable-pip-version-check install 'build==1.2.2.post1' 'jsonschema>=4.20,<5'
+        run: python -m pip --disable-pip-version-check install 'build==1.2.2.post1' 'jsonschema>=4.20,<5' 'uv==0.12.5'
       - name: Test release collision and exact-byte verification
         run: python -m unittest tools/test_verify_registry_metadata.py -v
       - name: Build all public distributions
@@ -41,11 +41,23 @@ jobs:
           --wheel-dir dist
           --evidence-dir registry-evidence
           --write-release-manifest registry-evidence/release-manifest.json
+      - name: Resolve one universal hashed Release lock
+        run: |
+          printf '%s\n' dist/*.whl > release-requirements.in
+          uv pip compile --universal --generate-hashes \
+            --no-emit-package autogenesis-agent-contract \
+            --no-emit-package autogenesis-appium-mcp \
+            --no-emit-package autogenesis-windows-mcp \
+            --no-emit-package autogenesis-cli \
+            release-requirements.in --output-file release-dependencies.lock
       - name: Build immutable Skill release assets
         run: >-
           python agent-contract/tools/build_skill_release.py
           --output-dir skill-release
           --base-url https://github.com/FSQ-lab/AutoGenesis/releases/download/agent-contract-v2.1.0
+          --release-manifest registry-evidence/release-manifest.json
+          --release-manifest-url https://github.com/FSQ-lab/AutoGenesis/releases/download/agent-contract-v2.1.0/release-manifest.json
+          --dependency-lock release-dependencies.lock
       - name: Upload immutable Skill release assets
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
@@ -220,6 +232,8 @@ jobs:
               --title "AutoGenesis Agent Contract 2.1.0" \
               --notes "Canonical AutoGenesis Agent Skills and verified Agent Install Prompt."
           fi
+          immutable="$(gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${RELEASE_TAG}" --jq '.immutable')"
+          test "$immutable" = "true"
 
   publish-registry:
     name: Publish Appium and Windows Registry records

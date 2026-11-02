@@ -12,7 +12,7 @@ from pathlib import Path, PurePosixPath
 from _files import atomic_write
 
 PACKAGE = "agent-contract/src/autogenesis_agent_contract"
-BUNDLE_RELATIVE = "skills/autogenesis-setup/references/appium-skills"
+BUNDLE_RELATIVE = "appium-skills"
 BUNDLE_MANIFEST = f"{BUNDLE_RELATIVE}/manifest.json"
 SOURCE_METADATA = f"{BUNDLE_RELATIVE}/SOURCE.json"
 SOURCE = "https://github.com/appium/skills"
@@ -23,6 +23,13 @@ LICENSE = "Apache-2.0"
 DIGEST_ALGORITHM = "sha256-length-prefixed-path-and-content-v1"
 UPSTREAM_ROOTS = ("contexts", "skills", "tools")
 LOCAL_ONLY = ("NOTICE", "SOURCE.json")
+SELECTED_SKILLS = frozenset({
+    "skills/appium-troubleshooting/SKILL.md",
+    "skills/setup-mac2/SKILL.md",
+    "skills/setup-uiautomator2/SKILL.md",
+    "skills/setup-xcuitest/SKILL.md",
+    "skills/xcuitest-real-device-config/SKILL.md",
+})
 _MAX_FILES = 512
 
 
@@ -90,32 +97,14 @@ def _metadata(repo: Path) -> dict:
     inventory = tuple(_relative(item) for item in inventory_value)
     if inventory != tuple(sorted(set(inventory))):
         raise ValueError("Appium Skills upstream inventory must be unique and sorted")
+    selected = frozenset(path for path in inventory if path.startswith("skills/"))
+    if selected != SELECTED_SKILLS:
+        raise ValueError("Appium Skills inventory differs from the supported workflow set")
     value["upstream_inventory"] = inventory
     return value
 
 
-def _scan(root: Path, inventory_roots: tuple[str, ...]) -> tuple[str, ...]:
-    paths: list[str] = []
-    entry_count = 0
-    for name in inventory_roots:
-        target = root / name
-        if name in {"LICENSE", *LOCAL_ONLY, "manifest.json"}:
-            entries = (target,)
-        else:
-            if not target.is_dir() or target.is_symlink():
-                raise ValueError(f"required upstream root is missing or unsafe: {name}")
-            entries = target.rglob("*")
-        for path in entries:
-            entry_count += 1
-            if entry_count > _MAX_FILES * 4:
-                raise ValueError("Appium Skills tree exceeds the bounded inventory")
-            if path.is_symlink() or not (path.is_file() or path.is_dir()):
-                raise ValueError("Appium Skills tree contains an unsafe path")
-            if path.is_file():
-                paths.append(path.relative_to(root).as_posix())
-    if len(paths) > _MAX_FILES:
-        raise ValueError("Appium Skills tree exceeds the bounded inventory")
-    return tuple(sorted(paths))
+
 
 
 def _scan_all(root: Path) -> tuple[str, ...]:
@@ -200,9 +189,10 @@ def bundle_bytes(repo: Path, upstream_root: Path | None = None) -> tuple[bytes, 
         ):
             raise ValueError("upstream verification requires a separate checkout or exported tree")
         _verify_git_identity(upstream_root)
-        upstream_actual = _scan(upstream_root, (*UPSTREAM_ROOTS, "LICENSE"))
-        if upstream_actual != expected:
-            raise ValueError("upstream checkout has extra or missing allowlisted assets")
+        for relative in expected:
+            path = upstream_root / relative
+            if path.is_symlink() or not path.is_file():
+                raise ValueError("upstream checkout is missing a selected safe asset")
         for relative, vendored in upstream_contents.items():
             upstream = read(upstream_root, relative)
             if vendored != upstream:

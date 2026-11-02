@@ -42,12 +42,21 @@ before any download, acquired-content interpretation, approval request, or write
 
 ### CLI-first
 
-Install the CLI through the Python environment and package index you choose:
+Download the Release manifest and its generated strict-hash lock from the same
+immutable GitHub Release. Do not install AutoGenesis directly by version from an
+index. Use the package index or mirror you choose only under that lock:
 
 ```bash
-python -m pip install autogenesis-cli==0.2.0
-autogenesis install
+curl --proto '=https' --tlsv1.2 --fail --location --remote-name https://github.com/FSQ-lab/AutoGenesis/releases/download/agent-contract-v2.1.0/release-manifest.json
+curl --proto '=https' --tlsv1.2 --fail --location --remote-name https://github.com/FSQ-lab/AutoGenesis/releases/download/agent-contract-v2.1.0/autogenesis-release.lock
+python -m pip download --require-hashes --requirement autogenesis-release.lock --dest autogenesis-wheelhouse
+python -m pip install --force-reinstall --no-deps --no-index --find-links autogenesis-wheelhouse --require-hashes --requirement autogenesis-release.lock
+autogenesis install --scope user --project-root "$PWD"
 ```
+
+The Release workflow derives `autogenesis-release.lock` from the reviewed
+manifest wheel identities and a universal third-party dependency lock. Missing
+or changed bytes fail before any first-party AutoGenesis code executes.
 
 The Python package installation resolves the supported host bundle:
 
@@ -65,33 +74,26 @@ autogenesis-appium-mcp --version
 autogenesis-windows-mcp --version  # Windows only
 ```
 
-`autogenesis install` does not invoke pip or uv. It verifies those already
-installed package versions and installs the canonical `autogenesis-setup` and
-`autogenesis-run` files under `~/.agents/skills`. Running it again with identical
-Skill files reports them as `unchanged`.
+`autogenesis install` does not invoke pip or uv. It verifies the authenticated
+host bundle and installs one canonical `autogenesis` Skill at the explicit
+`--scope`; `--project-root` binds discovery precedence. Re-running identical
+bytes is idempotent, while another canonical or legacy discovery copy fails.
 
-The command does not install Appium Server, Appium Drivers, platform SDKs,
-project MCP configuration, or business configuration, and does not execute an
-application. Use `autogenesis-setup` afterward to inspect a concrete target and
-approve any additional machine or project preparation.
-
-For local Appium readiness, Setup loads the immutable official Appium Skills
-snapshot pinned by Agent Contract 2.1.0. `autogenesis appium-skills --json`
-verifies its identity and inventory, and `autogenesis appium-asset <relative>`
-returns only bytes held by that verification pass without trusting a mutable path.
+The command does not install Appium Server, Drivers, SDKs, project MCP, or
+business configuration. Invoke `autogenesis` for preparation, diagnosis, direct
+execution, or BDD work. For Appium targets it loads only a supported authenticated
+official workflow with `autogenesis appium-workflow <id> --json`; the LLM selects
+the workflow. Execution fails closed until the authenticated, approval-bound
+AutoGenesis Host capability interface tracked by Issue #50 is available.
 
 ### Agent-first
 
 Copy [`agent-install-prompt.txt`](https://github.com/FSQ-lab/AutoGenesis/releases/download/agent-contract-v2.1.0/agent-install-prompt.txt)
-from the Agent Contract 2.1.0 release into OMP, Pi, Codex CLI, or GitHub Copilot
-CLI. Before acquisition, the prompt requires native Darwin or native Windows
-and rejects Linux and WSL. Only after that gate passes does it download the
-Setup Skill as untrusted bytes, verify the published SHA-256, show the selected
-scope and destination, request approval, and persistently install only
-`autogenesis-setup` through the Coding Agent's native Skill mechanism. A
-session-only trial is not supported in this release. Setup then proposes the
-host Runtime and project-readiness plan; it does not execute that plan without
-the user's approval.
+from the reviewed Release or Candidate into the Coding Agent. The prompt rejects
+Linux/WSL before writes, authenticates one `autogenesis` Skill and the CLI source,
+shows the complete scope/destination/package plan, obtains one approval, and uses
+the same `autogenesis install` transaction as CLI-first installation. It stops
+before a business task.
 
 Low-level `autogenesis-appium-mcp` and `autogenesis-windows-mcp` packages remain
 independently runnable without Skills for expert CLI/MCP consumers.

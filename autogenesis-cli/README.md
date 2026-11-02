@@ -4,12 +4,18 @@
 Runtimes and canonical Agent Skills. Python 3.10+ and native macOS or Windows
 are required; Linux and WSL are unsupported.
 
-Install it through the Python environment and package index selected by the user:
+Authenticate the immutable Release manifest and `autogenesis-release.lock`
+before any AutoGenesis package executes. Use the selected index only under that
+strict hash lock, then install offline from the verified wheelhouse:
 
 ```bash
-python -m pip install autogenesis-cli==0.2.0
-autogenesis install
+python -m pip download --require-hashes --requirement autogenesis-release.lock --dest autogenesis-wheelhouse
+python -m pip install --force-reinstall --no-deps --no-index --find-links autogenesis-wheelhouse --require-hashes --requirement autogenesis-release.lock
+autogenesis install --scope user --project-root <absolute-business-project>
 ```
+
+The repository README gives the immutable Release URLs. Never install the CLI
+directly by version from an index.
 
 `autogenesis --version` prints the installed CLI version without checking the
 host, packages, Contract, or Skill destination.
@@ -21,28 +27,24 @@ The package manager, not `autogenesis install`, installs the host dependencies:
 | macOS | `autogenesis-agent-contract==2.1.0`, `autogenesis-appium-mcp==0.5.0` |
 | Windows | `autogenesis-agent-contract==2.1.0`, `autogenesis-appium-mcp==0.5.0`, `autogenesis-windows-mcp==0.5.0` |
 
-`autogenesis install` verifies that the required package versions and Agent
-Contract are available, then copies `autogenesis-setup` and `autogenesis-run`
-to `~/.agents/skills`. It fails rather than invoking pip or uv when a package is
-missing or incompatible. Re-running it with canonical files already present is
-idempotent and reports `unchanged`.
+`autogenesis install --scope user --project-root <absolute-business-project>`
+verifies the authenticated package bundle, rejects other canonical or legacy
+discovery copies, and atomically installs one `autogenesis` Skill. Use
+`--scope project` for `<project>/.agents/skills`. An identical rerun reports
+`unchanged`.
 
-`autogenesis appium-skills --json` verifies the bundled official Appium Skills
-snapshot and returns its source, commit, license, supported Node majors, and
-read-only asset digest inventory. `autogenesis appium-asset <relative-path>`
-writes one verified asset to stdout for preview and use.
-For approved setup helpers only, preview the absolute Node path, exact version,
-lowercase SHA-256, helper/arguments, and each required non-secret environment
-value/hash. Run `autogenesis appium-tool --help` and invoke it with those exact
-values (`--allow-env NAME=SHA256` binds inherited values). The CLI rejects
-scripts/wrappers, copies native Node from its held handle, verifies identity and
-version with an empty process environment, and starts the held helper through a
-private bootstrap that adds only approved environment values.
+`autogenesis appium-skills --json` verifies the internal supported Appium workflow
+snapshot. `autogenesis appium-workflow <id> --json` loads one authenticated
+workflow selected by the LLM with its Context/tool inventory and provenance.
+`autogenesis appium-asset <workflow-id> <relative-path>` returns held verified
+bytes only when the asset belongs to that exact selected workflow. This CLI
+does not expose a generic Appium helper executor: execution requires the
+authenticated, approval-bound Host capability interface tracked by Issue #50.
 
-Use `--skills-dir /absolute/path` to select another user-approved destination.
-Existing non-canonical Skill bytes are preserved and cause a conflict instead
-of being overwritten.
+The selected scope and project root determine the only accepted discovery path.
+Existing non-canonical bytes or a Skill in another discovery scope are preserved
+and cause a conflict instead of being overwritten.
 
-The command does not install Appium Server, Appium Drivers, platform SDKs,
-register MCP, create project or business configuration, or execute an
-application. Invoke `autogenesis-setup` afterward for target-specific readiness.
+The command does not install Appium Server, Drivers, SDKs, register MCP, create
+business configuration, or execute an application. Invoke `autogenesis` for
+target preparation, diagnosis, direct execution, or BDD work.

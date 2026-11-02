@@ -5,15 +5,13 @@ on:
     branches: [main, feature/agent-integration-v2]
     paths:
       - 'agent-contract/**'
-      - '.github/skills/autogenesis-setup/SKILL.md'
-      - '.github/skills/autogenesis-run/SKILL.md'
+      - '.github/skills/autogenesis/SKILL.md'
       - '.github/workflows/agent-contract.yml'
   push:
     branches: [feature/agent-integration-v2]
     paths:
       - 'agent-contract/**'
-      - '.github/skills/autogenesis-setup/SKILL.md'
-      - '.github/skills/autogenesis-run/SKILL.md'
+      - '.github/skills/autogenesis/SKILL.md'
       - '.github/workflows/agent-contract.yml'
   workflow_dispatch:
 
@@ -95,7 +93,7 @@ jobs:
         node: ['20', '22', '24']
     defaults:
       run:
-        working-directory: agent-contract/src/autogenesis_agent_contract/assets/skills/autogenesis-setup/references/appium-skills
+        working-directory: agent-contract/src/autogenesis_agent_contract/assets/appium-skills
     steps:
       - name: Preserve exact LF asset bytes
         run: git config --global core.autocrlf false
@@ -106,7 +104,10 @@ jobs:
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: ${{ matrix.node }}
-      - name: Validate immutable upstream structure
-        run: node tools/validate-repository.mjs
-      - name: Run upstream helper tests
-        run: node --test tools/tests/helpers.test.mjs
+      - name: Validate selected upstream helper syntax
+        run: |
+          node --check tools/appium/setup/scripts/check-mac2-env.mjs
+          node --check tools/appium/setup/scripts/check-uiautomator2-env.mjs
+          node --check tools/appium/setup/scripts/check-xcuitest-env.mjs
+          node --check tools/appium/setup/scripts/check-node-env.mjs
+          node --check tools/appium/setup/scripts/windows-command.mjs
