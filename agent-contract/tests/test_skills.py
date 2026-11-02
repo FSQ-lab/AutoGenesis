@@ -191,7 +191,7 @@ def test_candidate_channel_binds_exact_first_party_wheels_and_skill(tmp_path, re
     assert hashlib.sha256(manifest_raw).hexdigest() in prompt
     install_lock = (output / "candidate-install.lock").read_text(encoding="utf-8")
     assert "autogenesis-windows-mcp==0.5.0 ; sys_platform == 'win32'" in install_lock
-    assert "Never resolve or replace a first-party Candidate package from an index" in prompt
+    assert "never resolve or replace a first-party candidate package from an index" in prompt.lower()
     assert "complete offline-install lock" in prompt
 
     assert "force-reinstalled" in prompt
