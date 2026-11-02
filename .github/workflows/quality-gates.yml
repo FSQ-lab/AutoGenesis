@@ -90,9 +90,13 @@ jobs:
   candidate-channel:
     name: Build exact Candidate channel
     runs-on: ubuntu-24.04
+    env:
+      CANDIDATE_COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}
     steps:
       - name: Checkout exact Candidate commit
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: ${{ env.CANDIDATE_COMMIT }}
       - name: Setup Python
         uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with:
@@ -120,11 +124,11 @@ jobs:
           --wheel-dir dist
           --output-dir candidate-channel
           --base-url .
-          --commit "${GITHUB_SHA}"
+          --commit "${CANDIDATE_COMMIT}"
           --dependency-lock candidate-dependencies.lock
       - name: Upload exact Candidate channel
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: autogenesis-candidate-${{ github.sha }}
+          name: autogenesis-candidate-${{ env.CANDIDATE_COMMIT }}
           path: candidate-channel
           if-no-files-found: error
