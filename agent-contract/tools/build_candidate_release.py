@@ -37,14 +37,12 @@ _MAX_METADATA_BYTES = 256 * 1024
 
 
 def _read_regular(path: Path, maximum: int) -> bytes:
-    nofollow = getattr(os, "O_NOFOLLOW", None)
-    if nofollow is None:
-        raise ValueError("secure Candidate reads require O_NOFOLLOW")
+    nofollow = getattr(os, "O_NOFOLLOW", 0)
     try:
         expected = os.lstat(path)
         if not stat.S_ISREG(expected.st_mode) or expected.st_size <= 0 or expected.st_size > maximum:
             raise ValueError("candidate input must be a bounded regular non-symlink file")
-        descriptor = os.open(path, os.O_RDONLY | nofollow)
+        descriptor = os.open(path, os.O_RDONLY | getattr(os, "O_BINARY", 0) | nofollow)
         try:
             opened = os.fstat(descriptor)
             if (opened.st_dev, opened.st_ino, opened.st_size) != (expected.st_dev, expected.st_ino, expected.st_size):
