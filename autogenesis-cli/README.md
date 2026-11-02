@@ -4,12 +4,18 @@
 Runtimes and canonical Agent Skills. Python 3.10+ and native macOS or Windows
 are required; Linux and WSL are unsupported.
 
-Install it through the Python environment and package index selected by the user:
+Authenticate the immutable Release manifest and `autogenesis-release.lock`
+before any AutoGenesis package executes. Use the selected index only under that
+strict hash lock, then install offline from the verified wheelhouse:
 
 ```bash
-python -m pip install autogenesis-cli==0.2.0
-autogenesis install
+python -m pip download --require-hashes --requirement autogenesis-release.lock --dest autogenesis-wheelhouse
+python -m pip install --no-index --find-links autogenesis-wheelhouse --require-hashes --requirement autogenesis-release.lock
+autogenesis install --scope user --project-root <absolute-business-project>
 ```
+
+The repository README gives the immutable Release URLs. Never install the CLI
+directly by version from an index.
 
 `autogenesis --version` prints the installed CLI version without checking the
 host, packages, Contract, or Skill destination.

@@ -157,36 +157,42 @@ export class CopilotIntegrationService {
   }
 
   /** Hold canonical Skill bytes from the selected Feature's discovery scope. */
-  loadSkillContent(skillName: string, featureFilePath: string): string | null {
+  loadSkillContent(skillName: string, featureFilePath: string):
+    { status: 'ready'; content: string } | { status: 'absent' | 'invalid' } {
     const relative = ['.agents', 'skills', skillName, 'SKILL.md'];
     const expectedSha256 = '54b23e8a55408cf41815a3dd06db107e5747d27a3473e33f98a04d752c943773';
     const selected = vscode.workspace.getWorkspaceFolder(vscode.Uri.file(featureFilePath));
     const projectSkill = selected && path.join(selected.uri.fsPath, ...relative);
     const userSkill = path.join(os.homedir(), ...relative);
 
-    const held = (candidate: string): string | null => {
+    const held = (candidate: string):
+      { status: 'ready'; content: string } | { status: 'absent' | 'invalid' } => {
       let descriptor: number | undefined;
       try {
-        if (process.platform === 'win32') return null;
         const expected = fs.lstatSync(candidate);
-        if (!expected.isFile() || expected.isSymbolicLink() || expected.size <= 0 || expected.size > 256 * 1024) return null;
-        descriptor = fs.openSync(candidate, fs.constants.O_RDONLY | fs.constants.O_NOFOLLOW);
+        if (!expected.isFile() || expected.isSymbolicLink() || expected.size <= 0 || expected.size > 256 * 1024) return { status: 'invalid' };
+        const noFollow = process.platform === 'win32' ? 0 : fs.constants.O_NOFOLLOW;
+        descriptor = fs.openSync(candidate, fs.constants.O_RDONLY | noFollow);
         const opened = fs.fstatSync(descriptor);
-        if (opened.dev !== expected.dev || opened.ino !== expected.ino || opened.size !== expected.size) return null;
+        if (opened.dev !== expected.dev || opened.ino !== expected.ino || opened.size !== expected.size) return { status: 'invalid' };
         const raw = fs.readFileSync(descriptor);
         const final = fs.fstatSync(descriptor);
-        if (final.dev !== opened.dev || final.ino !== opened.ino || final.size !== opened.size) return null;
-        if (createHash('sha256').update(raw).digest('hex') !== expectedSha256) return null;
-        return raw.toString('utf8');
-      } catch {
-        return null;
+        if (final.dev !== opened.dev || final.ino !== opened.ino || final.size !== opened.size) return { status: 'invalid' };
+        if (createHash('sha256').update(raw).digest('hex') !== expectedSha256) return { status: 'invalid' };
+        return { status: 'ready', content: raw.toString('utf8') };
+      } catch (error) {
+        const code = (error as NodeJS.ErrnoException).code;
+        return { status: code === 'ENOENT' ? 'absent' : 'invalid' };
       } finally {
         if (descriptor !== undefined) fs.closeSync(descriptor);
       }
     };
 
-    // A project copy shadows user scope; invalid bytes fail closed rather than switching scope.
-    if (projectSkill && fs.existsSync(projectSkill)) return held(projectSkill);
+    // Project scope has precedence; invalid bytes fail closed rather than switching scope.
+    if (projectSkill) {
+      const project = held(projectSkill);
+      if (project.status !== 'absent') return project;
+    }
     return held(userSkill);
   }
 

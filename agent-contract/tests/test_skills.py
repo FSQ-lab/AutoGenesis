@@ -112,6 +112,12 @@ def test_skill_release_assets_match_contract_and_bootstrap_prompt(tmp_path, repo
     assert checksums["autogenesis-SKILL.md"] in extension_service
     assert "getWorkspaceFolder(vscode.Uri.file(featureFilePath))" in extension_service
     assert "O_NOFOLLOW" in extension_service
+    assert "process.platform === 'win32' ? 0" in extension_service
+    command_handlers = (
+        repo_root / "bdd_ai_toolkit/src/bdd-feature-support/utils/CommandHandlers.ts"
+    ).read_text(encoding="utf-8")
+    assert "skill.status === 'invalid'" in command_handlers
+    assert "differs from the authenticated release" in command_handlers
 
 def _candidate_wheel(root, package, version):
     filename = f"{package.replace('-', '_')}-{version}-py3-none-any.whl"
