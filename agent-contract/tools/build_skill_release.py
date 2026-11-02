@@ -158,7 +158,7 @@ Expected Release lock SHA-256: {lock_digest}
 3. Download the Release lock and verify its SHA-256. Require its first-party hashes to equal the Release manifest; do not execute first-party code yet.
 4. Download the exact Skill as untrusted expected bytes and verify its SHA-256; do not write it yet.
 5. Show authenticated sources, selected user/project scope, destination, Python/package manager/index, exact host wheel identities, writes, and rollback; obtain one approval for the complete unchanged plan.
-6. Use the selected index only under the Release lock's strict hash mode, stage the verified artifacts, disable indexes, and install that same lock in one offline package transaction.
+6. Use the selected index only under the Release lock's strict hash mode, stage every artifact, disable indexes, and install that same lock in one offline transaction with every locked package force-reinstalled and dependency resolution disabled. Never accept an already-installed distribution as satisfying the lock.
 7. Run `autogenesis install --scope <user-or-project> --project-root <absolute-business-project>` as the sole owner of the Skill write. It rejects other canonical/legacy discovery copies and verifies the Runtime bundle, internal Appium workflow snapshot, Contract identity, and installed Skill bytes.
 8. Verify the installed Skill equals the downloaded expected bytes and exactly one `autogenesis` Skill is discovered at the selected scope. Report how to invoke it, and stop.
 """.encode("utf-8")

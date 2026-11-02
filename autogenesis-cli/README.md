@@ -10,7 +10,7 @@ strict hash lock, then install offline from the verified wheelhouse:
 
 ```bash
 python -m pip download --require-hashes --requirement autogenesis-release.lock --dest autogenesis-wheelhouse
-python -m pip install --no-index --find-links autogenesis-wheelhouse --require-hashes --requirement autogenesis-release.lock
+python -m pip install --force-reinstall --no-deps --no-index --find-links autogenesis-wheelhouse --require-hashes --requirement autogenesis-release.lock
 autogenesis install --scope user --project-root <absolute-business-project>
 ```
 

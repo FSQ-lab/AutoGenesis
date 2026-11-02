@@ -50,7 +50,7 @@ index. Use the package index or mirror you choose only under that lock:
 curl --proto '=https' --tlsv1.2 --fail --location --remote-name https://github.com/FSQ-lab/AutoGenesis/releases/download/agent-contract-v2.1.0/release-manifest.json
 curl --proto '=https' --tlsv1.2 --fail --location --remote-name https://github.com/FSQ-lab/AutoGenesis/releases/download/agent-contract-v2.1.0/autogenesis-release.lock
 python -m pip download --require-hashes --requirement autogenesis-release.lock --dest autogenesis-wheelhouse
-python -m pip install --no-index --find-links autogenesis-wheelhouse --require-hashes --requirement autogenesis-release.lock
+python -m pip install --force-reinstall --no-deps --no-index --find-links autogenesis-wheelhouse --require-hashes --requirement autogenesis-release.lock
 autogenesis install --scope user --project-root "$PWD"
 ```
 

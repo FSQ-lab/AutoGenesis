@@ -106,6 +106,7 @@ def test_skill_release_assets_match_contract_and_bootstrap_prompt(tmp_path, repo
     assert "autogenesis install" in prompt
     assert "exactly one `autogenesis` Skill" in prompt
     assert "stop before running a business task" in prompt
+    assert "force-reinstalled" in prompt
     extension_service = (
         repo_root / "bdd_ai_toolkit/src/bdd-feature-support/services/CopilotIntegrationService.ts"
     ).read_text(encoding="utf-8")
@@ -193,6 +194,7 @@ def test_candidate_channel_binds_exact_first_party_wheels_and_skill(tmp_path, re
     assert "Never resolve or replace a first-party Candidate package from an index" in prompt
     assert "complete offline-install lock" in prompt
 
+    assert "force-reinstalled" in prompt
 
 def test_candidate_channel_rejects_incomplete_wheel_set(tmp_path, repo_root):
     wheel_dir = tmp_path / "wheels"
