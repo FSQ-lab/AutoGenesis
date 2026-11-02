@@ -8,6 +8,8 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
+import * as os from 'os';
+import { createHash } from 'crypto';
 import { Scenario, Background } from '../core/gherkin/types';
 import { ConfigManager } from '../utils/ConfigManager';
 
@@ -154,41 +156,42 @@ export class CopilotIntegrationService {
     }
   }
 
-  /**
-   * Check if a specific skill exists in the current workspace repository
-   * Looks for .github/skills/{skillName}/SKILL.md in workspace folders
-   * @param skillName Name of the skill to search for
-   * @returns true if the skill exists
-   */
-  hasSkillInWorkspace(skillName: string): boolean {
-    const workspaceFolders = vscode.workspace.workspaceFolders;
-    if (!workspaceFolders) {
-      return false;
-    }
+  /** Resolve only the canonical Skill bytes at the selected Feature's discovery scope. */
+  hasSkillAvailable(skillName: string, featureFilePath: string): boolean {
+    const relative = ['.agents', 'skills', skillName, 'SKILL.md'];
+    const expectedSha256 = '837a83cb03ef5ca3670930510566147490d5cad808ad28b1d4a3f2a0103193a9';
+    const selected = vscode.workspace.getWorkspaceFolder(vscode.Uri.file(featureFilePath));
+    const projectSkill = selected && path.join(selected.uri.fsPath, ...relative);
+    const userSkill = path.join(os.homedir(), ...relative);
 
-    for (const folder of workspaceFolders) {
-      const skillPath = path.join(
-        folder.uri.fsPath,
-        '.github',
-        'skills',
-        skillName,
-        'SKILL.md'
-      );
-      if (fs.existsSync(skillPath)) {
-        return true;
+    const verified = (candidate: string): boolean => {
+      try {
+        const info = fs.lstatSync(candidate);
+        if (!info.isFile() || info.isSymbolicLink() || info.size <= 0 || info.size > 256 * 1024) {
+          return false;
+        }
+        return createHash('sha256').update(fs.readFileSync(candidate)).digest('hex') === expectedSha256;
+      } catch {
+        return false;
       }
+    };
+
+    // A stale project copy shadows user scope and must fail closed rather than silently switch scope.
+    if (projectSkill && fs.existsSync(projectSkill)) {
+      return verified(projectSkill);
     }
-    return false;
+    return verified(userSkill);
   }
 
-  /**
-   * Generate a skill invocation command for Copilot
-   * @param skillName Name of the skill
-   * @param scenarioName Name of the scenario
-   * @returns Skill invocation string (e.g. "/autogenesis-run Scenario Name")
-   */
-  generateSkillCommand(skillName: string, scenarioName: string): string {
-    return `/${skillName} ${scenarioName}`;
+  /** Generate an exact, unambiguous Skill invocation for a selected Scenario. */
+  generateSkillCommand(
+    skillName: string,
+    scenarioName: string,
+    featureFilePath: string,
+    lineNumber: number
+  ): string {
+    const selection = JSON.stringify({ featureFilePath, lineNumber, scenarioName });
+    return `/${skillName} Execute the exact selected Scenario using this selection data: ${selection}`;
   }
 
   /**

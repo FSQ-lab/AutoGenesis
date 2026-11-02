@@ -46,6 +46,8 @@ jobs:
           python agent-contract/tools/build_skill_release.py
           --output-dir skill-release
           --base-url https://github.com/FSQ-lab/AutoGenesis/releases/download/agent-contract-v2.1.0
+          --release-manifest registry-evidence/release-manifest.json
+          --release-manifest-url https://github.com/FSQ-lab/AutoGenesis/releases/download/agent-contract-v2.1.0/release-manifest.json
       - name: Upload immutable Skill release assets
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
@@ -220,6 +222,8 @@ jobs:
               --title "AutoGenesis Agent Contract 2.1.0" \
               --notes "Canonical AutoGenesis Agent Skills and verified Agent Install Prompt."
           fi
+          immutable="$(gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${RELEASE_TAG}" --jq '.immutable')"
+          test "$immutable" = "true"
 
   publish-registry:
     name: Publish Appium and Windows Registry records

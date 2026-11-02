@@ -8,9 +8,9 @@ WORKFLOWS = (
     "generate_scenario_test",
     "execute_natural_language_task",
 )
-SKILLS = ("autogenesis-setup", "autogenesis-run")
+SKILLS = ("autogenesis",)
 SCHEMAS = ("manifest", "identity", "arguments", "secret-reference")
-APPIUM_SKILLS_ROOT = "skills/autogenesis-setup/references/appium-skills"
+APPIUM_SKILLS_ROOT = "appium-skills"
 APPIUM_SKILLS_MANIFEST = f"{APPIUM_SKILLS_ROOT}/manifest.json"
 ASSET_PATHS = (
     CORE_POLICY,

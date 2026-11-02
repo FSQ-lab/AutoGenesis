@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 import re
+import posixpath
 from dataclasses import dataclass, field
 from importlib import resources
 from pathlib import Path, PurePosixPath
@@ -22,6 +23,106 @@ LICENSE = "Apache-2.0"
 NODE_MAJORS = (20, 22, 24)
 _MAX_FILES = 512
 _DIGEST = re.compile(r"^[0-9a-f]{64}$")
+SUPPORTED_WORKFLOWS = MappingProxyType({
+    "appium-troubleshooting": "skills/appium-troubleshooting/SKILL.md",
+    "setup-mac2": "skills/setup-mac2/SKILL.md",
+    "setup-uiautomator2": "skills/setup-uiautomator2/SKILL.md",
+    "setup-xcuitest": "skills/setup-xcuitest/SKILL.md",
+    "xcuitest-real-device-config": "skills/xcuitest-real-device-config/SKILL.md",
+})
+_ASSET_REFERENCE = re.compile(r"(?<![A-Za-z0-9_.\-/])(?:contexts|tools)/[A-Za-z0-9_.\-/]+")
+_IMPORT_REFERENCE = re.compile(r"(?:from\s+|import\s*\(|import\s+|require\s*\()[\"']([^\"']+)[\"']")
+
+
+@dataclass(frozen=True, slots=True)
+class AppiumWorkflow:
+    workflow_id: str
+    entrypoint: str
+    content: bytes = field(repr=False)
+    required_contexts: tuple[str, ...]
+    optional_contexts: tuple[str, ...]
+    tools: tuple[str, ...]
+    assets: Mapping[str, str]
+
+
+def _declared_contexts(text: str, key: str) -> tuple[str, ...]:
+    prefix = f"  {key}: "
+    rows = [line[len(prefix):] for line in text.splitlines() if line.startswith(prefix)]
+    if len(rows) > 1:
+        raise _integrity("invalid_appium_workflow_metadata")
+    if not rows:
+        return ()
+    value = rows[0]
+    if len(value) < 2 or value[0] != "'" or value[-1] != "'":
+        raise _integrity("invalid_appium_workflow_metadata")
+    try:
+        paths = json.loads(value[1:-1])
+    except (TypeError, ValueError):
+        raise _integrity("invalid_appium_workflow_metadata") from None
+    if not isinstance(paths, list) or any(not isinstance(path, str) for path in paths):
+        raise _integrity("invalid_appium_workflow_metadata")
+    return tuple(paths)
+
+
+
+def _transitive_assets(bundle: "AppiumSkillsBundle", roots: tuple[str, ...]) -> tuple[str, ...]:
+    selected = set(roots)
+    pending = list(roots)
+    while pending:
+        relative = pending.pop()
+        try:
+            text = bundle._contents[relative].decode("utf-8")
+        except (KeyError, UnicodeError):
+            raise _integrity("invalid_appium_workflow_inventory") from None
+        references = {
+            value.rstrip("`.,;:)")
+            for value in _ASSET_REFERENCE.findall(text)
+        }
+        if relative.endswith((".js", ".mjs")):
+            parent = PurePosixPath(relative).parent
+            for value in _IMPORT_REFERENCE.findall(text):
+                if not value.startswith("."):
+                    continue
+                candidate = posixpath.normpath((parent / value).as_posix())
+                candidates = (candidate, candidate + ".js", candidate + ".mjs", candidate + ".json")
+                matches = tuple(path for path in candidates if path in bundle._contents)
+                if len(matches) != 1:
+                    raise _integrity("invalid_appium_workflow_inventory")
+                references.add(matches[0])
+        if any(path not in bundle._contents for path in references):
+            raise _integrity("invalid_appium_workflow_inventory")
+        for path in references:
+            if path not in selected:
+                selected.add(path)
+                pending.append(path)
+    return tuple(sorted(selected))
+
+def _load_workflow(bundle: "AppiumSkillsBundle", workflow_id: str) -> AppiumWorkflow:
+    if not isinstance(workflow_id, str) or workflow_id not in SUPPORTED_WORKFLOWS:
+        raise _integrity("unsupported_appium_workflow")
+    entrypoint = SUPPORTED_WORKFLOWS[workflow_id]
+    try:
+        content = bundle._contents[entrypoint]
+        text = content.decode("utf-8")
+    except (KeyError, UnicodeError):
+        raise _integrity("invalid_appium_workflow_inventory") from None
+    required = _declared_contexts(text, "renma.requires-context")
+    optional = _declared_contexts(text, "renma.optional-context")
+    direct_tools = tuple(sorted({path.rstrip("`.,;:)") for path in _ASSET_REFERENCE.findall(text) if path.startswith("tools/")}))
+    direct = (entrypoint, *required, *optional, *direct_tools)
+    if len(direct) != len(set(direct)) or any(path not in bundle._contents for path in direct):
+        raise _integrity("invalid_appium_workflow_inventory")
+    selected = _transitive_assets(bundle, direct)
+    tools = tuple(path for path in selected if path.startswith("tools/"))
+    return AppiumWorkflow(
+        workflow_id=workflow_id,
+        entrypoint=entrypoint,
+        content=content,
+        required_contexts=required,
+        optional_contexts=optional,
+        tools=tools,
+        assets=MappingProxyType({path: bundle.assets[path] for path in selected}),
+    )
 
 
 @dataclass(frozen=True, slots=True)
@@ -38,6 +139,9 @@ class AppiumSkillsBundle:
         if not isinstance(relative, str) or relative not in self._contents:
             raise _integrity("invalid_appium_skills_asset")
         return self._contents[relative]
+    def load_workflow(self, workflow_id: str) -> AppiumWorkflow:
+        """Load one supported authenticated official workflow by exact ID."""
+        return _load_workflow(self, workflow_id)
 
 
 def _assets_root():

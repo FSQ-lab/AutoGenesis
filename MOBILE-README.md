@@ -34,7 +34,7 @@ uvx --from autogenesis-appium-mcp==0.5.0 autogenesis-appium-mcp --platform ios -
 ```
 
 The runtime pins Agent Contract **2.1.0**, manifest SHA-256
-`7ef4c25a1659505ff6dce335196c0516ca36709ca30424669b927fc5675d0094`.
+`cc8d75739906d6876a5a2500f1f911190e5128d761f14533853a3455d84bf0bf`.
 Mismatched or corrupt contract assets prevent startup.
 
 Standard MCP Registry metadata is `appium-mcp-server/server.json`. From a source
@@ -53,10 +53,11 @@ retain the last valid snapshot. Changes apply to the next driver session.
 `reload_config` requests a reload and `get_current_config` returns a masked view,
 including nested values and URLs. The bundled template does not need a watcher.
 
-For local devices, invoke `autogenesis-setup`. It verifies the pinned official
-Appium Skills snapshot and selects only `setup-uiautomator2` for Android or
-`setup-xcuitest` for iOS; physical iOS continues to its real-device workflow.
-Every installation, SDK, signing, trust, or device change requires approval.
+Invoke `autogenesis` for local mobile preparation or execution. It loads the
+pinned internal `setup-uiautomator2` workflow for Android or `setup-xcuitest` for
+iOS; physical iOS may continue to `xcuitest-real-device-config`. The LLM follows
+the official workflow and every SDK, signing, trust, or device change remains an
+explicitly approved Host operation.
 Keep `APPIUM_DRIVER_CONFIGS` as the top-level configuration key.
 
 BrowserStack connections use the Appium client directly; its SDK is not required.

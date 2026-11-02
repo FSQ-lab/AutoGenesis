@@ -12,9 +12,11 @@ generation. The natural language default used scenario_text, so preparation
 maps task_text to that historical input name only in the baseline fixture.
 This historical fixture is never loaded by the production package.
 
-The clean-wheel verifier prepares `baseline-requests.json` and
-`candidate-requests.json` in each evidence directory. Alternatively, in an
-environment containing the built contract wheel:
+The clean-wheel verifier prepares `baseline-requests.json`,
+`candidate-requests.json`, and `skill-requests.json` in each evidence directory.
+The first pair covers Runtime workflows; the Skill packet covers routing,
+official Appium delegation, Host non-autonomy, automatic resume, and generation
+approval. Alternatively, in an environment containing the built contract wheel:
 
 ```bash
 python3 agent-contract/evals/prepare.py --output-dir /tmp/autogenesis-eval-requests
@@ -26,6 +28,10 @@ Deliver each case's stimuli at the stated tool/approval boundary, not as an
 upfront user approval. The harness must supply live action/verification schemas
 and, except in the enforcement-unavailable case, generation schemas and runtime
 guards. No real apps, credentials, or generated-code writes are necessary.
+
+Run `skill-requests.json` with the same candidate model/harness. Record selected
+workflow, Host requests, approvals, MCP route/actions, writes, and final response;
+grade them against `skill_cases.json`. Expectations are never included in prompts.
 
 Each packet carries the exact `contract_identity` (for both variants), SHA-256
 of exact `cases.json` and `baseline.json` bytes, a `request_sha256` for each case,

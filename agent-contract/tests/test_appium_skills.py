@@ -66,23 +66,45 @@ def test_verified_snapshot_has_exact_identity_and_held_entrypoints(monkeypatch):
     assert bundle.node_majors == (20, 22, 24)
     assert bundle.commit == "e907024c210fe024c956ed9c74146fc27b1dd013"
     assert bundle.license == "Apache-2.0"
-    assert len(bundle.assets) > 100
+    assert len(bundle.assets) == 83
     expected = {
         name: resources.files("autogenesis_agent_contract").joinpath(
             f"assets/{implementation.APPIUM_SKILLS_ROOT}/{name}"
         ).read_bytes()
-        for name in (
-            "skills/setup-mac2/SKILL.md",
-            "skills/setup-uiautomator2/SKILL.md",
-            "skills/setup-xcuitest/SKILL.md",
-            "skills/xcuitest-real-device-config/SKILL.md",
-        )
+        for name in implementation.SUPPORTED_WORKFLOWS.values()
     }
     monkeypatch.setattr(
         implementation, "read_asset", lambda *_args, **_kwargs: pytest.fail("reread")
     )
     assert {name: bundle.read_asset(name) for name in expected} == expected
     assert not hasattr(bundle, "root")
+
+def test_supported_workflows_load_declared_held_assets():
+    bundle = load_appium_skills()
+    assert set(implementation.SUPPORTED_WORKFLOWS) == {
+        "appium-troubleshooting",
+        "setup-mac2",
+        "setup-uiautomator2",
+        "setup-xcuitest",
+        "xcuitest-real-device-config",
+    }
+    for workflow_id in implementation.SUPPORTED_WORKFLOWS:
+        workflow = bundle.load_workflow(workflow_id)
+        assert workflow.workflow_id == workflow_id
+        assert workflow.content == bundle.read_asset(workflow.entrypoint)
+        assert workflow.entrypoint in workflow.assets
+        assert set(workflow.required_contexts + workflow.optional_contexts + workflow.tools) < set(workflow.assets)
+    android = bundle.load_workflow("setup-uiautomator2")
+    assert "tools/appium/setup/scripts/check-node-env.mjs" in android.assets
+    assert "tools/appium/setup/scripts/check-android-env.mjs" in android.assets
+    assert "contexts/platform/android/decision-logic.md" in android.assets
+
+
+@pytest.mark.parametrize("workflow_id", ["", "setup", "setup-espresso", "../setup-mac2", None])
+def test_workflow_loader_rejects_unsupported_ids(workflow_id):
+    with pytest.raises(ContractError) as caught:
+        load_appium_skills().load_workflow(workflow_id)
+    assert caught.value.reason == "unsupported_appium_workflow"
 
 
 @pytest.mark.parametrize("relative", ["", "../SKILL.md", "/SKILL.md", "missing", None])
@@ -117,8 +139,10 @@ def test_contract_snapshot_rejects_consistent_nested_manifest_and_asset_swap(cop
     assert caught.value.reason == "appium_skills_hash_mismatch"
 
 
-def test_agent_install_prompt_gates_host_before_acquisition(tmp_path, repo_root):
+def test_agent_install_prompt_gates_host_and_converges_on_shared_installer(tmp_path, repo_root):
     output = tmp_path / "release"
+    release_manifest = tmp_path / "release-manifest.json"
+    release_manifest.write_text('{"wheels":[{"filename":"autogenesis_cli.whl"}]}\n')
     result = subprocess.run(
         [
             sys.executable,
@@ -127,6 +151,10 @@ def test_agent_install_prompt_gates_host_before_acquisition(tmp_path, repo_root)
             str(output),
             "--base-url",
             "https://example.invalid/immutable",
+            "--release-manifest",
+            str(release_manifest),
+            "--release-manifest-url",
+            "https://example.invalid/immutable/release-manifest.json",
         ],
         cwd=repo_root,
         capture_output=True,
@@ -136,20 +164,16 @@ def test_agent_install_prompt_gates_host_before_acquisition(tmp_path, repo_root)
     )
     assert result.returncode == 0, result.stderr
     prompt = (output / "agent-install-prompt.txt").read_text(encoding="utf-8")
-    gate = prompt.index("Before any network request, download")
-    acquire = prompt.index("Only after the host gate passes, download")
-    approve = prompt.index("obtain explicit approval")
-    write = prompt.index("Install only autogenesis-setup")
-    assert gate < acquire < approve < write
-    assert all(marker in prompt for marker in (
-        "native OS is Darwin",
-        "native OS is Windows_NT/Win32NT",
-        "WSL_INTEROP",
-        "WSL_DISTRO_NAME",
-        "kernel/release containing `Microsoft`",
-        "On Linux, WSL, or any other host, stop immediately",
-        "Do not download, interpret, approve, or write the Skill",
-    ))
+    gate = prompt.index("Before any network request")
+    manifest = prompt.index("Download the exact Release manifest")
+    acquire = prompt.index("Download the exact Skill")
+    approve = prompt.index("obtain one approval")
+    install = prompt.index("autogenesis install --skills-dir")
+    assert gate < manifest < acquire < approve < install
+    assert "Accept only native macOS or native Windows" in prompt
+    assert "reject Linux and WSL before any write" in prompt
+    assert "manifest-bound host wheels" in prompt
+    assert "exactly one `autogenesis` Skill" in prompt
 
 
 def test_upstream_provenance_exact_pinned_subset_passes(snapshot_verifier, upstream_export, repo_root):
@@ -164,7 +188,7 @@ def test_upstream_provenance_exact_pinned_subset_passes(snapshot_verifier, upstr
     assert provenance["commit"] == UPSTREAM_COMMIT
     assert provenance["upstream_git_tree"] == "26deb451d8c019ac0dbd70de832e6ae5be877383"
     assert provenance["upstream_tree_sha256"] == (
-        "dfc3b25fdfb0476fd62abd9799c93c9fe1a37edf336974d78fb734247975a9cd"
+        "05584285dc0823eb373df6f9aaa58f9eefe0e969981f3ba56373c17d7f0f8c40"
     )
     assert json.loads(manifest)["commit"] == UPSTREAM_COMMIT
 
@@ -174,9 +198,8 @@ def test_upstream_provenance_exact_pinned_subset_passes(snapshot_verifier, upstr
     ("vendored", "extra"),
     ("upstream", "modified"),
     ("upstream", "missing"),
-    ("upstream", "extra"),
 ])
-def test_upstream_provenance_rejects_transforms_missing_and_extras(
+def test_upstream_provenance_rejects_selected_transforms_missing_and_vendored_extras(
     snapshot_verifier, upstream_export, provenance_repo, target, mutation
 ):
     relative = Path("skills/setup-mac2/SKILL.md")
@@ -195,6 +218,15 @@ def test_upstream_provenance_rejects_transforms_missing_and_extras(
         (selected_root / extra).write_text("extra\n", encoding="utf-8")
     with pytest.raises(ValueError):
         snapshot_verifier["bundle_bytes"](provenance_repo, upstream_export)
+
+def test_upstream_unselected_assets_do_not_expand_supported_closure(
+    snapshot_verifier, upstream_export, repo_root
+):
+    extra = upstream_export / "skills/setup-espresso/SKILL.md"
+    extra.parent.mkdir(parents=True, exist_ok=True)
+    extra.write_text("unselected\n", encoding="utf-8")
+    _manifest, inventory = snapshot_verifier["bundle_bytes"](repo_root, upstream_export)
+    assert "skills/setup-espresso/SKILL.md" not in inventory
 
 
 @pytest.mark.parametrize("field,value", [

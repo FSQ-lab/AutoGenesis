@@ -48,13 +48,18 @@ export class CommandHandlers {
         .getBackgroundExtractor()
         .extractBackground(document);
 
-      // Check if the canonical autogenesis-run skill exists in the workspace
-      const skillName = 'autogenesis-run';
+      // Check if the canonical AutoGenesis skill exists in the workspace
+      const skillName = 'autogenesis';
       let textToSend: string;
 
-      if (this.copilotService.hasSkillInWorkspace(skillName)) {
-        // Use skill invocation command
-        textToSend = this.copilotService.generateSkillCommand(skillName, scenarioName);
+      if (this.copilotService.hasSkillAvailable(skillName, uri.fsPath)) {
+        // Bind the invocation to the exact Feature path and selected line.
+        textToSend = this.copilotService.generateSkillCommand(
+          skillName,
+          scenarioName,
+          uri.fsPath,
+          lineNumber
+        );
       } else {
         // Fallback: generate full prompt text for Copilot
         textToSend = await this.copilotService.generateScenarioText(

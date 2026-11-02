@@ -48,10 +48,9 @@ Open VS Code Extensions (`Ctrl+Shift+X` / `Cmd+Shift+X`) → Search "BDD AI Tool
    
    Click **"Setup"** button to configure the selected platform
 
-   > **Local Appium users**: invoke the canonical `autogenesis-setup` Skill.
-   > It verifies the pinned official Appium workflow, previews required Appium,
-   > Driver, SDK, Xcode, signing, trust, and permission changes, and waits for
-   > explicit approval before modifying the environment.
+   > **Local Appium users**: invoke the canonical `autogenesis` Skill. It loads
+   > the pinned supported official Appium workflow while AutoGenesis Host
+   > authenticates exact operations, approvals, and process cleanup.
 
 4. **Configure Automation Platform**
    
@@ -88,7 +87,7 @@ Now you're ready to use AI-powered test automation!
 3. Click **"Send to Copilot"** above the scenario
 4. AI generates automation code automatically
 
-> If `.github/skills/autogenesis-run/SKILL.md` exists in the workspace, the extension sends `/autogenesis-run <Scenario Name>` to Copilot instead of the default prompt.
+> If `.github/skills/autogenesis/SKILL.md` exists, the extension sends `/autogenesis <Scenario Name>` to Copilot instead of the fallback prompt.
 
 **Replaying** (Execute tests):
 1. Open a `.feature` file with recorded scenarios
@@ -126,7 +125,7 @@ Customize how AI generates code:
 - `${scenario_text}` - Full scenario content
 - `${feature_file_path}` - Path to feature file
 
-> **Note**: This prompt is used as fallback when the `autogenesis-run` skill is not present in the workspace.
+> **Note**: This prompt is used as fallback when the `autogenesis` Skill is not present in the workspace.
 
 ---
 

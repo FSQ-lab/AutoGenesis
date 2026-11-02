@@ -10,8 +10,7 @@ from autogenesis_cli import cli
 
 
 SKILL_BYTES = {
-    "autogenesis-setup": b"---\nname: autogenesis-setup\n---\nheld setup\n",
-    "autogenesis-run": b"---\nname: autogenesis-run\n---\nheld run\n",
+    "autogenesis": b"---\nname: autogenesis\n---\nheld skill\n",
 }
 
 
@@ -49,6 +48,19 @@ class Bundle:
         if relative not in self.assets:
             raise cli.ContractError("AUTOGENESIS_CONTRACT_INTEGRITY_ERROR", "invalid_appium_asset_path")
         return self.payloads[relative]
+
+    def load_workflow(self, workflow_id):
+        if workflow_id != "setup-mac2":
+            raise cli.ContractError("AUTOGENESIS_CONTRACT_INTEGRITY_ERROR", "unsupported_appium_workflow")
+        return type("Workflow", (), {
+            "workflow_id": workflow_id,
+            "entrypoint": "skills/setup-mac2/SKILL.md",
+            "content": b"official workflow\n",
+            "required_contexts": ("contexts/platform/macos/profile.md",),
+            "optional_contexts": (),
+            "tools": ("tools/appium/setup/scripts/check-mac2-env.mjs",),
+            "assets": {"skills/setup-mac2/SKILL.md": "0" * 64},
+        })()
 
 
 def ready(monkeypatch, contract=None, bundle=None):
@@ -94,15 +106,13 @@ def test_package_bytes_swapped_after_contract_load_are_never_installed(tmp_path,
     ready(monkeypatch, contract=contract)
 
     def load_once():
-        package_bytes["autogenesis-setup"] = b"modified package bytes\n"
-        package_bytes["autogenesis-run"] = b"modified package bytes\n"
+        package_bytes["autogenesis"] = b"modified package bytes\n"
         return contract
 
     monkeypatch.setattr(cli, "load_contract", load_once)
     root = tmp_path / "skills"
     cli.install(root)
-    assert (root / "autogenesis-setup" / "SKILL.md").read_bytes() == SKILL_BYTES["autogenesis-setup"]
-    assert (root / "autogenesis-run" / "SKILL.md").read_bytes() == SKILL_BYTES["autogenesis-run"]
+    assert (root / "autogenesis" / "SKILL.md").read_bytes() == SKILL_BYTES["autogenesis"]
 
 
 def test_appium_snapshot_failure_stops_before_destination_probe(tmp_path, monkeypatch):
@@ -159,7 +169,7 @@ def test_absolute_destination_spelling_is_preserved(tmp_path, monkeypatch):
     ready(monkeypatch)
     root = tmp_path / "skills"
     result = cli.install(root)
-    assert result["skills"]["autogenesis-setup"]["path"] == str(root / "autogenesis-setup" / "SKILL.md")
+    assert result["skills"]["autogenesis"]["path"] == str(root / "autogenesis" / "SKILL.md")
 
 
 @pytest.mark.skipif(not hasattr(os, "symlink"), reason="requires symlinks")
@@ -174,16 +184,15 @@ def test_symlink_destination_ancestor_is_rejected(tmp_path, monkeypatch):
     assert not list(external.iterdir())
 
 
-def test_conflict_in_second_skill_prevents_first_skill_write(tmp_path, monkeypatch):
+def test_existing_skill_conflict_prevents_write(tmp_path, monkeypatch):
     ready(monkeypatch)
     root = tmp_path / "skills"
-    target = root / "autogenesis-run" / "SKILL.md"
+    target = root / "autogenesis" / "SKILL.md"
     target.parent.mkdir(parents=True)
     target.write_bytes(b"user content\n")
     with pytest.raises(cli.InstallError, match="SKILL_CONFLICT"):
         cli.install(root)
     assert target.read_bytes() == b"user content\n"
-    assert not (root / "autogenesis-setup").exists()
 
 
 @pytest.mark.skipif(sys.platform == "win32", reason="POSIX descriptor race")
@@ -206,8 +215,7 @@ def test_conflict_appearing_after_preflight_is_never_overwritten(tmp_path, monke
     monkeypatch.setattr(cli._PosixTransaction, "create", create)
     with pytest.raises(cli.InstallError, match="SKILL_CONFLICT"):
         cli.install(root)
-    assert (root / "autogenesis-setup" / "SKILL.md").read_bytes() == b"concurrent owner\n"
-    assert not (root / "autogenesis-run").exists()
+    assert (root / "autogenesis" / "SKILL.md").read_bytes() == b"concurrent owner\n"
 
 
 @pytest.mark.skipif(sys.platform == "win32", reason="POSIX descriptor race")
@@ -232,8 +240,7 @@ def test_ancestor_swap_is_rejected_and_held_target_is_rolled_back(tmp_path, monk
     with pytest.raises(cli.InstallError, match="DESTINATION_UNSAFE"):
         cli.install(root)
     assert (root / "concurrent.txt").read_bytes() == b"concurrent\n"
-    assert not (moved / "autogenesis-setup").exists()
-    assert not (moved / "autogenesis-run").exists()
+    assert not (moved / "autogenesis").exists()
 
 
 @pytest.mark.skipif(sys.platform == "win32", reason="POSIX descriptor rollback")
@@ -247,53 +254,9 @@ def test_failure_after_file_commit_rolls_back_current_file(tmp_path, monkeypatch
     monkeypatch.setattr(cli._PosixTransaction, "_verify_record", fail_verification)
     with pytest.raises(cli.InstallError, match="INTEGRITY_ERROR"):
         cli.install(root)
-    assert not (root / "autogenesis-setup").exists()
-    assert not (root / "autogenesis-run").exists()
+    assert not (root / "autogenesis").exists()
 
 
-@pytest.mark.skipif(sys.platform == "win32", reason="POSIX descriptor rollback")
-def test_concurrent_replacement_during_rollback_is_preserved(tmp_path, monkeypatch):
-    ready(monkeypatch)
-    root = tmp_path / "skills"
-    original = cli._PosixTransaction.create
-    calls = 0
-
-    def create(transaction, relative, raw):
-        nonlocal calls
-        calls += 1
-        if calls == 2:
-            replacement = root / "replacement"
-            replacement.write_bytes(b"concurrent replacement\n")
-            os.replace(replacement, root / "autogenesis-setup" / "SKILL.md")
-            raise OSError("synthetic second write failure")
-        return original(transaction, relative, raw)
-
-    monkeypatch.setattr(cli._PosixTransaction, "create", create)
-    with pytest.raises(OSError, match="synthetic second write failure"):
-        cli.install(root)
-    assert (root / "autogenesis-setup" / "SKILL.md").read_bytes() == b"concurrent replacement\n"
-    assert not (root / "autogenesis-run").exists()
-
-
-@pytest.mark.skipif(sys.platform == "win32", reason="POSIX descriptor rollback")
-def test_two_skill_transaction_rolls_back_first_on_second_failure(tmp_path, monkeypatch):
-    ready(monkeypatch)
-    root = tmp_path / "skills"
-    original = cli._PosixTransaction.create
-    calls = 0
-
-    def create(transaction, relative, raw):
-        nonlocal calls
-        calls += 1
-        if calls == 2:
-            raise OSError("synthetic second write failure")
-        return original(transaction, relative, raw)
-
-    monkeypatch.setattr(cli._PosixTransaction, "create", create)
-    with pytest.raises(OSError, match="synthetic second write failure"):
-        cli.install(root)
-    assert not (root / "autogenesis-setup").exists()
-    assert not (root / "autogenesis-run").exists()
 
 
 class FakeWindowsAPI:
@@ -364,22 +327,22 @@ def test_windows_reparse_ancestor_is_rejected_before_creation():
     )
     transaction = cli._WindowsTransaction(PureWindowsPath("C:/Users/person/skills"), api)
     with pytest.raises(cli.InstallError, match="DESTINATION_UNSAFE"):
-        transaction.preflight(("autogenesis-setup", "SKILL.md"), SKILL_BYTES["autogenesis-setup"])
+        transaction.preflight(("autogenesis", "SKILL.md"), SKILL_BYTES["autogenesis"])
     transaction.rollback()
     assert not api.created_files
     assert not api.created_directories
 
 def test_windows_reparse_final_file_is_rejected_and_closed():
-    parent = "C:\\Users\\person\\skills\\autogenesis-setup"
+    parent = "C:\\Users\\person\\skills\\autogenesis"
     target = parent + "\\SKILL.md"
     api = FakeWindowsAPI(
         directories={"C:\\Users", "C:\\Users\\person", "C:\\Users\\person\\skills", parent},
-        files={target: SKILL_BYTES["autogenesis-setup"]},
+        files={target: SKILL_BYTES["autogenesis"]},
         reparses={target},
     )
     transaction = cli._WindowsTransaction(PureWindowsPath("C:/Users/person/skills"), api)
     with pytest.raises(cli.InstallError, match="DESTINATION_UNSAFE"):
-        transaction.preflight(("autogenesis-setup", "SKILL.md"), SKILL_BYTES["autogenesis-setup"])
+        transaction.preflight(("autogenesis", "SKILL.md"), SKILL_BYTES["autogenesis"])
     transaction.rollback()
     assert target in api.closed
 
@@ -388,9 +351,9 @@ def test_windows_reparse_final_file_is_rejected_and_closed():
 def test_windows_uses_handle_exact_rollback_for_committed_file():
     api = FakeWindowsAPI(directories={"C:\\Users", "C:\\Users\\person", "C:\\Users\\person\\skills"})
     transaction = cli._WindowsTransaction(PureWindowsPath("C:/Users/person/skills"), api)
-    relative = ("autogenesis-setup", "SKILL.md")
-    assert transaction.preflight(relative, SKILL_BYTES["autogenesis-setup"]) == "pending"
-    transaction.create(relative, SKILL_BYTES["autogenesis-setup"])
+    relative = ("autogenesis", "SKILL.md")
+    assert transaction.preflight(relative, SKILL_BYTES["autogenesis"]) == "pending"
+    transaction.create(relative, SKILL_BYTES["autogenesis"])
     handle = api.created_files[0]
     transaction.rollback()
     assert (handle, False) in api.deleted
@@ -400,14 +363,14 @@ def test_windows_uses_handle_exact_rollback_for_committed_file():
 def test_windows_conflict_after_preflight_is_not_overwritten():
     api = FakeWindowsAPI(directories={"C:\\Users", "C:\\Users\\person", "C:\\Users\\person\\skills"})
     transaction = cli._WindowsTransaction(PureWindowsPath("C:/Users/person/skills"), api)
-    relative = ("autogenesis-setup", "SKILL.md")
-    assert transaction.preflight(relative, SKILL_BYTES["autogenesis-setup"]) == "pending"
-    parent = "C:\\Users\\person\\skills\\autogenesis-setup"
+    relative = ("autogenesis", "SKILL.md")
+    assert transaction.preflight(relative, SKILL_BYTES["autogenesis"]) == "pending"
+    parent = "C:\\Users\\person\\skills\\autogenesis"
     api.directories.add(parent)
     target = parent + "\\SKILL.md"
     api.files[target] = b"concurrent\n"
     with pytest.raises(cli.InstallError, match="SKILL_CONFLICT"):
-        transaction.create(relative, SKILL_BYTES["autogenesis-setup"])
+        transaction.create(relative, SKILL_BYTES["autogenesis"])
     transaction.rollback()
     assert api.files[target] == b"concurrent\n"
 
@@ -422,6 +385,26 @@ def test_appium_skills_metadata_has_digest_inventory_without_mutable_root(monkey
     assert result["assets"] == bundle.assets
     assert result["asset_count"] == len(bundle.assets)
 
+def test_appium_workflow_loads_exact_supported_workflow(monkeypatch, capsys):
+    bundle = Bundle()
+    monkeypatch.setattr(cli, "_verified_contract", lambda: object())
+    monkeypatch.setattr(cli, "load_appium_skills", lambda _contract: bundle)
+    assert cli.main(["appium-workflow", "setup-mac2", "--json"]) == 0
+    result = json.loads(capsys.readouterr().out)
+    assert result["workflow_id"] == "setup-mac2"
+    assert result["entrypoint"] == "skills/setup-mac2/SKILL.md"
+    assert result["content"] == "official workflow\n"
+    assert result["required_contexts"] == ["contexts/platform/macos/profile.md"]
+    assert result["tools"] == ["tools/appium/setup/scripts/check-mac2-env.mjs"]
+
+
+def test_appium_workflow_rejects_unsupported_id(monkeypatch, capsys):
+    monkeypatch.setattr(cli, "_verified_contract", lambda: object())
+    monkeypatch.setattr(cli, "load_appium_skills", lambda _contract: Bundle())
+    assert cli.main(["appium-workflow", "setup-espresso", "--json"]) == 1
+    result = json.loads(capsys.readouterr().out)
+    assert result["status"] == "error"
+
 
 def test_appium_asset_writes_exact_held_binary_bytes(monkeypatch, capsysbinary):
     path = "skills/setup-mac2/SKILL.md"
@@ -429,7 +412,7 @@ def test_appium_asset_writes_exact_held_binary_bytes(monkeypatch, capsysbinary):
     bundle = Bundle({path: raw})
     monkeypatch.setattr(cli, "_verified_contract", lambda: object())
     monkeypatch.setattr(cli, "load_appium_skills", lambda _contract: bundle)
-    assert cli.main(["appium-asset", path]) == 0
+    assert cli.main(["appium-asset", "setup-mac2", path]) == 0
     assert capsysbinary.readouterr() == (raw, b"")
 
 
@@ -437,148 +420,17 @@ def test_appium_asset_writes_exact_held_binary_bytes(monkeypatch, capsysbinary):
 def test_appium_asset_rejects_non_inventory_and_traversal_paths(path, monkeypatch, capsysbinary):
     monkeypatch.setattr(cli, "_verified_contract", lambda: object())
     monkeypatch.setattr(cli, "load_appium_skills", lambda _contract: Bundle())
-    assert cli.main(["appium-asset", path]) == 1
+    assert cli.main(["appium-asset", "setup-mac2", path]) == 1
     stdout, stderr = capsysbinary.readouterr()
     assert stdout == b""
     assert stderr == b"AUTOGENESIS_CONTRACT_INTEGRITY_ERROR\n"
 
-def test_appium_tool_binds_node_and_helper_bytes_without_shell_or_inherited_environment(monkeypatch):
-    script = "tools/appium/setup/scripts/check-mac2-env.mjs"
-    helper = "tools/appium/setup/scripts/reporting.mjs"
-    bundle = Bundle({script: b"import './reporting.mjs';\n", helper: b"export {};\n"})
-    monkeypatch.setattr(cli, "_verified_contract", lambda: object())
-    monkeypatch.setattr(cli, "load_appium_skills", lambda _contract: bundle)
-    digest = "a" * 64
-    approved_path = "/approved/bin:/usr/bin"
-    path_digest = hashlib.sha256(approved_path.encode()).hexdigest()
-    monkeypatch.setenv("PATH", approved_path)
-    monkeypatch.setenv("NODE_OPTIONS", "--require=/untrusted/project/pwn.js")
-    monkeypatch.setattr(cli, "_hold_node", lambda node, sha256, cwd: cli._HeldNode(node, sha256))
-    def materialize(_held, root):
-        target = root / "node"
-        target.write_bytes(b"native node")
-        return str(target)
-    monkeypatch.setattr(cli, "_materialize_held_node", materialize)
-    roots = []
-
-    def run(command, **options):
-        if command[1:] == ["--version"]:
-            assert options == {
-                "cwd": Path.cwd(), "check": False, "capture_output": True, "text": True, "env": {},
-            }
-            return type("Completed", (), {"returncode": 0, "stdout": "v24.22.1\n", "stderr": ""})()
-        root = Path(command[3]).parents[4]
-        roots.append(root)
-        assert command[0] == str(root / "node")
-        assert command[1] == str(root / "autogenesis-node-bootstrap.mjs")
-        assert json.loads(cli.base64.urlsafe_b64decode(command[2])) == [["PATH", approved_path]]
-        assert command[3:] == [str(root / script), "--format", "summary"]
-        assert (root / "autogenesis-node-bootstrap.mjs").read_bytes() == cli._NODE_BOOTSTRAP
-        assert (root / script).read_bytes() == bundle.read_asset(script)
-        assert (root / helper).read_bytes() == bundle.read_asset(helper)
-        assert options == {"cwd": Path.cwd(), "check": False, "env": {}}
-        return type("Completed", (), {"returncode": 7})()
-
-    monkeypatch.setattr(cli.subprocess, "run", run)
-    assert cli.main([
-        "appium-tool", "--node", "/verified/path/node",
-        "--node-sha256", digest, "--node-version", "v24.22.1",
-        "--allow-env", f"PATH={path_digest}", script, "--", "--format", "summary",
-    ]) == 7
-    assert len(roots) == 1 and not roots[0].exists()
-
-def test_appium_tool_rejects_unsupported_host_before_loading_assets(monkeypatch, capsys):
-    monkeypatch.setattr(cli.sys, "platform", "linux")
-    monkeypatch.setattr(
-        cli, "load_appium_skills", lambda _contract: pytest.fail("assets loaded before host gate"),
-    )
-    assert cli.main([
-        "appium-tool", "--node", "/verified/path/node", "--node-sha256", "a" * 64,
-        "--node-version", "v24.22.1", "tools/appium/setup/scripts/check-mac2-env.mjs",
-    ]) == 1
-    assert "AUTOGENESIS_PLATFORM_UNSUPPORTED" in capsys.readouterr().err
-
-
-
-def test_appium_tool_rejects_non_helper_asset_before_execution(monkeypatch):
-    bundle = Bundle()
-    monkeypatch.setattr(cli, "_verified_contract", lambda: object())
-    monkeypatch.setattr(cli, "load_appium_skills", lambda _contract: bundle)
-    monkeypatch.setattr(
-        cli.subprocess, "run", lambda *_args, **_kwargs: pytest.fail("unauthorized process execution"),
-    )
-    assert cli.main([
-        "appium-tool", "--node", "/verified/path/node", "--node-sha256", "a" * 64,
-        "--node-version", "v24.22.1", "skills/setup-mac2/SKILL.md",
-    ]) == 1
-
-def test_node_identity_rejects_project_local_symlink_and_writable_paths(tmp_path):
-    project = tmp_path / "project"
-    project.mkdir()
-    project_node = project / "node"
-    project_node.write_bytes(b"\x7fELFnode")
-    project_node.chmod(0o755)
-    with pytest.raises(cli.InstallError, match="NODE_UNSAFE"):
-        cli._hold_node(str(project_node), hashlib.sha256(project_node.read_bytes()).hexdigest(), project)
-
-    outside = tmp_path / "outside-node"
-    outside.write_bytes(b"node")
-    outside.chmod(0o755)
-    linked = tmp_path / "node-link"
-    linked.symlink_to(outside)
-    with pytest.raises(cli.InstallError, match="NODE_UNSAFE"):
-        cli._hold_node(str(linked), hashlib.sha256(outside.read_bytes()).hexdigest(), project)
-    if sys.platform != "win32":
-        unsafe = tmp_path / "unsafe"
-        unsafe.mkdir(mode=0o777)
-        unsafe.chmod(0o777)
-        unsafe_node = unsafe / "node"
-        unsafe_node.write_bytes(b"\x7fELFnode")
-        unsafe_node.chmod(0o755)
-        with pytest.raises(cli.InstallError, match="NODE_UNSAFE"):
-            cli._hold_node(
-                str(unsafe_node), hashlib.sha256(unsafe_node.read_bytes()).hexdigest(), project,
-            )
-
-
-def test_node_identity_materializes_held_bytes_after_path_swap_and_rejects_env_shebang(tmp_path):
-    project = tmp_path / "project"
-    project.mkdir()
-    approved = tmp_path / "approved-node"
-    original = b"MZapproved" if sys.platform == "win32" else b"\x7fELFapproved"
-    approved.write_bytes(original)
-    approved.chmod(0o755)
-    held = cli._hold_node(str(approved), hashlib.sha256(original).hexdigest(), project)
-    try:
-        replacement = tmp_path / "replacement"
-        replacement.write_bytes(b"MZreplacement" if sys.platform == "win32" else b"\x7fELFreplacement")
-        replacement.chmod(0o755)
-        if sys.platform == "win32":
-            with pytest.raises(OSError):
-                replacement.replace(approved)
-        else:
-            replacement.replace(approved)
-        root = tmp_path / "private"
-        root.mkdir()
-        materialized = Path(cli._materialize_held_node(held, root))
-        assert materialized.read_bytes() == original
-    finally:
-        held.close()
-
-    wrapper = tmp_path / "node-wrapper"
-    wrapper.write_bytes(b"#!/usr/bin/env node\n")
-    wrapper.chmod(0o755)
-    with pytest.raises(cli.InstallError, match="NODE_IDENTITY_MISMATCH"):
-        cli._hold_node(str(wrapper), hashlib.sha256(wrapper.read_bytes()).hexdigest(), project)
 
 
 @pytest.mark.parametrize("arguments", [
     ["appium-skills", "--json"],
-    ["appium-asset", "skills/setup-mac2/SKILL.md"],
-    [
-        "appium-tool", "--node", "/verified/path/node", "--node-sha256", "a" * 64,
-        "--node-version", "v24.22.1", "tools/appium/setup/scripts/check-mac2-env.mjs",
-    ],
+    ["appium-workflow", "setup-mac2", "--json"],
+    ["appium-asset", "setup-mac2", "skills/setup-mac2/SKILL.md"],
 ])
 def test_appium_commands_reject_unpinned_contract(arguments, monkeypatch):
     contract = Contract()

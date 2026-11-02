@@ -42,10 +42,10 @@ def test_installed_wheel_release_identity_and_inventory(contract, repo_root):
     paths.update(f"workflows/{name}.md" for name in (
         "execute_scenario", "generate_scenario_test", "execute_natural_language_task"
     ))
-    paths.update(f"skills/{name}/SKILL.md" for name in ("autogenesis-setup", "autogenesis-run"))
+    paths.add("skills/autogenesis/SKILL.md")
     paths.add("schemas/secret-reference.schema.json")
     paths.update(f"schemas/{name}.schema.json" for name in ("manifest", "identity", "arguments"))
-    paths.add("skills/autogenesis-setup/references/appium-skills/manifest.json")
+    paths.add("appium-skills/manifest.json")
     assert set(manifest["assets"]) == paths
     for path, digest in manifest["assets"].items():
         content = assets().joinpath(path).read_bytes()
@@ -83,15 +83,12 @@ def test_immutable_order_and_untrusted_data_encoding(contract):
 
 
 def test_canonical_skill_bytes_are_held_after_one_verified_load(contract, monkeypatch):
-    expected = {
-        name: assets().joinpath(f"skills/{name}/SKILL.md").read_bytes()
-        for name in ("autogenesis-setup", "autogenesis-run")
-    }
+    expected = {"autogenesis": assets().joinpath("skills/autogenesis/SKILL.md").read_bytes()}
     monkeypatch.setattr(implementation, "read_asset", lambda *_args, **_kwargs: pytest.fail("reread"))
     assert {name: contract.read_skill(name) for name in expected} == expected
 
 
-@pytest.mark.parametrize("name", ["", "Autogenesis-setup", "../autogenesis-run", "unknown", None])
+@pytest.mark.parametrize("name", ["", "Autogenesis", "../autogenesis", "autogenesis-run", "unknown", None])
 def test_canonical_skill_bytes_reject_unknown_names(contract, name):
     with pytest.raises(ContractError) as caught:
         contract.read_skill(name)
@@ -172,7 +169,7 @@ def copied_assets(tmp_path, monkeypatch):
 @pytest.mark.parametrize("path,mode", [
     ("core-policy.md", "edit"),
     ("workflows/generate_scenario_test.md", "missing"),
-    ("skills/autogenesis-run/SKILL.md", "crlf"),
+    ("skills/autogenesis/SKILL.md", "crlf"),
     ("schemas/arguments.schema.json", "edit"),
     ("manifest.json", "edit"),
     ("manifest.json", "missing"),
