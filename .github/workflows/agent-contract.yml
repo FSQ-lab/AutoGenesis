@@ -109,4 +109,5 @@ jobs:
           node --check tools/appium/setup/scripts/check-mac2-env.mjs
           node --check tools/appium/setup/scripts/check-uiautomator2-env.mjs
           node --check tools/appium/setup/scripts/check-xcuitest-env.mjs
-          node --check tools/appium/setup/scripts/smoke-appium-server.mjs
+          node --check tools/appium/setup/scripts/check-node-env.mjs
+          node --check tools/appium/setup/scripts/windows-command.mjs
