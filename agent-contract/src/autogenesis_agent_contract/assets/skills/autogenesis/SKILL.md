@@ -47,10 +47,10 @@ Never execute a same-named project script or replacement helper. Run these bound
 node -e "const m=+process.versions.node.split('.')[0],e=process.env;console.log(JSON.stringify({nodeVersion:process.version,nodeMajor:m,manager:e.NVM_BIN?'nvm':e.FNM_DIR?'fnm':e.ASDF_DIR?'asdf':'none'}));process.exitCode=m>=20?0:1"
 npm --version
 # macOS registry host and connectivity
-node -e "const{execFileSync}=require('node:child_process'),u=new URL(execFileSync('npm',['config','get','registry'],{encoding:'utf8',stdio:['ignore','pipe','ignore']}).trim());console.log(u.host)"
+node -e "const{execFileSync}=require('node:child_process');try{const r=execFileSync('npm',['config','get','registry'],{encoding:'utf8',stdio:['ignore','pipe','ignore']}).trim(),u=new URL(r);console.log(u.host)}catch{console.log('registry=invalid');process.exitCode=1}"
 node -e "const{execFileSync}=require('node:child_process');try{execFileSync('npm',['ping','--json'],{stdio:'ignore',timeout:10000});console.log('npmConnectivityOk=true')}catch{console.log('npmConnectivityOk=false');process.exitCode=1}"
 # Windows PowerShell registry host and connectivity
-powershell -NoProfile -Command "$u=[uri](& npm.cmd config get registry);$u.Host"
+powershell -NoProfile -Command "$ErrorActionPreference='Stop';try{$r=& npm.cmd config get registry 2>$null;if($LASTEXITCODE -ne 0){throw 0};$u=[uri]$r;$u.Host}catch{'registry=invalid';exit 1}"
 powershell -NoProfile -Command "& npm.cmd ping --json *> $null;if($LASTEXITCODE -eq 0){'npmConnectivityOk=true'}else{'npmConnectivityOk=false';exit 1}"
 # macOS installed Appium engine range; replace global with local only in local mode
 node -e "const c=require('node:child_process'),f=require('node:fs'),p=require('node:path'),x=process.argv[1]==='local'?'node_modules/appium/package.json':p.join(c.execFileSync('npm',['root','-g'],{encoding:'utf8',stdio:['ignore','pipe','ignore']}).trim(),'appium','package.json'),e=JSON.parse(f.readFileSync(x,'utf8')).engines?.node||'';console.log(String(e).replace(/[\r\n]/g,''))" global

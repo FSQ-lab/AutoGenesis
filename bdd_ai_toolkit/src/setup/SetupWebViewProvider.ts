@@ -519,7 +519,7 @@ export class SetupWebViewProvider implements vscode.WebviewViewProvider {
 
       const projectPath = workspaceFolder.uri.fsPath;
 
-      // Check the workspace MCP configuration file used by VS Code.
+      // Check the Runtime definitions currently exposed by the Extension provider.
       const mcpConfig = await mcpManager.getWorkspaceMcpConfig(projectPath);
 
       if (!mcpConfig || !mcpConfig.servers) {
@@ -658,9 +658,6 @@ export class SetupWebViewProvider implements vscode.WebviewViewProvider {
       console.log("Refreshing MCP status after successful setup...");
       await this.refreshMcpStatus();
 
-      // Auto-open MCP settings file after successful setup
-      console.log("Auto-opening MCP settings file...");
-      await this.openMcpSettings(webviewView);
 
       vscode.window.showInformationMessage(
         `${displayName} MCP server setup completed successfully!`
@@ -698,83 +695,20 @@ export class SetupWebViewProvider implements vscode.WebviewViewProvider {
    */
   private async setupAppiumMcp(webviewView: vscode.WebviewView): Promise<void> {
     return this.setupMcpServer(webviewView, "appium-common", "Appium");
-  } /**
-   * Open MCP settings file in VS Code
-   */
+  }
+
+  /** Explain the provider-backed configuration without creating workspace files. */
   private async openMcpSettings(
     webviewView: vscode.WebviewView
   ): Promise<void> {
-    try {
-      // Check if workspace folder exists
-      const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
-      if (!workspaceFolder) {
-        const errorMessage =
-          "No workspace folder found. Please open a workspace first.";
-        console.error(errorMessage);
-        vscode.window.showErrorMessage(errorMessage);
-        return;
-      }
-
-      // Option 1: Try to open dedicated MCP configuration file (.vscode/mcp.json)
-      const mcpConfigPath = vscode.Uri.joinPath(
-        workspaceFolder.uri,
-        ".vscode",
-        "mcp.json"
-      );
-
-      try {
-        // Check if mcp.json exists
-        await vscode.workspace.fs.stat(mcpConfigPath);
-        const document = await vscode.workspace.openTextDocument(mcpConfigPath);
-        await vscode.window.showTextDocument(document);
-        return;
-      } catch (mcpError) {
-        console.log("MCP config file does not exist, will create it");
-      }
-
-      // Option 2: If mcp.json doesn't exist, create it with current MCP configuration
-      // Get current MCP configuration or create default
-      const mcpConfigToSave = { servers: {} };
-
-      // Ensure .vscode directory exists
-      const vscodeDir = vscode.Uri.joinPath(workspaceFolder.uri, ".vscode");
-      try {
-        await vscode.workspace.fs.stat(vscodeDir);
-      } catch {
-        console.log("Creating .vscode directory...");
-        await vscode.workspace.fs.createDirectory(vscodeDir);
-      }
-
-      // Create the mcp.json file
-      const configContent = JSON.stringify(mcpConfigToSave, null, 4);
-      await vscode.workspace.fs.writeFile(
-        mcpConfigPath,
-        Buffer.from(configContent, "utf8")
-      );
-
-      // Open the newly created file
-      const document = await vscode.workspace.openTextDocument(mcpConfigPath);
-      await vscode.window.showTextDocument(document);
-      webviewView.webview.postMessage({
-        command: "mcpServerSetup",
-        status: "success",
-        message: "MCP settings file opened",
-      });
-    } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : String(error);
-      console.error("Failed to open MCP settings:", errorMessage);
-
-      webviewView.webview.postMessage({
-        command: "mcpServerSetup",
-        status: "error",
-        message: `Failed to open MCP settings: ${errorMessage}`,
-      });
-
-      vscode.window.showErrorMessage(
-        `Failed to open MCP settings: ${errorMessage}`
-      );
-    }
+    const message =
+      "AutoGenesis Runtimes are registered by this Extension. Use MCP: List Servers to inspect or restart them.";
+    webviewView.webview.postMessage({
+      command: "mcpServerSetup",
+      status: "success",
+      message,
+    });
+    vscode.window.showInformationMessage(message);
   }
 
   /**

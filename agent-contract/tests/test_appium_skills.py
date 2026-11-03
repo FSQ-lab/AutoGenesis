@@ -108,7 +108,9 @@ def test_supported_workflows_load_declared_held_assets():
         "Never print the raw registry URL",
     ):
         assert required in policy
-    assert 'powershell -NoProfile -Command "$u=[uri](& npm.cmd config get registry);$u.Host"' in policy
+    assert "$ErrorActionPreference='Stop'" in policy
+    assert "$u=[uri]$r;$u.Host" in policy
+    assert "catch{'registry=invalid';exit 1}" in policy
     assert "npm.cmd ping --json *> $null" in policy
     assert all(
         not hasattr(bundle.load_workflow(workflow_id), "host_operations")
@@ -122,7 +124,11 @@ def test_supported_workflows_load_declared_held_assets():
 
 
 @pytest.mark.skipif(os.name == "nt", reason="POSIX command fixture")
-def test_safe_registry_command_outputs_host_only(tmp_path):
+@pytest.mark.parametrize(("registry", "expected", "exit_code"), [
+    ("https://user:SYNTHETIC_TOKEN@registry.example/path?token=SYNTHETIC_TOKEN", "registry.example", 0),
+    ("not-a-url-SYNTHETIC_TOKEN", "registry=invalid", 1),
+])
+def test_safe_registry_command_outputs_host_only(tmp_path, registry, expected, exit_code):
     policy = load_contract().read_skill("autogenesis").decode("utf-8")
     command = next(
         line for line in policy.splitlines()
@@ -130,15 +136,15 @@ def test_safe_registry_command_outputs_host_only(tmp_path):
     )
     code = command[len('node -e "'):-1]
     npm = tmp_path / "npm"
-    npm.write_text("#!/bin/sh\nprintf '%s\\n' 'https://user:SYNTHETIC_TOKEN@registry.example/path?token=SYNTHETIC_TOKEN'\n")
+    npm.write_text(f"#!/bin/sh\nprintf '%s\\n' '{registry}'\n")
     npm.chmod(0o700)
     environment = dict(os.environ, PATH=str(tmp_path) + os.pathsep + os.environ["PATH"])
     result = subprocess.run(
         [shutil.which("node"), "-e", code], capture_output=True, text=True,
         env=environment, check=False, timeout=10,
     )
-    assert result.returncode == 0
-    assert result.stdout.strip() == "registry.example"
+    assert result.returncode == exit_code
+    assert result.stdout.strip() == expected
     assert "SYNTHETIC_TOKEN" not in result.stdout + result.stderr
 
 

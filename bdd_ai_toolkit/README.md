@@ -57,26 +57,20 @@ Open VS Code Extensions (`Ctrl+Shift+X` / `Cmd+Shift+X`) → Search "BDD AI Tool
    - **Windows** - Browser automation
    - **Appium** - For macOS and mobile testing (iOS/Android)
 
-   Click **"Setup"** to configure the canonical installed Runtime. If you change
-   `bdd_ai_conf.json` after setup, run setup again so the MCP entry is rebuilt.
+   Click **"Setup"** to register the canonical installed Runtime through the
+   Extension's MCP provider. If `bdd_ai_conf.json` changes, run setup again.
 
    > **Local Appium users**: invoke the canonical `autogenesis` Skill. It loads
    > the pinned supported official Appium workflow and guides the Coding Agent's
    > terminal diagnosis before the canonical installed Appium MCP starts.
 
-5. **Open MCP Configuration File**
-   
-   Click **"Open"** button to view/edit the MCP configuration file
-   
-   The config file will be opened in the editor
+5. **Inspect the Registered Server**
 
-6. **Start MCP Server**
-   
-   In the opened configuration file, click the **"Start"** button (CodeLens action)
-   
-   This launches the MCP server
+   Run **MCP: List Servers** from the Command Palette. The Extension supplies the
+   canonical stdio definition directly; it does not create or modify
+   `.vscode/mcp.json`.
 
-7. **Verify Connection in GitHub Copilot**
+6. **Verify Connection in GitHub Copilot**
    
    - Open GitHub Copilot Chat
    - Check MCP connections panel
