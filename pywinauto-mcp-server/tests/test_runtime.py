@@ -2,6 +2,7 @@ import json
 import sys
 from pathlib import Path
 from types import SimpleNamespace
+from unittest.mock import Mock
 
 
 import pytest
@@ -128,7 +129,6 @@ async def test_launch_expands_environment_refs_without_mutating_config(monkeypat
     monkeypatch.setattr(app_session, "Desktop", FakeDesktop)
     monkeypatch.setattr(app_session.psutil, "Process", FakeProcess)
     monkeypatch.setattr(app_session.time, "sleep", lambda duration: None)
-    monkeypatch.setattr(manager, "kill_app_process_by_path", lambda: None)
 
     def app_launch():
         pass
@@ -289,7 +289,6 @@ async def test_launch_preserves_the_window_that_passed_readiness(monkeypatch):
     monkeypatch.setattr(app_session, "Desktop", FakeDesktop)
     monkeypatch.setattr(app_session.psutil, "Process", FakeProcess)
     monkeypatch.setattr(app_session.time, "sleep", lambda duration: None)
-    monkeypatch.setattr(manager, "kill_app_process_by_path", lambda: None)
 
     def app_launch():
         pass
@@ -440,6 +439,48 @@ async def test_document_input_and_value_assertion_use_uia_value_pattern(monkeypa
     assert verified["status"] == "success"
 
 
+def test_runtime_close_releases_binding_without_closing_application(app_config):
+    instance = runtime.create_runtime(app_config)
+    application = Mock()
+    instance.manager._app = application
+    instance.manager._binding = object()
+    instance.manager.gen_code_id = "pending"
+    instance.manager.gen_code_cache.append({"private": "call"})
+    instance.manager.pending_write = {"private": "write"}
+
+    instance.close()
+    instance.close()
+
+    application.kill.assert_not_called()
+    assert instance.manager._app is None
+    assert instance.manager._binding is None
+    assert instance.manager.gen_code_id is None
+    assert instance.manager.gen_code_cache == []
+    assert instance.manager.pending_write is None
+
+
+@pytest.mark.anyio
+async def test_explicit_close_targets_only_bound_application(monkeypatch, app_config):
+    from autogenesis_windows_mcp import app_session
+
+    manager = app_session.AppSessionManager(app_config)
+    application = Mock()
+    window = Mock()
+    manager._app = application
+    manager._binding = object()
+    monkeypatch.setattr(manager, "_get_bound_window", lambda: window)
+    monkeypatch.setattr(app_session.psutil, "process_iter", lambda *args, **kwargs: pytest.fail(
+        "Explicit close enumerated unrelated applications."
+    ))
+
+    await manager.app_close()
+
+    window.close.assert_called_once_with()
+    application.kill.assert_called_once_with()
+    assert manager._app is None
+    assert manager._binding is None
+
+
 @pytest.mark.anyio
 async def test_generation_destination_cannot_escape_business_project(app_config, tmp_path):
     server = runtime.create_server(app_config, business_root=tmp_path)
@@ -455,7 +496,7 @@ async def test_canonical_instructions_prompts_and_identity_use_merged_adapter(ap
     server = runtime.create_server(app_config)
     contract = load_contract()
     assert server.instructions == contract.instructions
-    assert runtime.RUNTIME_CONTRACT == RuntimeContractRequirement("2.1.0", "dd88051a2b2440d4188b11eef41e41aa2c7dbfe3291f152a37a903ee17cb493f")
+    assert runtime.RUNTIME_CONTRACT == RuntimeContractRequirement("2.1.0", "4a9bb78c340cb859260d19e72a0a527dc855d06ad4de31d8167197947d5914de")
     assert {prompt.name: [(arg.name, arg.required) for arg in prompt.arguments] for prompt in await server.list_prompts()} == {
         "execute_scenario": [("scenario_text", True), ("feature_file_path", False)],
         "generate_scenario_test": [("scenario_text", True), ("feature_file_path", True)],
@@ -475,7 +516,7 @@ async def test_canonical_instructions_prompts_and_identity_use_merged_adapter(ap
     assert {key: identity[key] for key in contract.identity.to_dict()} == contract.identity.to_dict()
 
 
-@pytest.mark.parametrize("version,digest", [("3.0.0", "dd88051a2b2440d4188b11eef41e41aa2c7dbfe3291f152a37a903ee17cb493f"), ("2.1.0", "0" * 64)])
+@pytest.mark.parametrize("version,digest", [("3.0.0", "4a9bb78c340cb859260d19e72a0a527dc855d06ad4de31d8167197947d5914de"), ("2.1.0", "0" * 64)])
 def test_contract_drift_fails_closed_before_driver_import(monkeypatch, app_config, version, digest):
     monkeypatch.setattr(runtime, "RUNTIME_CONTRACT", RuntimeContractRequirement(version, digest))
     with pytest.raises(ContractError):

@@ -98,17 +98,10 @@ def test_supported_workflows_load_declared_held_assets():
     assert "tools/appium/setup/scripts/check-node-env.mjs" in android.assets
     assert "tools/appium/setup/scripts/check-android-env.mjs" in android.assets
     assert "contexts/platform/android/decision-logic.md" in android.assets
-    assert {
-        workflow_id: tuple(
-            operation.parameters["driver"]
-            for operation in bundle.load_workflow(workflow_id).host_operations
-        )
+    assert all(
+        not hasattr(bundle.load_workflow(workflow_id), "host_operations")
         for workflow_id in ("setup-mac2", "setup-uiautomator2", "setup-xcuitest")
-    } == {
-        "setup-mac2": ("mac2",),
-        "setup-uiautomator2": ("uiautomator2",),
-        "setup-xcuitest": ("xcuitest",),
-    }
+    )
     assert not {
         "tools/appium/setup/scripts/smoke-appium-server.mjs",
         "tools/appium/setup/scripts/smoke-chromium-session.mjs",

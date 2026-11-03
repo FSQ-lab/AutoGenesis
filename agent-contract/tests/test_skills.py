@@ -27,7 +27,7 @@ def test_repository_has_one_exact_canonical_skill_projection(repo_root):
     assert b"autogenesis-setup" not in source and b"autogenesis-run" not in source
 
 
-def test_single_skill_exposes_deep_host_and_runtime_seams(repo_root):
+def test_single_skill_exposes_skill_led_readiness_and_runtime_seams(repo_root):
     policy = (repo_root / f".github/skills/{NAME}/SKILL.md").read_text(encoding="utf-8")
     assert "autogenesis install" in policy
     assert "autogenesis appium-workflow <id> --json" in policy
@@ -43,7 +43,8 @@ def test_single_skill_exposes_deep_host_and_runtime_seams(repo_root):
     assert "generate_scenario_test" in policy
     assert "autogenesis://agent-contract/identity" in policy
     assert "Use Appium MCP" in policy and "Use Windows MCP" in policy
-    assert "Host executes only the submitted operation/plan" in policy
+    assert "Coding Agent's normal terminal" in policy
+    assert "Doctor and smoke success are" in policy and "diagnostic evidence" in policy
     assert "immediately resume the preserved request" in policy
     assert "Only an explicit recording/generation request" in policy
 

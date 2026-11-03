@@ -42,21 +42,23 @@ Select one supported internal workflow from observed target evidence:
 - Existing supported session/command failure: `appium-troubleshooting`.
 
 Load the exact workflow with `autogenesis appium-workflow <id> --json`; follow its
-authenticated Skill and selected Contexts. Vendored command examples are guidance,
-not executable authority: submit only the returned `host_operations`; never invoke
-an upstream tool path directly. The LLM owns workflow and remediation decisions.
-Host executes only the submitted operation/plan and owns security enforcement and
-cleanup; it never chooses a workflow, fix, fallback, optional capability, business
-action, or next step.
+authenticated Skill and selected Contexts. Use the Coding Agent's normal terminal
+capability for the official environment, version, doctor, status, and troubleshooting
+steps. Existing project-local or user/global Appium installations are valid when the
+workflow selects them. Ask before installation, configuration, permissions,
+credentials, persistent state, destructive action, or file writes.
 
-Approval covers one unchanged immutable plan. Any identity, argument, environment,
-destination, persistence, risk, or cleanup change invalidates it. Consent is not
-authentication; execute children only through Host authority.
+Some supported workflows reference a broad upstream server-smoke helper that is not
+packaged. Apply its documented completion criteria directly: use an Agent-managed
+Appium server, observe `/status` and the selected Driver, then stop a server started
+for this task. Never stop a pre-existing server. Doctor and smoke success are
+diagnostic evidence, not Runtime authority or business success.
 
-Official workflow completion is insufficient by itself. Observe Runtime/MCP
-initialization, Contract identity, a real target session, and UI. With no
-user-owned action pending, immediately resume the preserved request; never stop
-at readiness or ask the user to repeat confirmed facts.
+Start the canonical installed platform MCP through the MCP client. Ready requires
+Runtime/MCP initialization, matching Contract identity, a real target session or
+Windows application binding, and observed UI. With no user-owned action pending,
+immediately resume the preserved request; never stop at readiness or ask the user to
+repeat confirmed facts.
 
 ## Execute
 

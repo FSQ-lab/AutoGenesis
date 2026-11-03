@@ -49,8 +49,8 @@ Open VS Code Extensions (`Ctrl+Shift+X` / `Cmd+Shift+X`) → Search "BDD AI Tool
    Click **"Setup"** button to configure the selected platform
 
    > **Local Appium users**: invoke the canonical `autogenesis` Skill. It loads
-   > the pinned supported official Appium workflow while AutoGenesis Host
-   > authenticates exact operations, approvals, and process cleanup.
+   > the pinned supported official Appium workflow and guides the Coding Agent's
+   > terminal diagnosis before the canonical installed Appium MCP starts.
 
 4. **Configure Automation Platform**
    

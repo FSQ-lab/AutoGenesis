@@ -48,7 +48,7 @@ def test_skill_eval_covers_clean_room_behavior_contract(skill_cases):
     ids = {case["id"] for case in skill_cases}
     assert ids == {
         "android-readiness-resumes-original-task",
-        "host-does-not-choose-ambiguous-remediation",
+        "agent-asks-before-ambiguous-persistent-remediation",
         "explicit-low-risk-task-needs-no-confirmation",
         "bdd-execution-does-not-generate",
         "explicit-recording-is-preview-bound",

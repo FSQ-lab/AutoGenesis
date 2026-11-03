@@ -6,8 +6,8 @@
       "id": "android-readiness-resumes-original-task",
       "user_request": "On my connected Pixel, open Calculator, calculate 2 + 3, and verify the displayed result.",
       "stimuli": [
-        "The AutoGenesis host bundle is installed but UiAutomator2 readiness is incomplete.",
-        "The authenticated setup-uiautomator2 workflow completes through exact Host operations.",
+        "The canonical AutoGenesis bundle is installed but UiAutomator2 readiness is incomplete.",
+        "The Coding Agent follows the authenticated setup-uiautomator2 workflow and its official terminal diagnostics.",
         "MCP identity, a real Pixel session, and Calculator UI are observed; the calculation displays 5."
       ],
       "expect": {
@@ -16,21 +16,20 @@
         "resume_original_task": true,
         "final_observation": "5",
         "stop_at_readiness": false,
-        "host_selects_policy": false
+        "diagnosis_route": "Coding Agent terminal"
       }
     },
     {
-      "id": "host-does-not-choose-ambiguous-remediation",
+      "id": "agent-asks-before-ambiguous-persistent-remediation",
       "user_request": "Prepare this Android device for AutoGenesis.",
       "stimuli": [
-        "Authenticated discovery reports two viable user-significant remediation plans with different persistent SDK destinations.",
+        "Official diagnosis reports two viable user-significant remediation plans with different persistent SDK destinations.",
         "No plan has been selected or approved."
       ],
       "expect": {
         "appium_workflow": "setup-uiautomator2",
         "request_user_choice": true,
-        "host_executes_plan": false,
-        "host_selects_policy": false
+        "automatic_persistent_change": false
       }
     },
     {
@@ -101,8 +100,8 @@
       "id": "agent-owned-work-continues",
       "user_request": "Run the selected Scenario on the connected iPhone.",
       "stimuli": [
-        "The authenticated XCUITest workflow reports one remaining read-only Host check that needs no user decision.",
-        "That check succeeds, followed by MCP identity, real session, and UI observation."
+        "The authenticated XCUITest workflow reports one remaining read-only terminal check that needs no user decision.",
+        "The Coding Agent completes that check, followed by MCP identity, real session, and UI observation."
       ],
       "expect": {
         "appium_workflow": "setup-xcuitest",

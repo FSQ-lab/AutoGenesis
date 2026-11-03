@@ -22,10 +22,8 @@ import {
   installNpm,
   handlePythonInstallation,
   Platform,
-  getExtensionStoragePath,
 } from "./setupUtils";
 import { McpServerManager } from "./mcpServerManager";
-import { VersionManager } from "./versionManager";
 
 /**
  * Interface for MCP server status
@@ -547,87 +545,31 @@ export class SetupWebViewProvider implements vscode.WebviewViewProvider {
         };
       }
 
-      // Check if MCP server files exist and are up to date
-      const extensionStoragePath = this.getExtensionStoragePath();
+      const configured = [
+        windowsServerConfig && {
+          name: "Windows (pywinauto)",
+          canonical: windowsServerConfig.command === "autogenesis-windows-mcp",
+        },
+        appiumServerConfig && {
+          name: "Appium",
+          canonical: appiumServerConfig.command === "autogenesis-appium-mcp",
+        },
+      ].filter((value): value is { name: string; canonical: boolean } => Boolean(value));
 
-      // Check for both server types
-      const autoMcpServerPath = path.join(
-        extensionStoragePath,
-        "pywinauto-mcp-server"
-      );
-      const appiumMcpServerPath = path.join(
-        extensionStoragePath,
-        "appium-mcp-server"
-      );
-
-      let setupServers = [];
-      let missingServers = [];
-
-      // Check Windows server
-      if (windowsServerConfig) {
-        if (fs.existsSync(autoMcpServerPath)) {
-          setupServers.push("Windows (pywinauto)");
-        } else {
-          missingServers.push("Windows (pywinauto)");
-        }
-      }
-
-      // Check Appium server
-      if (appiumServerConfig) {
-        if (fs.existsSync(appiumMcpServerPath)) {
-          setupServers.push("Appium");
-        } else {
-          missingServers.push("Appium");
-        }
-      }
-
-      // If some servers are missing files, show ready to setup
-      if (missingServers.length > 0) {
+      if (configured.some((value) => !value.canonical)) {
         return {
-          status: "none",
-          message: "Ready to setup",
-          needsUserAction: false,
+          status: "update_available",
+          serverName: configured.map((value) => value.name).join(" & "),
+          message: "MCP configuration uses a legacy copied Runtime; setup the canonical installed Runtime.",
+          needsUserAction: true,
         };
-      } // Check if update is needed for any configured server
-      const currentExtensionVersion = VersionManager.getCurrentVersion();
-      if (currentExtensionVersion) {
-        let needsUpdate = false;
-
-        // Check update for Windows server if configured
-        if (windowsServerConfig && fs.existsSync(autoMcpServerPath)) {
-          needsUpdate = VersionManager.needsUpdate(
-            autoMcpServerPath,
-            currentExtensionVersion
-          );
-        }
-
-        // Check update for Appium server if configured and no update needed yet
-        if (
-          !needsUpdate &&
-          appiumServerConfig &&
-          fs.existsSync(appiumMcpServerPath)
-        ) {
-          needsUpdate = VersionManager.needsUpdate(
-            appiumMcpServerPath,
-            currentExtensionVersion
-          );
-        }
-
-        if (needsUpdate) {
-          return {
-            status: "update_available",
-            serverName: setupServers.join(" & "),
-            message: "MCP server update available, please setup again!",
-            needsUserAction: true,
-          };
-        }
       }
 
-      // MCP server(s) are complete and up to date
+      const names = configured.map((value) => value.name);
       return {
         status: "complete",
-        serverName: setupServers.join(" & "),
-        message: `MCP server(s) ready: ${setupServers.join(" & ")}`,
+        serverName: names.join(" & "),
+        message: `MCP server(s) ready: ${names.join(" & ")}`,
         needsUserAction: false,
       };
     } catch (error) {
@@ -638,10 +580,8 @@ export class SetupWebViewProvider implements vscode.WebviewViewProvider {
         needsUserAction: false,
       };
     }
-  } // Helper method to get extension storage path
-  private getExtensionStoragePath(): string {
-    return getExtensionStoragePath();
-  } /**
+  }
+  /**
    * Setup MCP server with detailed progress feedback
    * @param webviewView The webview to send progress updates to
    * @param serverType The type of MCP server to setup ('windows-browser' or 'appium-common')

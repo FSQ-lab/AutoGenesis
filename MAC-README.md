@@ -35,7 +35,7 @@ uvx --from autogenesis-appium-mcp==0.5.0 autogenesis-appium-mcp --platform mac -
 ```
 
 Agent Contract is pinned to **2.1.0**, manifest SHA-256
-`dd88051a2b2440d4188b11eef41e41aa2c7dbfe3291f152a37a903ee17cb493f`.
+`4a9bb78c340cb859260d19e72a0a527dc855d06ad4de31d8167197947d5914de`.
 A mismatched or corrupt contract prevents startup.
 
 Standard MCP Registry metadata is `appium-mcp-server/server.json`. From a source
@@ -48,10 +48,11 @@ python tools/render_mcp_descriptor.py --server appium --platform mac --config /a
 ## Configure Mac2
 
 Invoke `autogenesis` for local Mac2 preparation or execution. It loads the pinned
-internal official `setup-mac2` workflow while AutoGenesis Host authenticates exact
-operations and owns process cleanup. Official doctor/server-smoke completion is a
-prerequisite; AutoGenesis also observes MCP identity and a real Mac2 UI session.
-Grant Accessibility or Screen Recording only after reviewing the exact request.
+internal official `setup-mac2` workflow, then the Coding Agent performs its
+environment and doctor steps through the normal terminal. Doctor/server-smoke
+completion is diagnostic evidence; Ready also requires matching MCP identity, a
+real Mac2 session, and observed UI. Grant Accessibility or Screen Recording only
+after reviewing the exact request.
 
 Set the Mac profile in the business config, for example:
 

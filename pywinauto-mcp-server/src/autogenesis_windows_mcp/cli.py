@@ -17,7 +17,7 @@ from dotenv import load_dotenv
 
 from . import __version__
 from .config import ConfigurationError, load_app_config
-from .server import create_server
+from .server import create_runtime
 from .utils.logger import configure_logging
 
 logger = logging.getLogger(__name__)
@@ -169,6 +169,7 @@ def main(argv=None, *, default_config=None, default_transport="stdio") -> int:
     parser.add_argument("--config", default=default_config, help="Path to UTF-8 application-profile JSON")
     parser.add_argument("--project-root", help="Existing business-project root; defaults to cwd")
     args = parser.parse_args(argv)
+    runtime = None
     configure_logging()
     try:
         # Explicit business-directory dotenv only; never load files beside an
@@ -176,8 +177,8 @@ def main(argv=None, *, default_config=None, default_transport="stdio") -> int:
         load_dotenv(Path.cwd() / ".env", override=False)
         app_config = load_app_config(args.app, args.config)
         with redirect_stdout(_ProtocolStdout(sys.stdout)):
-            server = create_server(app_config, args.project_root)
-            anyio.run(_serve, server, args.transport)
+            runtime = create_runtime(app_config, args.project_root)
+            anyio.run(_serve, runtime.server, args.transport)
         return 0
     except KeyboardInterrupt:
         return 0
@@ -194,3 +195,6 @@ def main(argv=None, *, default_config=None, default_transport="stdio") -> int:
             raise
         logger.error("AUTOGENESIS_STARTUP_FAILED: check the Windows platform, installed dependencies, and application configuration.")
         return 1
+    finally:
+        if runtime is not None:
+            runtime.close()

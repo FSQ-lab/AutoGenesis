@@ -160,7 +160,7 @@ export class CopilotIntegrationService {
   loadSkillContent(skillName: string, featureFilePath: string):
     { status: 'ready'; content: string } | { status: 'absent' | 'invalid' } {
     const relative = ['.agents', 'skills', skillName, 'SKILL.md'];
-    const expectedSha256 = '54b23e8a55408cf41815a3dd06db107e5747d27a3473e33f98a04d752c943773';
+    const expectedSha256 = '75ed38e3e44d74b1448d7a0a31b179f3d726a57be1c2a96166b13684898bc946';
     const selected = vscode.workspace.getWorkspaceFolder(vscode.Uri.file(featureFilePath));
     const projectSkill = selected && path.join(selected.uri.fsPath, ...relative);
     const userSkill = path.join(os.homedir(), ...relative);
