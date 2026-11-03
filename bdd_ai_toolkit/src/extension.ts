@@ -28,7 +28,7 @@ export async function activate(context: vscode.ExtensionContext) {
 
   // Register Copilot language model tools
   registerTools(context);
-  context.subscriptions.push(McpServerManager.getInstance().registerProvider());
+  context.subscriptions.push(McpServerManager.getInstance().registerProvider(context));
 
   // Register setup panel WebView provider
   setupWebViewProvider = new SetupWebViewProvider(

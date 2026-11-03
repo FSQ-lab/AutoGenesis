@@ -29,10 +29,12 @@ interface CanonicalMcpDefinition {
 }
 
 const PROVIDER_ID = "bdd-ai-toolkit.autogenesis-runtimes";
+const STATE_KEY = "autogenesis.canonicalMcpServers";
 
 export class McpServerManager {
   private static instance: McpServerManager;
   private servers = new Map<string, McpServerConfig>();
+  private state?: vscode.Memento;
   private _onServerStatusChanged = new vscode.EventEmitter<{
     name: string;
     isRunning: boolean;
@@ -49,7 +51,9 @@ export class McpServerManager {
     return McpServerManager.instance;
   }
 
-  public registerProvider(): vscode.Disposable {
+  public registerProvider(context: vscode.ExtensionContext): vscode.Disposable {
+    this.state = context.workspaceState;
+    this.restoreServers();
     return vscode.lm.registerMcpServerDefinitionProvider(PROVIDER_ID, {
       onDidChangeMcpServerDefinitions: this._onDefinitionsChanged.event,
       provideMcpServerDefinitions: () =>
@@ -82,6 +86,7 @@ export class McpServerManager {
     };
     this.canonicalDefinition(server);
     this.servers.set(name, server);
+    await this.persistServers();
     return name;
   }
 
@@ -93,6 +98,7 @@ export class McpServerManager {
     }
     this.canonicalDefinition(server);
     server.isRunning = true;
+    await this.persistServers();
     this._onDefinitionsChanged.fire();
     this._onServerStatusChanged.fire({ name: serverName, isRunning: true });
   }
@@ -100,9 +106,51 @@ export class McpServerManager {
   public async stopMcpServer(serverName: string): Promise<void> {
     const server = this.requireServer(serverName);
     server.isRunning = false;
+    await this.persistServers();
     this._onDefinitionsChanged.fire();
     this._onServerStatusChanged.fire({ name: serverName, isRunning: false });
     vscode.window.showInformationMessage(`MCP Server ${serverName} stopped successfully`);
+  }
+
+  private restoreServers(): void {
+    this.servers.clear();
+    if (!vscode.workspace.isTrusted) {
+      return;
+    }
+    const stored = this.state?.get<unknown>(STATE_KEY, []);
+    if (!Array.isArray(stored)) {
+      return;
+    }
+    for (const value of stored) {
+      if (!this.isStoredServer(value)) {
+        continue;
+      }
+      const server = { ...value };
+      try {
+        this.canonicalDefinition(server);
+      } catch {
+        continue;
+      }
+      this.servers.set(server.name, server);
+    }
+  }
+
+  private isStoredServer(value: unknown): value is McpServerConfig {
+    if (!value || typeof value !== "object") {
+      return false;
+    }
+    const item = value as Record<string, unknown>;
+    return (
+      typeof item.name === "string" &&
+      typeof item.projectPath === "string" &&
+      (item.browser === "edge" || item.browser === "chrome") &&
+      (item.serverType === "windows-browser" || item.serverType === "appium-common") &&
+      typeof item.isRunning === "boolean"
+    );
+  }
+
+  private async persistServers(): Promise<void> {
+    await this.state?.update(STATE_KEY, Array.from(this.servers.values()));
   }
 
   public getServers(): McpServerConfig[] {
