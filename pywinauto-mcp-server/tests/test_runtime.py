@@ -179,11 +179,6 @@ async def test_launch_preserves_the_window_that_passed_readiness(monkeypatch):
         def wrapper_object(self):
             return self
 
-        def close(self):
-            nonlocal close_calls
-            close_calls += 1
-
-
         def is_visible(self):
             return True
 
@@ -252,6 +247,11 @@ async def test_launch_preserves_the_window_that_passed_readiness(monkeypatch):
             if not self.predicate(verified_window.element_info):
                 raise app_session.ElementNotFoundError("bound window identity changed")
             return verified_window
+
+        def close(self):
+            nonlocal close_calls
+            self.wrapper_object()
+            close_calls += 1
 
         def wait(self, state_name, timeout):
             self.wrapper_object()
