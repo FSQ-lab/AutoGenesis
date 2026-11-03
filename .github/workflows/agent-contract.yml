@@ -2,13 +2,13 @@ name: Agent Contract
 
 on:
   pull_request:
-    branches: [main, feature/agent-integration-v2]
+    branches: [main, feature/agent-integration-v3]
     paths:
       - 'agent-contract/**'
       - '.github/skills/autogenesis/SKILL.md'
       - '.github/workflows/agent-contract.yml'
   push:
-    branches: [feature/agent-integration-v2]
+    branches: [feature/agent-integration-v3]
     paths:
       - 'agent-contract/**'
       - '.github/skills/autogenesis/SKILL.md'
