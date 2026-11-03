@@ -21,7 +21,7 @@ def test_repository_has_one_exact_canonical_skill_projection(repo_root):
     projection = repo_root / f".github/skills/{NAME}/SKILL.md"
     assert projection.read_bytes() == source
     assert source.startswith(b"---\nname: autogenesis\n")
-    assert len(source) < 4096
+    assert len(source) < 6144
     assert re.fullmatch(r"[a-z0-9]+(?:-[a-z0-9]+)*", NAME)
     assert {path.name for path in (repo_root / ".github/skills").iterdir()} == {NAME}
     assert b"autogenesis-setup" not in source and b"autogenesis-run" not in source

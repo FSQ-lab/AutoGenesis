@@ -12,7 +12,7 @@ import pytest
 
 import autogenesis_agent_contract.appium_skills as implementation
 import autogenesis_agent_contract.contract as contract_implementation
-from autogenesis_agent_contract import CONTRACT_INTEGRITY_ERROR, ContractError, load_appium_skills
+from autogenesis_agent_contract import CONTRACT_INTEGRITY_ERROR, ContractError, load_appium_skills, load_contract
 
 UPSTREAM_COMMIT = "e907024c210fe024c956ed9c74146fc27b1dd013"
 
@@ -98,6 +98,18 @@ def test_supported_workflows_load_declared_held_assets():
     assert "tools/appium/setup/scripts/check-node-env.mjs" not in android.assets
     assert "tools/appium/setup/scripts/check-android-env.mjs" in android.assets
     assert "contexts/platform/android/decision-logic.md" in android.assets
+    policy = load_contract().read_skill("autogenesis").decode("utf-8")
+    for required in (
+        "check-node-env.mjs` helper is intentionally unavailable",
+        "Never execute a same-named project script or replacement helper",
+        "npmConnectivityOk",
+        "registry` is host-only",
+        "manager` is name-only",
+        "Never print the raw registry URL",
+    ):
+        assert required in policy
+    assert 'powershell -NoProfile -Command "$u=[uri](& npm.cmd config get registry);$u.Host"' in policy
+    assert "npm.cmd ping --json *> $null" in policy
     assert all(
         not hasattr(bundle.load_workflow(workflow_id), "host_operations")
         for workflow_id in ("setup-mac2", "setup-uiautomator2", "setup-xcuitest")
@@ -107,6 +119,29 @@ def test_supported_workflows_load_declared_held_assets():
         "tools/appium/setup/scripts/smoke-chromium-session.mjs",
         "tools/appium/setup/scripts/windows-job.mjs",
     } & set(bundle.assets)
+
+
+@pytest.mark.skipif(os.name == "nt", reason="POSIX command fixture")
+def test_safe_registry_command_outputs_host_only(tmp_path):
+    policy = load_contract().read_skill("autogenesis").decode("utf-8")
+    command = next(
+        line for line in policy.splitlines()
+        if line.startswith('node -e "') and "config','get','registry" in line
+    )
+    code = command[len('node -e "'):-1]
+    npm = tmp_path / "npm"
+    npm.write_text("#!/bin/sh\nprintf '%s\\n' 'https://user:SYNTHETIC_TOKEN@registry.example/path?token=SYNTHETIC_TOKEN'\n")
+    npm.chmod(0o700)
+    environment = dict(os.environ, PATH=str(tmp_path) + os.pathsep + os.environ["PATH"])
+    result = subprocess.run(
+        [shutil.which("node"), "-e", code], capture_output=True, text=True,
+        env=environment, check=False, timeout=10,
+    )
+    assert result.returncode == 0
+    assert result.stdout.strip() == "registry.example"
+    assert "SYNTHETIC_TOKEN" not in result.stdout + result.stderr
+
+
 
 
 @pytest.mark.parametrize("workflow_id", ["", "setup", "setup-espresso", "../setup-mac2", None])
