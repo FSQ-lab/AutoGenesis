@@ -60,7 +60,6 @@ class Bundle:
             "optional_contexts": (),
             "tools": ("tools/appium/setup/scripts/check-mac2-env.mjs",),
             "assets": {"skills/setup-mac2/SKILL.md": "0" * 64},
-            "host_operations": (),
         })()
 
 
@@ -411,6 +410,7 @@ def test_appium_workflow_loads_exact_supported_workflow(monkeypatch, capsys):
     assert result["content"] == "official workflow\n"
     assert result["required_contexts"] == ["contexts/platform/macos/profile.md"]
     assert result["tools"] == ["tools/appium/setup/scripts/check-mac2-env.mjs"]
+    assert "host_operations" not in result
 
 
 def test_appium_workflow_rejects_unsupported_id(monkeypatch, capsys):

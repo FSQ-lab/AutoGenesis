@@ -28,7 +28,7 @@ EXPECTED = {
     "autogenesis-appium-mcp": "0.5.0",
     "autogenesis-windows-mcp": "0.5.0",
 }
-EXPECTED_CONTRACT_MANIFEST = "dd88051a2b2440d4188b11eef41e41aa2c7dbfe3291f152a37a903ee17cb493f"
+EXPECTED_CONTRACT_MANIFEST = "8982d6a7141c28e1fb2d9f95b0c4748eac43addb881b940d78bb96451c0282d3"
 _UNSAFE = "AUTOGENESIS_SKILL_DESTINATION_UNSAFE"
 _CONFLICT = "AUTOGENESIS_SKILL_CONFLICT: existing Skill differs"
 _INTEGRITY = "AUTOGENESIS_SKILL_INTEGRITY_ERROR"
@@ -845,14 +845,6 @@ def _appium_workflow_metadata(bundle: Any, workflow_id: str) -> dict[str, Any]:
         "optional_contexts": list(workflow.optional_contexts),
         "tools": list(workflow.tools),
         "assets": dict(workflow.assets),
-        "host_operations": [
-            {
-                "operation_id": operation.operation_id,
-                "parameters": dict(operation.parameters),
-                "replaces_upstream_tool": operation.replaces_upstream_tool,
-            }
-            for operation in workflow.host_operations
-        ],
     }
 
 

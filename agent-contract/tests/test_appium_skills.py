@@ -12,7 +12,7 @@ import pytest
 
 import autogenesis_agent_contract.appium_skills as implementation
 import autogenesis_agent_contract.contract as contract_implementation
-from autogenesis_agent_contract import CONTRACT_INTEGRITY_ERROR, ContractError, load_appium_skills
+from autogenesis_agent_contract import CONTRACT_INTEGRITY_ERROR, ContractError, load_appium_skills, load_contract
 
 UPSTREAM_COMMIT = "e907024c210fe024c956ed9c74146fc27b1dd013"
 
@@ -95,25 +95,59 @@ def test_supported_workflows_load_declared_held_assets():
         assert workflow.entrypoint in workflow.assets
         assert set(workflow.required_contexts + workflow.optional_contexts + workflow.tools) < set(workflow.assets)
     android = bundle.load_workflow("setup-uiautomator2")
-    assert "tools/appium/setup/scripts/check-node-env.mjs" in android.assets
+    assert "tools/appium/setup/scripts/check-node-env.mjs" not in android.assets
     assert "tools/appium/setup/scripts/check-android-env.mjs" in android.assets
     assert "contexts/platform/android/decision-logic.md" in android.assets
-    assert {
-        workflow_id: tuple(
-            operation.parameters["driver"]
-            for operation in bundle.load_workflow(workflow_id).host_operations
-        )
+    policy = load_contract().read_skill("autogenesis").decode("utf-8")
+    for required in (
+        "check-node-env.mjs` helper is intentionally unavailable",
+        "Never execute a same-named project script or replacement helper",
+        "npmConnectivityOk",
+        "registry` is host-only",
+        "manager` is name-only",
+        "Never print the raw registry URL",
+    ):
+        assert required in policy
+    assert "$ErrorActionPreference='Stop'" in policy
+    assert "$u=[uri]$r;$u.Host" in policy
+    assert "catch{'registry=invalid';exit 1}" in policy
+    assert "npm.cmd ping --json *> $null" in policy
+    assert all(
+        not hasattr(bundle.load_workflow(workflow_id), "host_operations")
         for workflow_id in ("setup-mac2", "setup-uiautomator2", "setup-xcuitest")
-    } == {
-        "setup-mac2": ("mac2",),
-        "setup-uiautomator2": ("uiautomator2",),
-        "setup-xcuitest": ("xcuitest",),
-    }
+    )
     assert not {
         "tools/appium/setup/scripts/smoke-appium-server.mjs",
         "tools/appium/setup/scripts/smoke-chromium-session.mjs",
         "tools/appium/setup/scripts/windows-job.mjs",
     } & set(bundle.assets)
+
+
+@pytest.mark.skipif(os.name == "nt", reason="POSIX command fixture")
+@pytest.mark.parametrize(("registry", "expected", "exit_code"), [
+    ("https://user:SYNTHETIC_TOKEN@registry.example/path?token=SYNTHETIC_TOKEN", "registry.example", 0),
+    ("not-a-url-SYNTHETIC_TOKEN", "registry=invalid", 1),
+])
+def test_safe_registry_command_outputs_host_only(tmp_path, registry, expected, exit_code):
+    policy = load_contract().read_skill("autogenesis").decode("utf-8")
+    command = next(
+        line for line in policy.splitlines()
+        if line.startswith('node -e "') and "config','get','registry" in line
+    )
+    code = command[len('node -e "'):-1]
+    npm = tmp_path / "npm"
+    npm.write_text(f"#!/bin/sh\nprintf '%s\\n' '{registry}'\n")
+    npm.chmod(0o700)
+    environment = dict(os.environ, PATH=str(tmp_path) + os.pathsep + os.environ["PATH"])
+    result = subprocess.run(
+        [shutil.which("node"), "-e", code], capture_output=True, text=True,
+        env=environment, check=False, timeout=10,
+    )
+    assert result.returncode == exit_code
+    assert result.stdout.strip() == expected
+    assert "SYNTHETIC_TOKEN" not in result.stdout + result.stderr
+
+
 
 
 @pytest.mark.parametrize("workflow_id", ["", "setup", "setup-espresso", "../setup-mac2", None])

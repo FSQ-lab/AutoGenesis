@@ -106,7 +106,6 @@ class LaunchHarness:
         monkeypatch.setattr(app_session.psutil, "Process", FakeProcess)
         monkeypatch.setattr(app_session, "Desktop", FakeDesktop)
         monkeypatch.setattr(app_session, "Application", FakeApplication)
-        monkeypatch.setattr(manager, "kill_app_process_by_path", lambda: None)
 
 
 def window(clock, handle=101, visible_at=0.0, enabled_at=0.0):

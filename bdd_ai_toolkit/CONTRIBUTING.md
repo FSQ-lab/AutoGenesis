@@ -77,7 +77,7 @@ This generates `bdd-ai-toolkit-<version>.vsix` that can be installed in VS Code.
 
 Use the canonical `autogenesis` Skill. Its internal verified official Appium
 workflows own Appium, Driver, SDK, Xcode, doctor, and server-smoke guidance while
-AutoGenesis Host authenticates exact operations and cleanup. Do not add a second
-extension-specific installer or startup script.
+the Coding Agent performs diagnostics through its normal terminal. Configure the
+canonical installed Runtime; do not add an extension-specific installer or copy.
 
 ---

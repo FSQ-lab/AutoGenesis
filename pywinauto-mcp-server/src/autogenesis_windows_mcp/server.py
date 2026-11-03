@@ -1,5 +1,6 @@
 """Construct the runtime once, against the released Agent Contract adapter."""
 
+from contextlib import asynccontextmanager
 import sys
 
 from autogenesis_agent_contract import (
@@ -12,7 +13,7 @@ from mcp.server.fastmcp.exceptions import ResourceError, ToolError
 
 RUNTIME_CONTRACT = RuntimeContractRequirement(
     contract_version="2.1.0",
-    manifest_sha256="dd88051a2b2440d4188b11eef41e41aa2c7dbfe3291f152a37a903ee17cb493f",
+    manifest_sha256="8982d6a7141c28e1fb2d9f95b0c4748eac43addb881b940d78bb96451c0282d3",
 )
 
 
@@ -45,24 +46,59 @@ class WindowsMCP(FastMCP):
             raise ResourceError("Resource request failed; check the resource URI.") from None
 
 
+class Runtime:
+    """Own one Windows MCP server and release its binding on shutdown."""
+
+    def __init__(self, app_config: dict, business_root=None):
+        self.manager = None
+        self.server = None
+        self._closed = False
+        try:
+            contract = load_contract(ContractIdentity(
+                RUNTIME_CONTRACT.contract_version, RUNTIME_CONTRACT.manifest_sha256, 2,
+            ))
+            if sys.platform != "win32":
+                raise RuntimeError("AUTOGENESIS_PLATFORM_UNSUPPORTED: Windows is required to serve automation tools.")
+
+            from .app_session import AppSessionManager
+            from .tools.common_tool import register_common_tools
+            from .tools.gen_code_tool import register_gen_code_tools
+            from .tools.mouse_tool import register_mouse_tools
+            from .tools.verify_tool import register_verify_tools
+
+            self.manager = AppSessionManager(app_config)
+
+            @asynccontextmanager
+            async def lifespan(server):
+                try:
+                    yield {}
+                finally:
+                    self.close()
+
+            self.server = WindowsMCP(
+                "pywinauto-mcp-server", instructions=contract.instructions,
+                lifespan=lifespan, log_level="INFO",
+            )
+            register_mcp(self.server, contract, None, RUNTIME_CONTRACT)
+            register_common_tools(self.server, self.manager)
+            register_mouse_tools(self.server, self.manager)
+            register_gen_code_tools(self.server, self.manager, business_root)
+            register_verify_tools(self.server, self.manager)
+        except BaseException:
+            self.close()
+            raise
+
+    def close(self):
+        if self._closed:
+            return
+        if self.manager is not None:
+            self.manager.release_binding()
+        self._closed = True
+
+
+def create_runtime(app_config: dict, business_root=None) -> Runtime:
+    return Runtime(app_config, business_root)
+
+
 def create_server(app_config: dict, business_root=None) -> WindowsMCP:
-    contract = load_contract(ContractIdentity(
-        RUNTIME_CONTRACT.contract_version, RUNTIME_CONTRACT.manifest_sha256, 2,
-    ))
-    server = WindowsMCP("pywinauto-mcp-server", instructions=contract.instructions, log_level="INFO")
-    register_mcp(server, contract, None, RUNTIME_CONTRACT)
-    if sys.platform != "win32":
-        raise RuntimeError("AUTOGENESIS_PLATFORM_UNSUPPORTED: Windows is required to serve automation tools.")
-
-    from .app_session import AppSessionManager
-    from .tools.common_tool import register_common_tools
-    from .tools.gen_code_tool import register_gen_code_tools
-    from .tools.mouse_tool import register_mouse_tools
-    from .tools.verify_tool import register_verify_tools
-
-    manager = AppSessionManager(app_config)
-    register_common_tools(server, manager)
-    register_mouse_tools(server, manager)
-    register_gen_code_tools(server, manager, business_root)
-    register_verify_tools(server, manager)
-    return server
+    return create_runtime(app_config, business_root).server
