@@ -159,6 +159,8 @@ async def test_launch_preserves_the_window_that_passed_readiness(monkeypatch):
         "launch_args": [],
     })
     connect_calls = 0
+    close_calls = 0
+    kill_calls = 0
     window_queries = []
     state = {"title_available": True}
 
@@ -176,6 +178,10 @@ async def test_launch_preserves_the_window_that_passed_readiness(monkeypatch):
 
         def wrapper_object(self):
             return self
+
+        def close(self):
+            nonlocal close_calls
+            close_calls += 1
 
 
         def is_visible(self):
@@ -285,6 +291,11 @@ async def test_launch_preserves_the_window_that_passed_readiness(monkeypatch):
             window_queries.append("identity")
             return BoundWindow(kwargs["predicate_func"])
 
+        def kill(self):
+            nonlocal kill_calls
+            assert self.process == 202
+            kill_calls += 1
+
     monkeypatch.setattr(app_session, "Application", FakeApplication)
     monkeypatch.setattr(app_session, "Desktop", FakeDesktop)
     monkeypatch.setattr(app_session.psutil, "Process", FakeProcess)
@@ -323,6 +334,8 @@ async def test_launch_preserves_the_window_that_passed_readiness(monkeypatch):
     assert manager._binding is None
     assert manager._app is None
     assert manager._session_generation > closing_generation
+    assert close_calls == 1
+    assert kill_calls == 1
     with pytest.raises(app_session.LaunchFailure) as caught:
         await manager.get_main_window()
     assert caught.value.code is app_session.LaunchErrorCode.WINDOW_CONNECTION_LOST
