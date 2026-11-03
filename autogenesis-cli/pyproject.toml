@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "autogenesis-cli"
 version = "0.2.0"
-description = "Install the AutoGenesis host runtime bundle and canonical Agent Skills"
+description = "Install the AutoGenesis Runtime bundle and canonical Agent Skill"
 readme = "README.md"
 requires-python = ">=3.10"
 license = "MIT"

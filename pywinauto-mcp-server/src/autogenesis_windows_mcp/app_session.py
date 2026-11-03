@@ -275,7 +275,6 @@ class AppSessionManager:
 
     async def _new_launch(self, args: list[str]):
         self._invalidate_binding()
-        self.kill_app_process_by_path()
 
         config = self.runtime_config()
         valid_exe_path = config["exe"]
@@ -398,43 +397,33 @@ class AppSessionManager:
     
 
     async def app_close(self):
+        """Close only the application instance bound by this Runtime."""
         app = self._app
-        if self._binding is not None and app is not None:
-            try:
-                main_window = self._get_bound_window()
-                main_window.close()
-                app.kill()
-            except Exception:
-                logger.error('[AppManager] Error closing app application: [redacted]')
-            finally:
-                self._invalidate_binding()
-        else:
+        if self._binding is None or app is None:
             logger.info("No app session to close.")
             self._invalidate_binding()
+            return
+        try:
+            main_window = self._get_bound_window()
+            main_window.close()
+            app.kill()
+        except Exception:
+            logger.error('[AppManager] Error closing app application: [redacted]')
+            raise RuntimeError("AUTOGENESIS_APP_CLOSE_FAILED: selected application closure was not confirmed.") from None
+        self._invalidate_binding()
 
-        self.kill_app_process_by_path()
-
-    def kill_app_process_by_path(self):
-        exe_path = os.path.normcase(os.path.normpath(self.runtime_config()["exe"]))
-        killed = False
-
-        for proc in psutil.process_iter(["pid", "name", "exe"]):
-            try:
-                proc_exe = proc.info["exe"]
-                if proc_exe and os.path.normcase(os.path.normpath(proc_exe)) == exe_path:
-                    logger.info('Killing existing app process: PID=[redacted], Exe=[redacted]')
-                    proc.kill()
-                    killed = True
-            except (psutil.NoSuchProcess, psutil.AccessDenied):
-                continue
-            except Exception as e:
-                logger.error('Error checking/killing process [redacted] [redacted]: [redacted]')
-                continue
-
-        if killed:
-            time.sleep(2)
-        else:
-            logger.info("No existing app process found to kill.")
+    def release_binding(self):
+        """Release Runtime-owned binding and transient state without closing the app."""
+        self._invalidate_binding()
+        self.is_executing = False
+        self.gen_code_id = None
+        self.gen_code_cache.clear()
+        self.proposed_changes = None
+        self.pending_write = None
+        self.recording_warnings.clear()
+        self.header_code = ""
+        self.steps_dir = None
+        self.step_file_target = None
 
     async def get_main_window(self, main_window_type: str = ""):
         if main_window_type == "screenshot_cn":

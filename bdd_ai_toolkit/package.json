@@ -10,7 +10,7 @@
     "url": "https://github.com/microsoft/AutoGenesis.git"
   },
   "engines": {
-    "vscode": "^1.95.0"
+    "vscode": "^1.140.0"
   },
   "categories": [
     "AI",
@@ -107,6 +107,12 @@
         "category": "BDD AI Toolkit"
       }
     ],
+    "mcpServerDefinitionProviders": [
+      {
+        "id": "bdd-ai-toolkit.autogenesis-runtimes",
+        "label": "AutoGenesis Canonical Runtimes"
+      }
+    ],
     "keybindings": []
   },
   "main": "./out/src/extension.js",
@@ -135,7 +141,7 @@
     "@types/adm-zip": "^0.5.7",
     "@types/js-yaml": "^4.0.9",
     "@types/node": "^20",
-    "@types/vscode": "^1.95.0",
+    "@types/vscode": "^1.140.0",
     "@types/xml2js": "^0.4.14",
     "generator-code": "^1.11.8",
     "prettier": "^3.5.3",

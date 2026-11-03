@@ -37,9 +37,9 @@ discovery copies, and atomically installs one `autogenesis` Skill. Use
 snapshot. `autogenesis appium-workflow <id> --json` loads one authenticated
 workflow selected by the LLM with its Context/tool inventory and provenance.
 `autogenesis appium-asset <workflow-id> <relative-path>` returns held verified
-bytes only when the asset belongs to that exact selected workflow. This CLI
-does not expose a generic Appium helper executor: execution requires the
-authenticated, approval-bound Host capability interface tracked by Issue #50.
+bytes only when the asset belongs to that exact selected workflow. The Coding
+Agent follows official terminal diagnostics, while real automation runs through
+the canonical installed platform MCP.
 
 The selected scope and project root determine the only accepted discovery path.
 Existing non-canonical bytes or a Skill in another discovery scope are preserved

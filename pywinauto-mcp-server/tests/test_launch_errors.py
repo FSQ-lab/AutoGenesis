@@ -206,7 +206,6 @@ async def test_process_start_failure_uses_structural_classification(monkeypatch,
         "window_title_re": ".*Sensitive title.*",
         "launch_args": ["--secret", "private-value"],
     })
-    monkeypatch.setattr(manager, "kill_app_process_by_path", lambda: None)
     monkeypatch.setattr(app_session.win32process, "CreateProcess", lambda *args: (_ for _ in ()).throw(error))
 
     def app_launch():

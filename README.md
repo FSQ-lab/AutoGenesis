@@ -75,16 +75,15 @@ autogenesis-windows-mcp --version  # Windows only
 ```
 
 `autogenesis install` does not invoke pip or uv. It verifies the authenticated
-host bundle and installs one canonical `autogenesis` Skill at the explicit
+Runtime bundle and installs one canonical `autogenesis` Skill at the explicit
 `--scope`; `--project-root` binds discovery precedence. Re-running identical
 bytes is idempotent, while another canonical or legacy discovery copy fails.
 
 The command does not install Appium Server, Drivers, SDKs, project MCP, or
 business configuration. Invoke `autogenesis` for preparation, diagnosis, direct
 execution, or BDD work. For Appium targets it loads only a supported authenticated
-official workflow with `autogenesis appium-workflow <id> --json`; the LLM selects
-the workflow. Execution fails closed until the authenticated, approval-bound
-AutoGenesis Host capability interface tracked by Issue #50 is available.
+official workflow with `autogenesis appium-workflow <id> --json`; the Coding Agent
+follows its terminal diagnostics and then uses the canonical installed platform MCP.
 
 ### Agent-first
 
