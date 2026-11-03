@@ -35,12 +35,13 @@ Then
 | Clean-environment smoke test |  |  |
 | Acceptance scenarios |  |  |
 
-## Agent roles
+## Agent roles and review gate
 
 - Implementer:
-- Reviewer:
-- Acceptor:
-- Security reviewer, if required:
+- Independent reviewer:
+- Security coverage: reviewer / separate specialist / not applicable
+- Separate acceptor: required / not required
+- Acceptance-gate reason, if required:
 
 ## Security review
 
@@ -66,10 +67,10 @@ Then
 
 - [ ] The issue met Definition of Ready before implementation began.
 - [ ] Scope and non-goals were preserved.
-- [ ] All acceptance scenarios pass in a clean environment.
+- [ ] All acceptance scenarios pass in their required environments; clean-environment evidence is present when the issue or release gate requires it.
 - [ ] Required CI checks pass.
-- [ ] An independent reviewer approved the change.
-- [ ] An independent acceptor posted evidence.
-- [ ] Security review passed or is explicitly not applicable.
+- [ ] One independent reviewer approved the change.
+- [ ] A separate acceptor posted clean-environment evidence when the issue or release gate requires it; otherwise marked not required with a reason.
+- [ ] Security coverage passed or is explicitly not applicable; correctness and security may be covered by the same qualified independent reviewer.
 - [ ] Prompt changes include an eval comparison.
 - [ ] Documentation and machine-readable configuration agree.
