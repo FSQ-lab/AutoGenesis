@@ -119,7 +119,8 @@ class DriverSessionManager:
             config_copy = runtime_config.copy()
             # Session cleanup must release only the automation binding. Business
             # application termination remains an explicit app_close operation.
-            config_copy.pop("noReset", None)
+            for key in ("fullReset", "appium:fullReset", "noReset"):
+                config_copy.pop(key, None)
             config_copy["appium:noReset"] = True
             
             # Add or override arguments if provided

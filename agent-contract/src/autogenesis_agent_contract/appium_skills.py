@@ -32,7 +32,10 @@ SUPPORTED_WORKFLOWS = MappingProxyType({
 })
 _ASSET_REFERENCE = re.compile(r"(?<![A-Za-z0-9_.\-/])(?:contexts|tools)/[A-Za-z0-9_.\-/]+")
 _IMPORT_REFERENCE = re.compile(r"(?:from\s+|import\s*\(|import\s+|require\s*\()[\"']([^\"']+)[\"']")
-_EXCLUDED_BROAD_SMOKE_TOOL = "tools/appium/setup/scripts/smoke-appium-server.mjs"
+_EXCLUDED_TOOLS = frozenset({
+    "tools/appium/setup/scripts/check-node-env.mjs",
+    "tools/appium/setup/scripts/smoke-appium-server.mjs",
+})
 
 
 
@@ -92,7 +95,7 @@ def _transitive_assets(bundle: "AppiumSkillsBundle", roots: tuple[str, ...]) -> 
                 if len(matches) != 1:
                     raise _integrity("invalid_appium_workflow_inventory")
                 references.add(matches[0])
-        references.discard(_EXCLUDED_BROAD_SMOKE_TOOL)
+        references.difference_update(_EXCLUDED_TOOLS)
         if any(path not in bundle._contents for path in references):
             raise _integrity("invalid_appium_workflow_inventory")
         for path in references:
@@ -113,7 +116,7 @@ def _load_workflow(bundle: "AppiumSkillsBundle", workflow_id: str) -> AppiumWork
     required = _declared_contexts(text, "renma.requires-context")
     optional = _declared_contexts(text, "renma.optional-context")
     referenced_tools = {path.rstrip("`.,;:)") for path in _ASSET_REFERENCE.findall(text) if path.startswith("tools/")}
-    direct_tools = tuple(sorted(referenced_tools - {_EXCLUDED_BROAD_SMOKE_TOOL}))
+    direct_tools = tuple(sorted(referenced_tools - _EXCLUDED_TOOLS))
     direct = (entrypoint, *required, *optional, *direct_tools)
     if len(direct) != len(set(direct)) or any(path not in bundle._contents for path in direct):
         raise _integrity("invalid_appium_workflow_inventory")

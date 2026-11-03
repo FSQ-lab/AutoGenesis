@@ -482,6 +482,27 @@ async def test_explicit_close_targets_only_bound_application(monkeypatch, app_co
 
 
 @pytest.mark.anyio
+async def test_explicit_close_failure_preserves_binding_for_retry(app_config):
+    from autogenesis_windows_mcp import app_session
+
+    manager = app_session.AppSessionManager(app_config)
+    application = Mock()
+    application.kill.side_effect = OSError("private close detail")
+    window = Mock()
+    binding = object()
+    manager._app = application
+    manager._binding = binding
+    manager._get_bound_window = Mock(return_value=window)
+
+    with pytest.raises(RuntimeError, match="AUTOGENESIS_APP_CLOSE_FAILED") as caught:
+        await manager.app_close()
+
+    assert "private close detail" not in str(caught.value)
+    assert manager._app is application
+    assert manager._binding is binding
+
+
+@pytest.mark.anyio
 async def test_generation_destination_cannot_escape_business_project(app_config, tmp_path):
     server = runtime.create_server(app_config, business_root=tmp_path)
     outside = tmp_path.parent / f"{tmp_path.name}-outside" / "steps.py"

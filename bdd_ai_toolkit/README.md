@@ -40,24 +40,29 @@ Open VS Code Extensions (`Ctrl+Shift+X` / `Cmd+Shift+X`) → Search "BDD AI Tool
    
    Click **"Auto-Resolve"** if any issues are detected
 
-3. **Choose Platform & Click Setup**
-   
+3. **Configure the Canonical Runtime**
+
+   Create `bdd_ai_conf.json` in the project root before running setup. Use the
+   installed Runtime's documented schema:
+   - Windows: `PYWINAUTO_CONFIG.apps_config.edge` or `.chrome`, matching the
+     selected browser.
+   - Appium: `APPIUM_DRIVER_CONFIGS.mac` on macOS or `.android` on Windows.
+
+   Keep credentials as environment references. The Extension rejects a missing,
+   unreadable, or unselected profile instead of writing an unusable MCP entry.
+
+4. **Choose Platform & Click Setup**
+
    Select your target platform:
    - **Windows** - Browser automation
    - **Appium** - For macOS and mobile testing (iOS/Android)
-   
-   Click **"Setup"** button to configure the selected platform
+
+   Click **"Setup"** to configure the canonical installed Runtime. If you change
+   `bdd_ai_conf.json` after setup, run setup again so the MCP entry is rebuilt.
 
    > **Local Appium users**: invoke the canonical `autogenesis` Skill. It loads
    > the pinned supported official Appium workflow and guides the Coding Agent's
    > terminal diagnosis before the canonical installed Appium MCP starts.
-
-4. **Configure Automation Platform**
-   
-   Open `bdd_ai_conf.json` in the project root and update the configuration for your target platform, such as:
-   - Account credentials (e.g. BrowserStack `userName`, `accessKey`)
-   - App `bundleId` or `appPackage`/`appActivity`
-   - Device name, platform version, etc.
 
 5. **Open MCP Configuration File**
    

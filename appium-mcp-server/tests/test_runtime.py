@@ -257,6 +257,8 @@ def test_session_close_failure_is_stable_and_preserves_owned_driver(config_path)
 @pytest.mark.parametrize("platform", ["ios", "android", "mac"])
 def test_session_cleanup_never_terminates_business_app(platform, config_path, monkeypatch):
     runtime = server.Runtime(platform, config_path)
+    runtime.driver.config["fullReset"] = True
+    runtime.driver.config["appium:fullReset"] = True
     created = Mock(capabilities={})
     remote = Mock(return_value=created)
     monkeypatch.setattr(driver_session.webdriver, "Remote", remote)
@@ -266,6 +268,7 @@ def test_session_cleanup_never_terminates_business_app(platform, config_path, mo
 
     capabilities = remote.call_args.kwargs["options"].to_capabilities()
     assert capabilities["appium:noReset"] is True
+    assert "appium:fullReset" not in capabilities
     runtime.close()
     created.quit.assert_called_once()
     created.terminate_app.assert_not_called()

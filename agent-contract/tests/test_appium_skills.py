@@ -95,7 +95,7 @@ def test_supported_workflows_load_declared_held_assets():
         assert workflow.entrypoint in workflow.assets
         assert set(workflow.required_contexts + workflow.optional_contexts + workflow.tools) < set(workflow.assets)
     android = bundle.load_workflow("setup-uiautomator2")
-    assert "tools/appium/setup/scripts/check-node-env.mjs" in android.assets
+    assert "tools/appium/setup/scripts/check-node-env.mjs" not in android.assets
     assert "tools/appium/setup/scripts/check-android-env.mjs" in android.assets
     assert "contexts/platform/android/decision-logic.md" in android.assets
     assert all(

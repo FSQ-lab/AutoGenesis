@@ -42,6 +42,33 @@ export class McpServerManager {
     }
     return McpServerManager.instance;
   }
+  private samePath(left: string, right: string): boolean {
+    const normalize = (value: string) =>
+      process.platform === "win32" ? value.toLowerCase() : value;
+    return normalize(path.resolve(left)) === normalize(path.resolve(right));
+  }
+
+  private assertRealDirectory(directory: string, label: string): void {
+    const stats = fs.lstatSync(directory);
+    if (stats.isSymbolicLink() || !stats.isDirectory()) {
+      throw new Error(`${label} must be a real directory, not a link or reparse point.`);
+    }
+    if (!this.samePath(fs.realpathSync.native(directory), directory)) {
+      throw new Error(`${label} must not traverse links or reparse points.`);
+    }
+  }
+
+  private assertRealFile(file: string, directory: string, label: string): void {
+    const stats = fs.lstatSync(file);
+    if (stats.isSymbolicLink() || !stats.isFile()) {
+      throw new Error(`${label} must be a regular file, not a link or reparse point.`);
+    }
+    const realFile = fs.realpathSync.native(file);
+    if (!this.samePath(path.dirname(realFile), directory)) {
+      throw new Error(`${label} must remain inside the selected workspace.`);
+    }
+  }
+
 
   /**
    * Configure the installed Runtime directly. Package installation and Skill
@@ -52,6 +79,9 @@ export class McpServerManager {
     browser: "edge" | "chrome" = "edge",
     serverType: string = "appium-common"
   ): Promise<string> {
+    if (!vscode.workspace.isTrusted) {
+      throw new Error("Trust this workspace before configuring executable MCP settings.");
+    }
     const projectBaseName = path.basename(projectPath);
     const serverTypeSuffix =
       serverType === "windows-browser" ? "windows" : "appium";
@@ -108,10 +138,16 @@ export class McpServerManager {
   public async getWorkspaceMcpConfig(
     projectPath: string
   ): Promise<WorkspaceMcpConfig> {
+    this.assertRealDirectory(projectPath, "Workspace");
+    const vscodeDirectory = path.join(projectPath, ".vscode");
+    if (fs.existsSync(vscodeDirectory)) {
+      this.assertRealDirectory(vscodeDirectory, "Workspace .vscode directory");
+    }
     const mcpConfigPath = path.join(projectPath, ".vscode", "mcp.json");
     if (!fs.existsSync(mcpConfigPath)) {
       return { servers: {} };
     }
+    this.assertRealFile(mcpConfigPath, vscodeDirectory, "Workspace MCP configuration");
     try {
       const content = await fs.promises.readFile(mcpConfigPath, "utf8");
       const config = JSON.parse(content) as Partial<WorkspaceMcpConfig>;
@@ -121,13 +157,45 @@ export class McpServerManager {
     }
   }
 
+  private requireBusinessConfig(serverConfig: McpServerConfig): string {
+    const configPath = path.join(serverConfig.projectPath, "bdd_ai_conf.json");
+    this.assertRealDirectory(serverConfig.projectPath, "Workspace");
+    if (!fs.existsSync(configPath)) {
+      throw new Error(
+        "Create bdd_ai_conf.json with the selected Runtime profile, then run setup again."
+      );
+    }
+    this.assertRealFile(configPath, serverConfig.projectPath, "bdd_ai_conf.json");
+    let config: any;
+    try {
+      config = JSON.parse(fs.readFileSync(configPath, "utf8"));
+    } catch {
+      throw new Error("bdd_ai_conf.json must be readable UTF-8 JSON.");
+    }
+    if (serverConfig.serverType === "windows-browser") {
+      const profiles = config?.PYWINAUTO_CONFIG?.apps_config;
+      if (!profiles || typeof profiles[serverConfig.browser] !== "object") {
+        throw new Error(
+          `bdd_ai_conf.json must define PYWINAUTO_CONFIG.apps_config.${serverConfig.browser}.`
+        );
+      }
+    } else {
+      const platform = process.platform === "darwin" ? "mac" : "android";
+      const profile = config?.APPIUM_DRIVER_CONFIGS?.[platform];
+      if (!profile || typeof profile !== "object") {
+        throw new Error(
+          `bdd_ai_conf.json must define APPIUM_DRIVER_CONFIGS.${platform}.`
+        );
+      }
+    }
+    return configPath;
+  }
+
   private canonicalDefinition(
     serverConfig: McpServerConfig
   ): CanonicalMcpDefinition {
-    const configPath = path.join(serverConfig.projectPath, "bdd_ai_conf.json");
-    const configArgs = fs.existsSync(configPath)
-      ? ["--config", configPath]
-      : [];
+    const configPath = this.requireBusinessConfig(serverConfig);
+    const configArgs = ["--config", configPath];
     const common = [
       "--transport",
       "stdio",
@@ -206,9 +274,17 @@ export class McpServerManager {
     projectPath: string,
     mcpConfig: WorkspaceMcpConfig
   ): Promise<void> {
+    this.assertRealDirectory(projectPath, "Workspace");
     const vscodeDirectory = path.join(projectPath, ".vscode");
     const mcpConfigPath = path.join(vscodeDirectory, "mcp.json");
-    await fs.promises.mkdir(vscodeDirectory, { recursive: true });
+    try {
+      await fs.promises.mkdir(vscodeDirectory, { recursive: false });
+    } catch (error: any) {
+      if (error?.code !== "EEXIST") {
+        throw error;
+      }
+    }
+    this.assertRealDirectory(vscodeDirectory, "Workspace .vscode directory");
 
     const temporary = `${mcpConfigPath}.${process.pid}.${Date.now()}.tmp`;
     try {
@@ -217,9 +293,18 @@ export class McpServerManager {
         `${JSON.stringify(mcpConfig, null, 2)}\n`,
         { encoding: "utf8", flag: "wx" }
       );
+      this.assertRealDirectory(vscodeDirectory, "Workspace .vscode directory");
+      this.assertRealFile(temporary, vscodeDirectory, "Temporary MCP configuration");
       await fs.promises.rename(temporary, mcpConfigPath);
+      this.assertRealDirectory(vscodeDirectory, "Workspace .vscode directory");
+      this.assertRealFile(mcpConfigPath, vscodeDirectory, "Workspace MCP configuration");
     } finally {
-      await fs.promises.rm(temporary, { force: true });
+      try {
+        this.assertRealDirectory(vscodeDirectory, "Workspace .vscode directory");
+        await fs.promises.rm(temporary, { force: true });
+      } catch {
+        // Fail closed rather than following a replaced workspace directory.
+      }
     }
   }
 

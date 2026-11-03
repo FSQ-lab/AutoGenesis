@@ -409,8 +409,8 @@ class AppSessionManager:
             app.kill()
         except Exception:
             logger.error('[AppManager] Error closing app application: [redacted]')
-        finally:
-            self._invalidate_binding()
+            raise RuntimeError("AUTOGENESIS_APP_CLOSE_FAILED: selected application closure was not confirmed.") from None
+        self._invalidate_binding()
 
     def release_binding(self):
         """Release Runtime-owned binding and transient state without closing the app."""
