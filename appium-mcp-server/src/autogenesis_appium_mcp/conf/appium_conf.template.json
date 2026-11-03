@@ -27,6 +27,7 @@
             "automationName": "Mac2",
             "bundleId": "",
             "appium:fullReset": false,
+            "appium:noReset": true,
             "appium:sessionTimeout": 6000,
             "appium:newCommandTimeout": 6000,
             "shouldUseSingletonTestManager": false,

@@ -254,6 +254,40 @@ def test_session_close_failure_is_stable_and_preserves_owned_driver(config_path)
     driver.terminate_app.assert_not_called()
     assert runtime.driver._driver is driver
 
+@pytest.mark.parametrize("platform", ["ios", "android", "mac"])
+def test_session_cleanup_never_terminates_business_app(platform, config_path, monkeypatch):
+    runtime = server.Runtime(platform, config_path)
+    created = Mock(capabilities={})
+    remote = Mock(return_value=created)
+    monkeypatch.setattr(driver_session.webdriver, "Remote", remote)
+
+    with tool_execution(runtime.driver.app_launch, (), {}) as (args, kwargs):
+        runtime.driver.app_launch(*args, **kwargs)
+
+    capabilities = remote.call_args.kwargs["options"].to_capabilities()
+    assert capabilities["appium:noReset"] is True
+    runtime.close()
+    created.quit.assert_called_once()
+    created.terminate_app.assert_not_called()
+
+
+def test_mac_app_close_is_explicit_business_operation(config_path):
+    runtime = server.Runtime("mac", config_path)
+    runtime.driver.config["bundleId"] = "com.example.BusinessApp"
+    driver = Mock(capabilities={})
+    driver.get_window_size.return_value = {"width": 1, "height": 1}
+    runtime.driver._driver = driver
+
+    with tool_execution(runtime.driver.app_close, (), {}) as (args, kwargs):
+        runtime.driver.app_close(*args, **kwargs)
+
+    driver.execute_script.assert_called_once_with(
+        "macos: terminateApp", {"bundleId": "com.example.BusinessApp"}
+    )
+    driver.terminate_app.assert_not_called()
+    runtime.close()
+
+
 def test_reuse_activation_failure_destroys_old_session_before_replacement(config_path, monkeypatch):
     runtime = server.Runtime("ios", config_path)
     old_driver = Mock()

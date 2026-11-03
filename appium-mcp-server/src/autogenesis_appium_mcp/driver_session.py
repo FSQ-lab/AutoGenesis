@@ -117,6 +117,10 @@ class DriverSessionManager:
 
             # Resolved plaintext remains local to session creation only.
             config_copy = runtime_config.copy()
+            # Session cleanup must release only the automation binding. Business
+            # application termination remains an explicit app_close operation.
+            config_copy.pop("noReset", None)
+            config_copy["appium:noReset"] = True
             
             # Add or override arguments if provided
             if arguments is not None:
@@ -188,14 +192,18 @@ class DriverSessionManager:
         return None
 
     def app_close(self):
-        if self._driver and self._is_session_valid():
-            package = self.app_package()
-            if package and self.device in ["ios", "android"]:
-                # For iOS and Android, terminate the app using bundle ID
-                logger.info("Operation diagnostic; private details omitted")
-                self._driver.terminate_app(package)
-        else:
+        if not self._driver or not self._is_session_valid():
             logger.warning("No app to close or driver session is invalid.")
+            return
+        package = self.app_package()
+        if not package:
+            logger.warning("No configured business application to close.")
+            return
+        logger.info("Operation diagnostic; private details omitted")
+        if self.device == "mac":
+            self._driver.execute_script("macos: terminateApp", {"bundleId": package})
+        else:
+            self._driver.terminate_app(package)
 
     @staticmethod
     def _destroy_session(driver):
