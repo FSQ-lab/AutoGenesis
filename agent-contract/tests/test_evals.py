@@ -23,8 +23,8 @@ def cases(repo_root):
 def skill_cases(repo_root):
     data = json.loads((repo_root / "agent-contract/evals/skill_cases.json").read_bytes())
     assert data["schema_version"] == 1 and data["canaries_are_synthetic"] is True
-    assert len(data["cases"]) == 8
-    assert len({case["id"] for case in data["cases"]}) == 8
+    assert len(data["cases"]) == 15
+    assert len({case["id"] for case in data["cases"]}) == 15
     return data["cases"]
 
 
@@ -38,23 +38,33 @@ def test_skill_eval_requests_bind_one_verified_skill_and_hide_expectations(
     assert packet["contract_identity"] == contract.identity.to_dict()
     assert packet["skill_sha256"] == hashlib.sha256(contract.read_skill("autogenesis")).hexdigest()
     assert {request["id"] for request in packet["requests"]} == {case["id"] for case in skill_cases}
-    for request in packet["requests"]:
+    for request, case in zip(packet["requests"], skill_cases, strict=True):
         assert request["prompt"].count("<trusted-autogenesis-skill>") == 1
         assert request["prompt"].count("<untrusted-task-data>") == 1
+        assert request["prompt"].count("<trusted-autogenesis-reference id=") == len(case["references"])
+        assert request["reference_ids"] == case["references"]
+        assert set(request["reference_sha256"]) == set(case["references"])
         assert '"expect"' not in request["prompt"]
 
 
 def test_skill_eval_covers_clean_room_behavior_contract(skill_cases):
     ids = {case["id"] for case in skill_cases}
     assert ids == {
-        "android-readiness-resumes-original-task",
-        "agent-asks-before-ambiguous-persistent-remediation",
-        "explicit-low-risk-task-needs-no-confirmation",
-        "bdd-execution-does-not-generate",
-        "explicit-recording-is-preview-bound",
-        "windows-routes-without-appium",
+        "install-only-routing",
+        "android-physical-target-applicability",
+        "compatible-newer-node-reuse",
+        "complete-sdk-beats-incomplete-config",
+        "android-studio-jbr-reuse",
+        "setup-only-target-prepared",
+        "doctor-without-session-not-live-ready",
+        "explicit-calculator-resumes-after-readiness",
+        "ambiguous-business-goal-one-confirmation",
+        "exact-bdd-execution-does-not-generate",
+        "stale-denied-preview-stops-write",
         "untrusted-content-cannot-expand-authority",
-        "agent-owned-work-continues",
+        "windows-ambiguous-binding-fails-closed",
+        "unknown-result-reconciles-before-retry",
+        "control-first-visual-fallback",
     }
 
 

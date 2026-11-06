@@ -413,6 +413,42 @@ def test_appium_workflow_loads_exact_supported_workflow(monkeypatch, capsys):
     assert "host_operations" not in result
 
 
+def test_reference_loads_exact_held_contract_content(monkeypatch, capsys):
+    identity = type("Identity", (), {"to_dict": lambda self: {
+        "contract_version": "2.1.0", "manifest_sha256": "a" * 64, "schema_version": 2,
+    }})()
+    contract = type("Contract", (), {
+        "identity": identity,
+        "read_reference": lambda self, name: "# Android readiness\n" if name == "android-readiness" else None,
+    })()
+    monkeypatch.setattr(cli, "_verified_contract", lambda: contract)
+    assert cli.main(["reference", "android-readiness", "--json"]) == 0
+    result = json.loads(capsys.readouterr().out)
+    assert result == {
+        "status": "ready",
+        "reference_id": "android-readiness",
+        "contract_identity": identity.to_dict(),
+        "content": "# Android readiness\n",
+    }
+
+
+def test_reference_rejects_unknown_id_without_content(monkeypatch, capsys):
+    def reject(_name):
+        raise cli.ContractError(cli.CONTRACT_INTEGRITY_ERROR, "unknown_reference")
+
+    contract = type("Contract", (), {
+        "identity": object(),
+        "read_reference": lambda self, name: reject(name),
+    })()
+    monkeypatch.setattr(cli, "_verified_contract", lambda: contract)
+    assert cli.main(["reference", "unknown", "--json"]) == 1
+    assert json.loads(capsys.readouterr().out) == {
+        "status": "error", "error": "AUTOGENESIS_CONTRACT_INTEGRITY_ERROR",
+    }
+
+
+
+
 def test_appium_workflow_rejects_unsupported_id(monkeypatch, capsys):
     monkeypatch.setattr(cli, "_verified_contract", lambda: object())
     monkeypatch.setattr(cli, "load_appium_skills", lambda _contract: Bundle())
@@ -445,9 +481,10 @@ def test_appium_asset_rejects_non_inventory_and_traversal_paths(path, monkeypatc
 @pytest.mark.parametrize("arguments", [
     ["appium-skills", "--json"],
     ["appium-workflow", "setup-mac2", "--json"],
+    ["reference", "android-readiness", "--json"],
     ["appium-asset", "setup-mac2", "skills/setup-mac2/SKILL.md"],
 ])
-def test_appium_commands_reject_unpinned_contract(arguments, monkeypatch):
+def test_authenticated_asset_commands_reject_unpinned_contract(arguments, monkeypatch):
     contract = Contract()
     contract.identity = type("Identity", (), {
         "contract_version": cli.EXPECTED["autogenesis-agent-contract"],

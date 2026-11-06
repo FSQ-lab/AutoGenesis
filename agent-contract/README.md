@@ -16,7 +16,7 @@ from mcp.server.fastmcp import FastMCP
 # These pins belong to the runtime release, independently of the installed wheel.
 required = RuntimeContractRequirement(
     contract_version="2.1.0",
-    manifest_sha256="8982d6a7141c28e1fb2d9f95b0c4748eac43addb881b940d78bb96451c0282d3",
+    manifest_sha256="89ec8f67dfbb9522eb3138488fbaf2b823abf5ed42b3140a82abfc45a883e98a",
 )
 contract = load_contract(ContractIdentity(required.contract_version, required.manifest_sha256))
 appendix = load_project_appendix("/absolute/business-project")
@@ -28,6 +28,9 @@ register_mcp(server, contract, appendix, required)
   verifies the pinned manifest and every asset before returning an immutable snapshot.
 - `AgentContract.read_skill(name: str) -> bytes` returns held verified bytes for
   exactly `autogenesis`; it never rereads package paths.
+- `AgentContract.read_reference(name: str) -> str` returns one held, verified
+  internal install, readiness, or execution reference from the allowlisted
+  Contract inventory; unknown and path-like names fail closed.
 - `AgentContract.identity -> ContractIdentity` has `contract_version`,
   `manifest_sha256`, and `schema_version` (current `2`); `to_dict()` returns metadata.
 - `load_appium_skills(contract: AgentContract | None = None) -> AppiumSkillsBundle`
