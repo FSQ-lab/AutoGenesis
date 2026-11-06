@@ -43,6 +43,12 @@ def test_installed_wheel_release_identity_and_inventory(contract, repo_root):
         "execute_scenario", "generate_scenario_test", "execute_natural_language_task"
     ))
     paths.add("skills/autogenesis/SKILL.md")
+    paths.update(f"references/{name}.md" for name in (
+        "install", "readiness-common", "appium-environment", "android-readiness",
+        "ios-simulator-readiness", "ios-real-device-readiness", "macos-readiness",
+        "windows-readiness", "execution-common", "android-execution",
+        "apple-execution", "windows-execution",
+    ))
     paths.add("schemas/secret-reference.schema.json")
     paths.update(f"schemas/{name}.schema.json" for name in ("manifest", "identity", "arguments"))
     paths.add("appium-skills/manifest.json")
@@ -55,6 +61,16 @@ def test_installed_wheel_release_identity_and_inventory(contract, repo_root):
     schema = json.loads(assets().joinpath("schemas/manifest.schema.json").read_bytes())
     Draft202012Validator(schema).validate(manifest)
     assert load_contract(contract.identity).identity == contract.identity
+def test_internal_references_are_held_and_allowlisted(contract, monkeypatch):
+    expected = assets().joinpath("references/android-readiness.md").read_text(encoding="utf-8")
+    monkeypatch.setattr(implementation, "read_asset", lambda *_args, **_kwargs: pytest.fail("reread"))
+    assert contract.read_reference("android-readiness") == expected
+    for name in ("", "../android-readiness", "Android-Readiness", "unknown", None):
+        with pytest.raises(ContractError) as caught:
+            contract.read_reference(name)
+        assert caught.value.code == CONTRACT_INTEGRITY_ERROR
+        assert caught.value.reason == "unknown_reference"
+
 
 
 def test_immutable_order_and_untrusted_data_encoding(contract):
@@ -170,6 +186,7 @@ def copied_assets(tmp_path, monkeypatch):
     ("core-policy.md", "edit"),
     ("workflows/generate_scenario_test.md", "missing"),
     ("skills/autogenesis/SKILL.md", "crlf"),
+    ("references/windows-readiness.md", "edit"),
     ("schemas/arguments.schema.json", "edit"),
     ("manifest.json", "edit"),
     ("manifest.json", "missing"),

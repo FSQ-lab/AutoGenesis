@@ -33,6 +33,10 @@ discovery copies, and atomically installs one `autogenesis` Skill. Use
 `--scope project` for `<project>/.agents/skills`. An identical rerun reports
 `unchanged`.
 
+`autogenesis reference <id> --json` loads one Contract-authenticated internal
+install, platform-readiness, or execution reference with the exact Contract
+identity. Unknown and path-like IDs fail closed. The canonical Skill loads only
+the references required by the current request and target.
 `autogenesis appium-skills --json` verifies the internal supported Appium workflow
 snapshot. `autogenesis appium-workflow <id> --json` loads one authenticated
 workflow selected by the LLM with its Context/tool inventory and provenance.

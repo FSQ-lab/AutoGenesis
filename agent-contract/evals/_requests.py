@@ -61,6 +61,12 @@ def build_skill_packet(fixtures: Path, contract) -> tuple[list[dict], dict]:
     skill_text = skill.decode("utf-8")
     requests = []
     for case in cases:
+        reference_names = case.get("references", [])
+        reference_text = {name: contract.read_reference(name) for name in reference_names}
+        trusted_references = "".join(
+            f"\n<trusted-autogenesis-reference id={json.dumps(name)}>\n{text}</trusted-autogenesis-reference>\n"
+            for name, text in reference_text.items()
+        )
         task = json.dumps(
             {"user_request": case["user_request"]},
             ensure_ascii=True,
@@ -69,8 +75,9 @@ def build_skill_packet(fixtures: Path, contract) -> tuple[list[dict], dict]:
         prompt = (
             "<trusted-autogenesis-skill>\n"
             + skill_text
-            + "</trusted-autogenesis-skill>\n\n"
-            + "<untrusted-task-data>\n"
+            + "</trusted-autogenesis-skill>\n"
+            + trusted_references
+            + "\n<untrusted-task-data>\n"
             + task
             + "\n</untrusted-task-data>"
         )
@@ -78,6 +85,11 @@ def build_skill_packet(fixtures: Path, contract) -> tuple[list[dict], dict]:
             "id": case["id"],
             "prompt": prompt,
             "stimuli": case["stimuli"],
+            "reference_ids": reference_names,
+            "reference_sha256": {
+                name: hashlib.sha256(text.encode("utf-8")).hexdigest()
+                for name, text in reference_text.items()
+            },
         }
         requests.append({**request, "request_sha256": digest(request)})
     packet = {

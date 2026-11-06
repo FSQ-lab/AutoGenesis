@@ -98,7 +98,7 @@ def test_supported_workflows_load_declared_held_assets():
     assert "tools/appium/setup/scripts/check-node-env.mjs" not in android.assets
     assert "tools/appium/setup/scripts/check-android-env.mjs" in android.assets
     assert "contexts/platform/android/decision-logic.md" in android.assets
-    policy = load_contract().read_skill("autogenesis").decode("utf-8")
+    policy = load_contract().read_reference("appium-environment")
     for required in (
         "check-node-env.mjs` helper is intentionally unavailable",
         "Never execute a same-named project script or replacement helper",
@@ -129,18 +129,18 @@ def test_supported_workflows_load_declared_held_assets():
     ("not-a-url-SYNTHETIC_TOKEN", "registry=invalid", 1),
 ])
 def test_safe_registry_command_outputs_host_only(tmp_path, registry, expected, exit_code):
-    policy = load_contract().read_skill("autogenesis").decode("utf-8")
+    policy = load_contract().read_reference("appium-environment")
     command = next(
         line for line in policy.splitlines()
-        if line.startswith('node -e "') and "config','get','registry" in line
+        if line.startswith('python3 -c "') and "config','get','registry" in line
     )
-    code = command[len('node -e "'):-1]
+    code = command[len('python3 -c "'):-1]
     npm = tmp_path / "npm"
     npm.write_text(f"#!/bin/sh\nprintf '%s\\n' '{registry}'\n")
     npm.chmod(0o700)
     environment = dict(os.environ, PATH=str(tmp_path) + os.pathsep + os.environ["PATH"])
     result = subprocess.run(
-        [shutil.which("node"), "-e", code], capture_output=True, text=True,
+        [sys.executable, "-c", code], capture_output=True, text=True,
         env=environment, check=False, timeout=10,
     )
     assert result.returncode == exit_code
