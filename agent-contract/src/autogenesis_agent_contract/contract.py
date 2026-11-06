@@ -12,7 +12,7 @@ from jsonschema import Draft202012Validator
 from jsonschema.exceptions import SchemaError, ValidationError
 
 from ._asset_io import MAX_MANIFEST_BYTES, AssetReadError, read_asset
-from ._layout import ASSET_PATHS, CONTRACT_VERSION, CORE_POLICY, SCHEMA_VERSION, SKILLS, WORKFLOWS
+from ._layout import ASSET_PATHS, CONTRACT_VERSION, CORE_POLICY, REFERENCES, SCHEMA_VERSION, SKILLS, WORKFLOWS
 from ._release import MANIFEST_SHA256
 from .appendix import APPENDIX_PATH, ProjectAppendix
 from .errors import CONTRACT_INTEGRITY_ERROR, CONTRACT_MISMATCH, PROJECT_INSTRUCTIONS_INVALID, ContractError
@@ -81,6 +81,7 @@ class AgentContract:
     _schemas: Mapping[str, str] = field(repr=False)
 
     _skill_bytes: Mapping[str, bytes] = field(repr=False)
+    _references: Mapping[str, str] = field(repr=False)
     _asset_bytes: Mapping[str, bytes] = field(repr=False)
 
     @property
@@ -99,6 +100,12 @@ class AgentContract:
         if not isinstance(name, str) or name not in self._skill_bytes:
             raise _integrity("unknown_skill")
         return self._skill_bytes[name]
+    def read_reference(self, name: str) -> str:
+        """Return one held, verified internal guidance reference."""
+        if not isinstance(name, str) or name not in self._references:
+            raise _integrity("unknown_reference")
+        return self._references[name]
+
 
     def _read_verified_asset(self, path: str) -> bytes:
         """Return an outer-manifest asset retained by this verification pass."""
@@ -209,6 +216,9 @@ def load_contract(expected_identity: ContractIdentity | None = None) -> AgentCon
     object.__setattr__(result, "_core", assets[CORE_POLICY])
     object.__setattr__(result, "_workflows", MappingProxyType({
         name: assets[f"workflows/{name}.md"] for name in WORKFLOWS
+    }))
+    object.__setattr__(result, "_references", MappingProxyType({
+        name: assets[f"references/{name}.md"] for name in REFERENCES
     }))
     object.__setattr__(result, "_schemas", MappingProxyType({
         name: json.dumps(definitions[name]) for name in WORKFLOWS

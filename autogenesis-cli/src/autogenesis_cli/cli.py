@@ -28,7 +28,7 @@ EXPECTED = {
     "autogenesis-appium-mcp": "0.5.0",
     "autogenesis-windows-mcp": "0.5.0",
 }
-EXPECTED_CONTRACT_MANIFEST = "8982d6a7141c28e1fb2d9f95b0c4748eac43addb881b940d78bb96451c0282d3"
+EXPECTED_CONTRACT_MANIFEST = "89ec8f67dfbb9522eb3138488fbaf2b823abf5ed42b3140a82abfc45a883e98a"
 _UNSAFE = "AUTOGENESIS_SKILL_DESTINATION_UNSAFE"
 _CONFLICT = "AUTOGENESIS_SKILL_CONFLICT: existing Skill differs"
 _INTEGRITY = "AUTOGENESIS_SKILL_INTEGRITY_ERROR"
@@ -872,6 +872,11 @@ def main(argv: list[str] | None = None) -> int:
     )
     appium_workflow.add_argument("workflow_id")
     appium_workflow.add_argument("--json", action="store_true", help="emit machine-readable result")
+    reference = subparsers.add_parser(
+        "reference", help="load one authenticated internal AutoGenesis reference by ID"
+    )
+    reference.add_argument("reference_id")
+    reference.add_argument("--json", action="store_true", help="emit machine-readable result")
     appium_asset = subparsers.add_parser(
         "appium-asset", help="write one held verified Appium Skills asset to stdout"
     )
@@ -888,6 +893,15 @@ def main(argv: list[str] | None = None) -> int:
         elif args.command == "appium-workflow":
             bundle = load_appium_skills(_verified_contract())
             result = _appium_workflow_metadata(bundle, args.workflow_id)
+        elif args.command == "reference":
+            contract = _verified_contract()
+            content = contract.read_reference(args.reference_id)
+            result = {
+                "status": "ready",
+                "reference_id": args.reference_id,
+                "contract_identity": contract.identity.to_dict(),
+                "content": content,
+            }
         elif args.command == "appium-asset":
             bundle = load_appium_skills(_verified_contract())
             workflow = bundle.load_workflow(args.workflow_id)
