@@ -106,9 +106,16 @@ process incarnation or its transferred child, including after launcher exit.
 Process creation, trusted top-level window discovery, connection, visibility,
 enabled state and initial binding share one monotonic launch budget. The runtime
 polls readiness at an internal 500 ms interval and uses cancellable asynchronous
-waits; it does not add a probe or sleep after the configured deadline. Multiple
-title-matched windows belonging to the same launch are rejected as ambiguous
-rather than selecting one arbitrarily.
+waits; it does not add a probe or sleep after the configured deadline. Before
+process creation it records every top-level UIA identity. A newly observed
+title-matched window is eligible when it belongs to the launcher process tree.
+For a single-process application such as modern Notepad, a new window may
+instead belong to an exact pre-launch process incarnation that already owned a
+matching window. The process must also match the configured executable path or,
+for packaged modern Notepad, the canonical Windows Notepad package family. That
+fallback must remain the sole eligible identity across two uninterrupted polls
+before binding. Pre-existing identities are never eligible, even if their title
+changes. Multiple eligible new windows are rejected as ambiguous.
 
 `app_launch` failures have a fixed, secret-safe response contract. Alongside
 `status: "error"` and an empty `data` object, responses include `error_code`,
@@ -142,6 +149,12 @@ reincarnated element, identity mismatch, or invalid generation invalidates the
 session and fails the operation; ordinary tools do not reconnect by title or
 restart the application. A subsequent explicit `app_launch` may establish a new
 session.
+
+`app_close` sends close only to the pinned top-level window and never terminates
+its owning process. For modern Notepad, it invokes that selected window's unique
+WinUI discard confirmation when required. Failure to close the selected window
+or identify one selected confirmation leaves the binding intact and returns
+`AUTOGENESIS_APP_CLOSE_FAILED`.
 
 ## Source execution
 
