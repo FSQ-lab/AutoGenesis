@@ -10,11 +10,81 @@
       "expect": {"scope": "install", "machine_bootstrap_only": true, "platform_discovery": false, "live_session": false}
     },
     {
+      "id": "explicit-project-scope-install",
+      "references": ["install"],
+      "user_request": "Install AutoGenesis only for this project, not for my user account.",
+      "stimuli": ["The absolute business project and current Coding Agent are uniquely observable. The project scope is writable and no platform task was requested."],
+      "expect": {"scope": "install", "skill_scope": "project", "installer_scope_argument": "project", "platform_discovery": false, "clarification_turns": 0, "approval_requests": 1}
+    },
+    {
+      "id": "shadow-legacy-skill-conflict-fails-closed",
+      "references": ["install"],
+      "user_request": "Verify that this project's AutoGenesis installation is usable.",
+      "stimuli": ["Canonical package and project Skill bytes are valid, but a legacy autogenesis-run Skill remains at the same discovery precedence. No removal or repair approval was given."],
+      "expect": {"machine_ready": false, "shadow_or_legacy_conflict": true, "silent_overwrite_or_delete": false, "persistent_change": false, "disclose_one_repair": true}
+    },
+    {
+      "id": "diagnosis-does-not-authorize-mcp-repair",
+      "references": ["install"],
+      "user_request": "AutoGenesis is installed, but this Coding Agent cannot use it. Find out why.",
+      "stimuli": ["Packages and canonical Skill are valid. The selected Agent's active project MCP entry is missing. No repair approval was given."],
+      "expect": {"scope": "diagnose", "platform_discovery": false, "diagnose_mcp_entry": true, "persistent_change": false, "disclose_one_repair": true}
+    },
+    {
+      "id": "reload-required-not-machine-ready",
+      "references": ["install"],
+      "user_request": "Finish enabling AutoGenesis in this project.",
+      "stimuli": ["The canonical installer and MCP configuration succeeded, but the current Agent has not reloaded and cannot discover the Runtime yet."],
+      "expect": {"machine_ready": false, "required_action": "reload-current-agent", "maximum_required_actions": 1, "preserve_resume_context": true}
+    },
+    {
+      "id": "shell-runtime-is-not-agent-connection-proof",
+      "references": ["install"],
+      "user_request": "Verify that AutoGenesis installation is usable here.",
+      "stimuli": ["The Runtime --version command succeeds in a shell, but MCP initialize, discovery, and identity through the current Agent are absent."],
+      "expect": {"machine_ready": false, "shell_probe_sufficient": false, "verify_actual_agent_connection": true}
+    },
+    {
+      "id": "unchanged-install-does-not-loop",
+      "references": ["install"],
+      "user_request": "Install AutoGenesis in the already configured project.",
+      "stimuli": ["The canonical installer reports unchanged package and Skill state. The active MCP entry and current Agent connection already match."],
+      "expect": {"reuse_install_result": true, "repeat_install": false, "broad_doctor": false, "outcome": "Machine Ready"}
+    },
+    {
+      "id": "minimum-repair-one-approval",
+      "references": ["readiness-common", "appium-environment", "android-readiness"],
+      "user_request": "Prepare my connected physical Android device.",
+      "stimuli": ["All existing Java candidates fail the observed requirement. One verified user-level JDK package is the only missing applicable layer; emulator layers are not applicable."],
+      "expect": {"one_effect_set": true, "include_source_destination_consequences_rollback_verification": true, "approval_requests": 1, "unrelated_changes": false}
+    },
+    {
+      "id": "unchanged-approval-survives-official-handoff",
+      "references": ["readiness-common", "appium-environment", "android-readiness"],
+      "user_request": "Apply the approved minimum repair and continue preparing my physical Pixel.",
+      "stimuli": ["The user approved one immutable JDK repair effect set with a stable plan identity. A first-party installer and authenticated setup-uiautomator2 handoff preserve every action, source, destination, persistence, consequence, rollback, and verification field unchanged."],
+      "expect": {"carry_unchanged_plan_identity": true, "approval_requests_total": 1, "fresh_approval_required": false, "resume_original_task": true}
+    },
+    {
+      "id": "one-native-user-action-then-resume",
+      "references": ["readiness-common", "android-readiness"],
+      "user_request": "Open Calculator on my connected Pixel and verify it starts.",
+      "stimuli": ["Every Agent-owned layer passes. The selected device is connected but awaits the user's USB authorization confirmation."],
+      "expect": {"outcome": "Action Required", "maximum_required_actions": 1, "required_action": "authorize-selected-device", "technical_work_delegated_to_user": false, "resume_original_task": true}
+    },
+    {
       "id": "android-physical-target-applicability",
       "references": ["readiness-common", "appium-environment", "android-readiness"],
       "user_request": "Prepare AutoGenesis for my connected physical Pixel; do not create an emulator.",
       "stimuli": ["One authorized physical Pixel is online. Emulator packages and AVDs are absent."],
       "expect": {"target_class": "physical-device", "emulator_required": false, "avd_creation": false, "appium_workflow": "setup-uiautomator2"}
+    },
+    {
+      "id": "android-emulator-target-applicability",
+      "references": ["readiness-common", "appium-environment", "android-readiness"],
+      "user_request": "Prepare AutoGenesis on the existing running Pixel_8 emulator; do not use a physical device.",
+      "stimuli": ["One compatible running emulator is online and its existing AVD and image are usable. No physical Android device is connected."],
+      "expect": {"target_class": "emulator", "physical_device_required": false, "usb_authorization_required": false, "reuse_running_emulator": true, "avd_creation": false}
     },
     {
       "id": "compatible-newer-node-reuse",
@@ -57,6 +127,13 @@
       "user_request": "Open Calculator, calculate 2 + 3, and verify the visible result is 5.",
       "stimuli": ["Readiness is initially incomplete. Mac2 identity, a real Calculator session, and UI later become observed."],
       "expect": {"resume_original_task": true, "clarification_turns": 0, "final_observation": "5", "readiness_separate_from_result": true}
+    },
+    {
+      "id": "explicit-notepad-resumes-after-readiness",
+      "references": ["readiness-common", "windows-readiness", "execution-common", "windows-execution"],
+      "user_request": "Open Notepad, enter AUTOGENESIS_READY, and verify that exact text is visible.",
+      "stimuli": ["Readiness is initially incomplete. A valid profile, matching Windows MCP identity, one selected Notepad binding, and observed Notepad UI later establish Live Ready."],
+      "expect": {"runtime_route": "Windows MCP", "resume_original_task": true, "clarification_turns": 0, "final_observation": "AUTOGENESIS_READY", "readiness_separate_from_result": true}
     },
     {
       "id": "ambiguous-business-goal-one-confirmation",
