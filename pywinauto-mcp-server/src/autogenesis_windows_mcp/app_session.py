@@ -7,6 +7,8 @@ from autogenesis_agent_contract import resolve
 from .launch_errors import LaunchErrorCode, LaunchFailure
 from dataclasses import dataclass
 from enum import IntEnum
+import ctypes
+from ctypes import wintypes
 import asyncio
 import os
 import re
@@ -26,6 +28,9 @@ _WINDIR_REFERENCE = re.compile(r"%WINDIR%", re.IGNORECASE)
 _PROCESS_TIME_TOLERANCE = 0.01
 _DEFAULT_LAUNCH_TIMEOUT_SECONDS = 15
 _POLL_INTERVAL_SECONDS = 0.5
+_NOTEPAD_PACKAGE_FAMILY_NAME = "Microsoft.WindowsNotepad_8wekyb3d8bbwe"
+_PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
+_ERROR_INSUFFICIENT_BUFFER = 122
 _monotonic = time.monotonic
 _sleep = asyncio.sleep
 
@@ -164,6 +169,19 @@ class AppSessionManager:
             return (value,)
         return tuple(int(part) for part in value)
 
+    @classmethod
+    def _window_identity(cls, wrapper) -> tuple[int, int, tuple[int, ...]] | None:
+        try:
+            handle = int(wrapper.handle)
+            process_id = int(wrapper.element_info.process_id)
+            runtime_id = cls._runtime_id(wrapper.element_info)
+        except Exception:
+            return None
+        if handle <= 0 or process_id <= 0 or not runtime_id:
+            return None
+        return handle, process_id, runtime_id
+
+
     @staticmethod
     def _belongs_to_launch(
         process_id: int,
@@ -200,6 +218,99 @@ class AppSessionManager:
                 return False
         return False
 
+    @staticmethod
+    def _matching_windows(config: dict):
+        return Desktop(backend="uia").windows(
+            title_re=config["window_title_re"],
+            control_type="Window",
+            visible_only=False,
+            enabled_only=False,
+        )
+
+    @staticmethod
+    def _all_windows():
+        return Desktop(backend="uia").windows(
+            control_type="Window",
+            visible_only=False,
+            enabled_only=False,
+        )
+
+    @staticmethod
+    def _window_matches_title(candidate, title_pattern) -> bool:
+        try:
+            return title_pattern.match(candidate.window_text()) is not None
+        except Exception:
+            return False
+
+    @staticmethod
+    def _same_process_incarnation(process_id: int, created_at: float) -> bool:
+        try:
+            return abs(psutil.Process(process_id).create_time() - created_at) <= _PROCESS_TIME_TOLERANCE
+        except (psutil.NoSuchProcess, psutil.AccessDenied):
+            return False
+
+
+    def _is_notepad_profile(self) -> bool:
+        executable = self.config.get("exe")
+        return (
+            self.app_name.casefold() == "notepad"
+            and isinstance(executable, str)
+            and os.path.basename(executable).casefold() == "notepad.exe"
+        )
+
+    @staticmethod
+    def _package_family_name(process_id: int) -> str | None:
+        kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+        kernel32.OpenProcess.argtypes = [wintypes.DWORD, wintypes.BOOL, wintypes.DWORD]
+        kernel32.OpenProcess.restype = wintypes.HANDLE
+        kernel32.GetPackageFamilyName.argtypes = [
+            wintypes.HANDLE,
+            ctypes.POINTER(wintypes.UINT),
+            wintypes.LPWSTR,
+        ]
+        kernel32.GetPackageFamilyName.restype = wintypes.LONG
+        kernel32.CloseHandle.argtypes = [wintypes.HANDLE]
+        kernel32.CloseHandle.restype = wintypes.BOOL
+        handle = kernel32.OpenProcess(_PROCESS_QUERY_LIMITED_INFORMATION, False, process_id)
+        if not handle:
+            return None
+        try:
+            length = wintypes.UINT(0)
+            result = kernel32.GetPackageFamilyName(handle, ctypes.byref(length), None)
+            if result != _ERROR_INSUFFICIENT_BUFFER or length.value == 0:
+                return None
+            value = ctypes.create_unicode_buffer(length.value)
+            if kernel32.GetPackageFamilyName(handle, ctypes.byref(length), value) != 0:
+                return None
+            return value.value
+        finally:
+            kernel32.CloseHandle(handle)
+
+    def _matches_configured_application(self, process_id: int, executable: str) -> bool:
+        try:
+            actual_executable = psutil.Process(process_id).exe()
+        except (psutil.NoSuchProcess, psutil.AccessDenied):
+            return False
+        if os.path.normcase(os.path.abspath(actual_executable)) == os.path.normcase(os.path.abspath(executable)):
+            return True
+        return (
+            self._is_notepad_profile()
+            and self._package_family_name(process_id) == _NOTEPAD_PACKAGE_FAMILY_NAME
+        )
+
+    @staticmethod
+    def _dismiss_notepad_close_confirmation(main_window):
+        buttons = [
+            button
+            for button in main_window.wrapper_object().descendants(control_type="Button")
+            if button.element_info.automation_id == "SecondaryButton"
+            and button.is_visible()
+            and button.is_enabled()
+        ]
+        if len(buttons) != 1:
+            raise RuntimeError("Notepad close confirmation was not unique.")
+        buttons[0].invoke()
+
 
     def _window_for_identity(
         self,
@@ -229,12 +340,19 @@ class AppSessionManager:
             predicate_func=matches,
         )
 
-    def _bind_window(self, app, wrapper):
-        handle = int(wrapper.handle)
-        process_id = int(wrapper.element_info.process_id)
-        runtime_id = self._runtime_id(wrapper.element_info)
-        if handle <= 0 or process_id <= 0 or not runtime_id:
-            raise RuntimeError("Unable to bind the verified application window.")
+    def _bind_window(
+        self,
+        app,
+        wrapper,
+        authenticated_identity: tuple[int, int, tuple[int, ...]],
+        authenticated_element_info,
+    ):
+        if (
+            self._window_identity(wrapper) != authenticated_identity
+            or wrapper.element_info != authenticated_element_info
+        ):
+            raise _WindowConnectionLost()
+        handle, process_id, runtime_id = authenticated_identity
 
         self._session_generation += 1
         generation = self._session_generation
@@ -243,7 +361,7 @@ class AppSessionManager:
             handle,
             process_id,
             runtime_id,
-            wrapper.element_info,
+            authenticated_element_info,
             generation,
         )
         self._app = app
@@ -252,7 +370,7 @@ class AppSessionManager:
             process_id=process_id,
             runtime_id=runtime_id,
             generation=generation,
-            element_info=wrapper.element_info,
+            element_info=authenticated_element_info,
             window=window,
         )
 
@@ -275,15 +393,39 @@ class AppSessionManager:
 
     async def _new_launch(self, args: list[str]):
         self._invalidate_binding()
-        self.kill_app_process_by_path()
 
         config = self.runtime_config()
+        deadline = _monotonic() + self.launch_timeout_seconds
         valid_exe_path = config["exe"]
+
+        try:
+            title_pattern = re.compile(config["window_title_re"])
+            baseline_windows = self._all_windows()
+            baseline_identities = {
+                identity
+                for candidate in baseline_windows
+                if (identity := self._window_identity(candidate)) is not None
+            }
+            singleton_processes = {}
+            for candidate in baseline_windows:
+                identity = self._window_identity(candidate)
+                if identity is None or not self._window_matches_title(candidate, title_pattern):
+                    continue
+                if not self._matches_configured_application(identity[1], valid_exe_path):
+                    continue
+                try:
+                    singleton_processes[identity[1]] = psutil.Process(identity[1]).create_time()
+                except (psutil.NoSuchProcess, psutil.AccessDenied):
+                    continue
+        except Exception:
+            raise LaunchFailure(LaunchErrorCode.WINDOW_BIND_FAILED) from None
+
+        if _monotonic() >= deadline:
+            raise _LaunchTimeout(_LaunchState.PROCESS_STARTED)
 
         # CreateProcess receives one Windows-escaped command line and retains the
         # launcher handle so transferred children can be authenticated after exit.
         cmd = subprocess.list2cmdline([valid_exe_path, *args])
-        deadline = _monotonic() + self.launch_timeout_seconds
         logger.info('[AppManager] Launching new [redacted]: [redacted]')
         try:
             process_handle, thread_handle, launched_process_id, _ = win32process.CreateProcess(
@@ -310,60 +452,107 @@ class AppSessionManager:
         except Exception:
             process_handle.Close()
             raise LaunchFailure(LaunchErrorCode.PROCESS_START_FAILED) from None
+        fallback_identity = None
+        authenticated_selection = None
+        authenticated_window = None
         deepest_state = _LaunchState.PROCESS_STARTED
         try:
             while _monotonic() < deadline:
                 try:
-                    candidates = Desktop(backend="uia").windows(
-                        title_re=config["window_title_re"],
-                        control_type="Window",
-                        visible_only=False,
-                        enabled_only=False,
-                    )
-                    trusted = [
-                        candidate for candidate in candidates
-                        if self._belongs_to_launch(
-                            int(candidate.element_info.process_id),
-                            int(launched_process_id),
-                            launched_created_at,
-                            process_handle,
-                        )
-                    ]
-                    if len(trusted) > 1:
-                        raise _WindowAmbiguous()
-                    if trusted:
-                        wrapper = trusted[0]
-                        deepest_state = max(deepest_state, _LaunchState.WINDOW_FOUND)
-                        app = Application(backend="uia").connect(handle=int(wrapper.handle))
-                        deepest_state = max(deepest_state, _LaunchState.CONNECTED)
-                        handle = int(wrapper.handle)
-                        process_id = int(wrapper.element_info.process_id)
-                        runtime_id = self._runtime_id(wrapper.element_info)
-                        if handle <= 0 or process_id <= 0 or not runtime_id:
-                            raise RuntimeError("Unable to identify the discovered application window.")
-                        main_window = self._window_for_identity(
-                            app,
-                            handle,
-                            process_id,
-                            runtime_id,
-                            wrapper.element_info,
-                        )
-                        if main_window.exists(timeout=0):
-                            deepest_state = max(deepest_state, _LaunchState.EXISTS)
-                            verified_wrapper = main_window.wrapper_object()
-                            if verified_wrapper.is_visible():
-                                deepest_state = max(deepest_state, _LaunchState.VISIBLE)
-                                if verified_wrapper.is_enabled():
-                                    deepest_state = max(deepest_state, _LaunchState.ENABLED)
-                                    self._bind_window(app, verified_wrapper)
-                                    deepest_state = _LaunchState.BOUND
-                                    if _monotonic() < deadline:
-                                        logger.info('[AppManager] Launching new [redacted] using pywinauto: done')
-                                        return
-                                    self._invalidate_binding()
-                except _WindowAmbiguous:
+                    if authenticated_selection is None:
+                        candidates = self._matching_windows(config)
+                        lineage = []
+                        singleton = []
+                        for candidate in candidates:
+                            identity = self._window_identity(candidate)
+                            if identity is None or identity in baseline_identities:
+                                continue
+                            process_id = identity[1]
+                            if self._belongs_to_launch(
+                                process_id,
+                                int(launched_process_id),
+                                launched_created_at,
+                                process_handle,
+                            ):
+                                lineage.append((candidate, identity, candidate.element_info))
+                            elif (
+                                process_id in singleton_processes
+                                and self._same_process_incarnation(process_id, singleton_processes[process_id])
+                                and self._matches_configured_application(process_id, valid_exe_path)
+                            ):
+                                singleton.append((candidate, identity, candidate.element_info))
+                        eligible = lineage + singleton
+                        if len(eligible) > 1:
+                            raise _WindowAmbiguous()
+                        trusted = []
+                        if lineage:
+                            fallback_identity = None
+                            trusted = [lineage[0]]
+                        elif singleton:
+                            candidate, identity, element_info = singleton[0]
+                            if fallback_identity == identity:
+                                trusted = [(candidate, identity, element_info)]
+                            else:
+                                fallback_identity = identity
+                        else:
+                            fallback_identity = None
+                        if trusted:
+                            wrapper, authenticated_identity, authenticated_element_info = trusted[0]
+                            authenticated_selection = (
+                                authenticated_identity,
+                                authenticated_element_info,
+                            )
+                            if (
+                                self._window_identity(wrapper) != authenticated_identity
+                                or wrapper.element_info != authenticated_element_info
+                            ):
+                                raise _WindowConnectionLost()
+                            deepest_state = max(deepest_state, _LaunchState.WINDOW_FOUND)
+                            handle, process_id, runtime_id = authenticated_identity
+                            app = Application(backend="uia").connect(handle=handle)
+                            deepest_state = max(deepest_state, _LaunchState.CONNECTED)
+                            main_window = self._window_for_identity(
+                                app,
+                                handle,
+                                process_id,
+                                runtime_id,
+                                authenticated_element_info,
+                            )
+                            authenticated_window = (app, main_window)
+
+                    if authenticated_selection is not None:
+                        authenticated_identity, authenticated_element_info = authenticated_selection
+                        app, main_window = authenticated_window
+                        if not main_window.exists(timeout=0):
+                            raise _WindowConnectionLost()
+                        deepest_state = max(deepest_state, _LaunchState.EXISTS)
+                        verified_wrapper = main_window.wrapper_object()
+                        if (
+                            self._window_identity(verified_wrapper) != authenticated_identity
+                            or verified_wrapper.element_info != authenticated_element_info
+                        ):
+                            raise _WindowConnectionLost()
+                        if verified_wrapper.is_visible():
+                            deepest_state = max(deepest_state, _LaunchState.VISIBLE)
+                            if verified_wrapper.is_enabled():
+                                deepest_state = max(deepest_state, _LaunchState.ENABLED)
+                                self._bind_window(
+                                    app,
+                                    verified_wrapper,
+                                    authenticated_identity,
+                                    authenticated_element_info,
+                                )
+                                deepest_state = _LaunchState.BOUND
+                                if _monotonic() < deadline:
+                                    logger.info('[AppManager] Launching new [redacted] using pywinauto: done')
+                                    return
+                                self._invalidate_binding()
+                except (_WindowAmbiguous, _WindowConnectionLost):
                     raise
                 except Exception:
+                    if authenticated_selection is not None:
+                        raise _WindowConnectionLost() from None
+                    fallback_identity = None
                     logger.error('[AppManager] Launching new [redacted] readiness probe error: [redacted]')
 
                 remaining = deadline - _monotonic()
@@ -398,43 +587,37 @@ class AppSessionManager:
     
 
     async def app_close(self):
-        app = self._app
-        if self._binding is not None and app is not None:
-            try:
-                main_window = self._get_bound_window()
-                main_window.close()
-                app.kill()
-            except Exception:
-                logger.error('[AppManager] Error closing app application: [redacted]')
-            finally:
-                self._invalidate_binding()
-        else:
+        """Close only the application instance bound by this Runtime."""
+        if self._binding is None or self._app is None:
             logger.info("No app session to close.")
             self._invalidate_binding()
+            return
+        try:
+            main_window = self._get_bound_window()
+            main_window.close()
+            if main_window.exists(timeout=0.5):
+                if not self._is_notepad_profile():
+                    raise RuntimeError("Selected window requested close confirmation.")
+                self._dismiss_notepad_close_confirmation(main_window)
+                if main_window.exists(timeout=5):
+                    raise RuntimeError("Selected Notepad window remained open.")
+        except Exception:
+            logger.error('[AppManager] Error closing app application: [redacted]')
+            raise RuntimeError("AUTOGENESIS_APP_CLOSE_FAILED: selected application closure was not confirmed.") from None
+        self._invalidate_binding()
 
-        self.kill_app_process_by_path()
-
-    def kill_app_process_by_path(self):
-        exe_path = os.path.normcase(os.path.normpath(self.runtime_config()["exe"]))
-        killed = False
-
-        for proc in psutil.process_iter(["pid", "name", "exe"]):
-            try:
-                proc_exe = proc.info["exe"]
-                if proc_exe and os.path.normcase(os.path.normpath(proc_exe)) == exe_path:
-                    logger.info('Killing existing app process: PID=[redacted], Exe=[redacted]')
-                    proc.kill()
-                    killed = True
-            except (psutil.NoSuchProcess, psutil.AccessDenied):
-                continue
-            except Exception as e:
-                logger.error('Error checking/killing process [redacted] [redacted]: [redacted]')
-                continue
-
-        if killed:
-            time.sleep(2)
-        else:
-            logger.info("No existing app process found to kill.")
+    def release_binding(self):
+        """Release Runtime-owned binding and transient state without closing the app."""
+        self._invalidate_binding()
+        self.is_executing = False
+        self.gen_code_id = None
+        self.gen_code_cache.clear()
+        self.proposed_changes = None
+        self.pending_write = None
+        self.recording_warnings.clear()
+        self.header_code = ""
+        self.steps_dir = None
+        self.step_file_target = None
 
     async def get_main_window(self, main_window_type: str = ""):
         if main_window_type == "screenshot_cn":

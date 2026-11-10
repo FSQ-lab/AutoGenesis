@@ -1,4 +1,5 @@
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -21,19 +22,25 @@ def test_sync_main_preserves_app_config_transport_and_source_defaults(monkeypatc
     monkeypatch.setattr(cli, "configure_logging", lambda: None)
     monkeypatch.setattr(cli.sys, "stdout", StdoutStub())
     monkeypatch.setattr(cli, "load_app_config", lambda app, path: calls.append((app, path)) or {"selected": True})
-    monkeypatch.setattr(cli, "create_server", lambda config, root=None: calls.append((config, root)) or "server")
+
+    def create_runtime(config, root=None):
+        calls.append((config, root))
+        return SimpleNamespace(server="server", close=lambda: calls.append("closed"))
+
+    monkeypatch.setattr(cli, "create_runtime", create_runtime)
+
     async def serve(server, selected_transport):
         calls.append((server, selected_transport))
+
     monkeypatch.setattr(cli, "_serve", serve)
     assert cli.main(["--app", "second", "--config", "apps.json", "--transport", transport, "--project-root", "."]) == 0
-    assert calls == [("second", "apps.json"), ({"selected": True}, "."), ("server", transport)]
+    assert calls == [("second", "apps.json"), ({"selected": True}, "."), ("server", transport), "closed"]
     calls.clear()
     assert cli.main([], default_config=Path("source.json"), default_transport="stdio") == 0
-    assert calls[-1] == ("server", "stdio")
-    assert calls[0] == (None, Path("source.json"))
+    assert calls == [(None, Path("source.json")), ({"selected": True}, None), ("server", "stdio"), "closed"]
     calls.clear()
     assert cli.main([]) == 0
-    assert calls[-1] == ("server", "stdio")
+    assert calls == [(None, None), ({"selected": True}, None), ("server", "stdio"), "closed"]
 
 
 def test_cli_version_does_not_load_configuration(capsys, monkeypatch):
@@ -41,12 +48,12 @@ def test_cli_version_does_not_load_configuration(capsys, monkeypatch):
     with pytest.raises(SystemExit) as caught:
         cli.main(["--version"])
     assert caught.value.code == 0
-    assert capsys.readouterr() == ("autogenesis-windows-mcp 0.4.0\n", "")
+    assert capsys.readouterr() == ("autogenesis-windows-mcp 0.5.0\n", "")
 
 
-def test_invalid_config_never_constructs_server(monkeypatch, tmp_path, caplog):
+def test_invalid_config_never_constructs_runtime(monkeypatch, tmp_path, caplog):
     monkeypatch.setattr(cli, "configure_logging", lambda: None)
-    monkeypatch.setattr(cli, "create_server", lambda config, root=None: pytest.fail("Server started before validating configuration."))
+    monkeypatch.setattr(cli, "create_runtime", lambda config, root=None: pytest.fail("Runtime started before validating configuration."))
     assert cli.main(["--config", str(tmp_path / "absent.json")]) == 2
     assert "AUTOGENESIS_CONFIG_INVALID" in caplog.text
 
@@ -73,9 +80,15 @@ def test_shutdown_errors_are_distinguished_from_startup_failures(monkeypatch, ca
     monkeypatch.setattr(cli, "configure_logging", lambda: None)
     monkeypatch.setattr(cli.sys, "stdout", StdoutStub())
     monkeypatch.setattr(cli, "load_app_config", lambda *args: {})
-    monkeypatch.setattr(cli, "create_server", lambda config, root=None: object())
+    closed = []
+    monkeypatch.setattr(cli, "create_runtime", lambda config, root=None: SimpleNamespace(
+        server=object(), close=lambda: closed.append(True),
+    ))
+
     async def serve(*args):
         raise error
+
     monkeypatch.setattr(cli, "_serve", serve)
     assert cli.main([]) == expected
+    assert closed == [True]
     assert "private startup details" not in caplog.text

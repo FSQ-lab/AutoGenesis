@@ -6,14 +6,15 @@ import argparse
 from email.parser import BytesParser
 import hashlib
 import json
+import os
 from pathlib import Path
+import re
 import tempfile
+import time
 import tomllib
 import urllib.error
 import urllib.request
 import zipfile
-
-from jsonschema import Draft7Validator, Draft202012Validator, FormatChecker
 
 from render_mcp_descriptor import DescriptorError, render_descriptor
 
@@ -43,6 +44,17 @@ SERVERS = {
 
 CLI_PROJECT = "autogenesis-cli/pyproject.toml"
 CLI_ENTRYPOINT = "autogenesis = autogenesis_cli.cli:main"
+RELEASE_MANIFEST_SCHEMA = 1
+RELEASE_PROVENANCE_KEYS = {
+    "repository",
+    "workflow_ref",
+    "ref",
+    "commit",
+    "run_id",
+    "run_attempt",
+}
+
+
 
 
 class VerificationError(ValueError):
@@ -70,6 +82,8 @@ def _official_schema() -> dict:
 
 
 def _metadata(repo: Path, schema: dict) -> dict[str, dict]:
+    from jsonschema import Draft7Validator, FormatChecker
+
     validated = {}
     for key, expected in SERVERS.items():
         document = _read_json(repo / expected["path"])
@@ -123,6 +137,8 @@ def _metadata(repo: Path, schema: dict) -> dict[str, dict]:
 
 
 def _verify_descriptors(repo: Path, metadata: dict[str, dict]) -> dict[str, dict]:
+    from jsonschema import Draft202012Validator, FormatChecker
+
     launch_schema = _read_json(repo / "registry/generic-launch.schema.json")
     validator = Draft202012Validator(launch_schema, format_checker=FormatChecker())
     with tempfile.TemporaryDirectory(prefix="autogenesis-registry-") as temporary:
@@ -231,9 +247,9 @@ def _verify_cli_wheel(repo: Path, wheel_dir: Path) -> None:
         raise VerificationError("Built AutoGenesis CLI entrypoint is unavailable")
     normalized = requirements.replace(" ", "").lower()
     for requirement in (
-        "autogenesis-agent-contract==2.0.0",
-        "autogenesis-appium-mcp==0.4.0;sys_platform==\"darwin\"orsys_platform==\"win32\"",
-        "autogenesis-windows-mcp==0.4.0;sys_platform==\"win32\"",
+        "autogenesis-agent-contract==2.1.0",
+        "autogenesis-appium-mcp==0.5.0;sys_platform==\"darwin\"orsys_platform==\"win32\"",
+        "autogenesis-windows-mcp==0.5.0;sys_platform==\"win32\"",
     ):
         if requirement not in normalized:
             raise VerificationError("AutoGenesis CLI host bundle dependencies drifted")
@@ -241,38 +257,283 @@ def _verify_cli_wheel(repo: Path, wheel_dir: Path) -> None:
         raise VerificationError("AutoGenesis CLI wheel lacks repository ownership metadata")
 
 
-def _verify_pypi(repo: Path, metadata: dict[str, dict]) -> None:
+def _release_projects(repo: Path, metadata: dict[str, dict]) -> list[tuple[str, str]]:
     contract = tomllib.loads((repo / "agent-contract/pyproject.toml").read_text(encoding="utf-8"))["project"]
     cli = tomllib.loads((repo / CLI_PROJECT).read_text(encoding="utf-8"))["project"]
-    packages = [(contract["name"], contract["version"]), (cli["name"], cli["version"])]
-    packages.extend(
+    projects = [(contract["name"], contract["version"]), (cli["name"], cli["version"])]
+    projects.extend(
         (document["packages"][0]["identifier"], document["packages"][0]["version"])
         for document in metadata.values()
     )
-    for identifier, version in packages:
-        url = f"https://pypi.org/pypi/{identifier}/{version}/json"
-        try:
-            response = json.loads(urllib.request.urlopen(url, timeout=30).read())
-        except (OSError, urllib.error.URLError, ValueError):
-            raise VerificationError(f"Published PyPI package is unavailable: {identifier}=={version}") from None
-        if response.get("info", {}).get("version") != version:
-            raise VerificationError("Published PyPI package version differs from local metadata")
+    return projects
 
+
+def _normalized_package(name: str) -> str:
+    return re.sub(r"[-_.]+", "-", name).lower()
+
+
+def _release_wheel_records(repo: Path, wheel_dir: Path, metadata: dict[str, dict]) -> list[dict]:
+    expected = {(_normalized_package(name), version) for name, version in _release_projects(repo, metadata)}
+    records = []
+    identities = set()
+    for wheel in sorted(wheel_dir.glob("*.whl")):
+        package, version, *_ = _wheel_metadata(wheel)
+        identity = (_normalized_package(package), version)
+        if identity not in expected:
+            raise VerificationError("Release wheel directory contains an unexpected distribution")
+        if identity in identities:
+            raise VerificationError("Release wheel directory contains duplicate package versions")
+        identities.add(identity)
+        raw = wheel.read_bytes()
+        records.append(
+            {
+                "filename": wheel.name,
+                "sha256": hashlib.sha256(raw).hexdigest(),
+                "size": len(raw),
+                "package": package,
+                "version": version,
+            }
+        )
+    if identities != expected:
+        raise VerificationError("Release wheel directory does not contain the complete release set")
+    return records
+
+
+def _github_provenance() -> dict[str, str]:
+    environment = {
+        "repository": "GITHUB_REPOSITORY",
+        "workflow_ref": "GITHUB_WORKFLOW_REF",
+        "ref": "GITHUB_REF",
+        "commit": "GITHUB_SHA",
+        "run_id": "GITHUB_RUN_ID",
+        "run_attempt": "GITHUB_RUN_ATTEMPT",
+    }
+    provenance = {key: os.environ.get(variable, "") for key, variable in environment.items()}
+    if any(not value for value in provenance.values()):
+        raise VerificationError("GitHub workflow provenance is incomplete")
+    if provenance["repository"] != "FSQ-lab/AutoGenesis":
+        raise VerificationError("Release provenance repository is not canonical")
+    if not re.fullmatch(r"[0-9a-f]{40}", provenance["commit"]):
+        raise VerificationError("Release provenance commit is invalid")
+    if not provenance["run_id"].isdigit() or not provenance["run_attempt"].isdigit():
+        raise VerificationError("Release provenance run identity is invalid")
+    return provenance
+
+
+def _validate_release_manifest(document: dict) -> None:
+    if set(document) != {"schema_version", "provenance", "wheels"}:
+        raise VerificationError("Release manifest has unexpected fields")
+    if document["schema_version"] != RELEASE_MANIFEST_SCHEMA:
+        raise VerificationError("Release manifest schema is unsupported")
+    provenance = document["provenance"]
+    if not isinstance(provenance, dict) or set(provenance) != RELEASE_PROVENANCE_KEYS:
+        raise VerificationError("Release manifest provenance is invalid")
+    if any(not isinstance(value, str) or not value for value in provenance.values()):
+        raise VerificationError("Release manifest provenance is incomplete")
+    wheels = document["wheels"]
+    if not isinstance(wheels, list) or not wheels:
+        raise VerificationError("Release manifest wheel set is empty")
+    filenames = set()
+    identities = set()
+    for wheel in wheels:
+        if not isinstance(wheel, dict) or set(wheel) != {"filename", "sha256", "size", "package", "version"}:
+            raise VerificationError("Release manifest wheel entry is invalid")
+        filename = wheel["filename"]
+        if (
+            not isinstance(filename, str)
+            or Path(filename).name != filename
+            or not filename.endswith(".whl")
+            or not isinstance(wheel["sha256"], str)
+            or re.fullmatch(r"[0-9a-f]{64}", wheel["sha256"]) is None
+            or not isinstance(wheel["size"], int)
+            or isinstance(wheel["size"], bool)
+            or wheel["size"] <= 0
+            or not isinstance(wheel["package"], str)
+            or not wheel["package"]
+            or not isinstance(wheel["version"], str)
+            or not wheel["version"]
+        ):
+            raise VerificationError("Release manifest wheel entry is invalid")
+        identity = (_normalized_package(wheel["package"]), wheel["version"])
+        if filename in filenames or identity in identities:
+            raise VerificationError("Release manifest contains duplicate wheels")
+        filenames.add(filename)
+        identities.add(identity)
+
+
+def _write_release_manifest(path: Path, records: list[dict], provenance: dict[str, str]) -> None:
+    document = {"schema_version": RELEASE_MANIFEST_SCHEMA, "provenance": provenance, "wheels": records}
+    _validate_release_manifest(document)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.with_name(f"{path.name}.tmp")
+    temporary.write_text(json.dumps(document, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    temporary.replace(path)
+
+
+def _load_release_manifest(path: Path, expected_provenance: dict[str, str] | None = None) -> dict:
+    document = _read_json(path)
+    _validate_release_manifest(document)
+    if expected_provenance is not None and document["provenance"] != expected_provenance:
+        raise VerificationError("Release manifest provenance differs from the current workflow run")
+    return document
+
+
+def _verify_manifest_wheels(wheel_dir: Path, manifest: dict) -> None:
+    expected = {wheel["filename"]: wheel for wheel in manifest["wheels"]}
+    wheels = sorted(wheel_dir.glob("*.whl"))
+    if not wheels:
+        raise VerificationError("No release wheels were downloaded")
+    for wheel in wheels:
+        record = expected.get(wheel.name)
+        if record is None:
+            raise VerificationError("Downloaded wheel is absent from the release manifest")
+        raw = wheel.read_bytes()
+        if len(raw) != record["size"] or hashlib.sha256(raw).hexdigest() != record["sha256"]:
+            raise VerificationError("Downloaded wheel bytes differ from the reviewed release manifest")
+
+
+def _pypi_version(identifier: str, version: str, opener=urllib.request.urlopen) -> dict | None:
+    url = f"https://pypi.org/pypi/{identifier}/{version}/json"
+    try:
+        raw = opener(url, timeout=30).read()
+    except urllib.error.HTTPError as error:
+        if error.code == 404:
+            return None
+        raise VerificationError("PyPI release metadata could not be retrieved") from None
+    except (OSError, urllib.error.URLError):
+        raise VerificationError("PyPI release metadata could not be retrieved") from None
+    try:
+        response = json.loads(raw)
+    except (UnicodeError, ValueError):
+        raise VerificationError("PyPI returned invalid release metadata") from None
+    if not isinstance(response, dict):
+        raise VerificationError("PyPI returned invalid release metadata")
+    return response
+
+
+def _release_packages(manifest: dict) -> dict[tuple[str, str], list[dict]]:
+    packages: dict[tuple[str, str], list[dict]] = {}
+    for wheel in manifest["wheels"]:
+        packages.setdefault((wheel["package"], wheel["version"]), []).append(wheel)
+    return packages
+
+
+def _verify_pypi_response(package: str, version: str, records: list[dict], response: dict) -> None:
+    info = response.get("info")
+    urls = response.get("urls")
+    if (
+        not isinstance(info, dict)
+        or _normalized_package(str(info.get("name", ""))) != _normalized_package(package)
+        or info.get("version") != version
+        or not isinstance(urls, list)
+    ):
+        raise VerificationError("Published PyPI package identity differs from the release manifest")
+    actual = {}
+    for item in urls:
+        if not isinstance(item, dict) or not isinstance(item.get("digests"), dict):
+            raise VerificationError("Published PyPI file metadata is invalid")
+        filename = item.get("filename")
+        digest = item["digests"].get("sha256")
+        size = item.get("size")
+        if (
+            not isinstance(filename, str)
+            or filename in actual
+            or item.get("packagetype") != "bdist_wheel"
+            or not isinstance(digest, str)
+            or re.fullmatch(r"[0-9a-f]{64}", digest) is None
+            or not isinstance(size, int)
+            or isinstance(size, bool)
+        ):
+            raise VerificationError("Published PyPI file metadata is invalid")
+        actual[filename] = (digest, size)
+    expected = {record["filename"]: (record["sha256"], record["size"]) for record in records}
+    if actual.keys() != expected.keys():
+        raise VerificationError(f"Published PyPI wheel filename set differs for {package}=={version}")
+    if actual != expected:
+        raise VerificationError(f"Published PyPI wheel bytes differ for {package}=={version}")
+
+
+def _preflight_pypi_release(manifest: dict, opener=urllib.request.urlopen) -> None:
+    for (package, version), records in _release_packages(manifest).items():
+        response = _pypi_version(package, version, opener)
+        if response is None:
+            continue
+        try:
+            _verify_pypi_response(package, version, records, response)
+        except VerificationError:
+            raise VerificationError(
+                f"PyPI release collision ({package}=={version}); existing bytes differ, bump the complete release version set"
+            ) from None
+
+
+def _verify_pypi_release(manifest: dict, opener=urllib.request.urlopen) -> None:
+    for (package, version), records in _release_packages(manifest).items():
+        response = _pypi_version(package, version, opener)
+        if response is None:
+            raise VerificationError(f"Published PyPI release is unavailable: {package}=={version}")
+        _verify_pypi_response(package, version, records, response)
+
+
+def _verify_pypi_release_with_retries(manifest: dict, attempts: int, delay_seconds: float) -> None:
+    for attempt in range(1, attempts + 1):
+        try:
+            _verify_pypi_release(manifest)
+            return
+        except VerificationError:
+            if attempt == attempts:
+                raise
+            time.sleep(delay_seconds)
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--wheel-dir", type=Path)
     parser.add_argument("--evidence-dir", type=Path)
-    parser.add_argument("--check-pypi", action="store_true")
+    parser.add_argument("--write-release-manifest", type=Path)
+    parser.add_argument("--release-manifest", type=Path)
+    release_mode = parser.add_mutually_exclusive_group()
+    release_mode.add_argument("--preflight-pypi-release", action="store_true")
+    release_mode.add_argument("--verify-manifest-wheels", action="store_true")
+    release_mode.add_argument("--verify-pypi-release", action="store_true")
+    parser.add_argument("--pypi-attempts", type=int, default=1)
+    parser.add_argument("--pypi-delay-seconds", type=float, default=0)
     args = parser.parse_args()
+    selected_release_mode = args.preflight_pypi_release or args.verify_manifest_wheels or args.verify_pypi_release
+    if selected_release_mode:
+        if args.release_manifest is None:
+            parser.error("release verification modes require --release-manifest")
+        if args.pypi_attempts < 1 or args.pypi_delay_seconds < 0:
+            parser.error("PyPI retry values must be non-negative and attempts must be positive")
+        manifest = _load_release_manifest(args.release_manifest.resolve(strict=True), _github_provenance())
+        if args.preflight_pypi_release:
+            _preflight_pypi_release(manifest)
+        elif args.verify_manifest_wheels:
+            if args.wheel_dir is None:
+                parser.error("--verify-manifest-wheels requires --wheel-dir")
+            _verify_manifest_wheels(args.wheel_dir.resolve(strict=True), manifest)
+        else:
+            _verify_pypi_release_with_retries(manifest, args.pypi_attempts, args.pypi_delay_seconds)
+        print("Release manifest and public package bytes agree.")
+        return
+    if args.release_manifest is not None:
+        parser.error("--release-manifest requires a release verification mode")
+    if args.pypi_attempts != 1 or args.pypi_delay_seconds != 0:
+        parser.error("PyPI retry options require --verify-pypi-release")
+
     repo = Path(__file__).resolve().parents[1]
     metadata = _metadata(repo, _official_schema())
     descriptors = _verify_descriptors(repo, metadata)
-    if args.wheel_dir is not None:
-        _verify_wheels(args.wheel_dir.resolve(strict=True), metadata)
-        _verify_cli_wheel(repo, args.wheel_dir.resolve(strict=True))
-    if args.check_pypi:
-        _verify_pypi(repo, metadata)
+    wheel_dir = args.wheel_dir.resolve(strict=True) if args.wheel_dir is not None else None
+    if wheel_dir is not None:
+        _verify_wheels(wheel_dir, metadata)
+        _verify_cli_wheel(repo, wheel_dir)
+    if args.write_release_manifest is not None:
+        if wheel_dir is None:
+            parser.error("--write-release-manifest requires --wheel-dir")
+        _write_release_manifest(
+            args.write_release_manifest.resolve(),
+            _release_wheel_records(repo, wheel_dir, metadata),
+            _github_provenance(),
+        )
     if args.evidence_dir is not None:
         evidence = args.evidence_dir.resolve()
         evidence.mkdir(parents=True, exist_ok=True)
@@ -287,8 +548,8 @@ def main() -> None:
                 for key, document in metadata.items()
             },
             "descriptors": descriptors,
-            "local_wheels_verified": args.wheel_dir is not None,
-            "pypi_verified": args.check_pypi,
+            "local_wheels_verified": wheel_dir is not None,
+            "release_manifest_written": args.write_release_manifest is not None,
         }
         temporary = evidence / "registry-verification.json.tmp"
         temporary.write_text(json.dumps(summary, indent=2, sort_keys=True) + "\n", encoding="utf-8")

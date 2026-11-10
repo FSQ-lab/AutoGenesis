@@ -32,7 +32,7 @@ def test_installed_wheel_release_identity_and_inventory(contract, repo_root):
     assert not Path(autogenesis_agent_contract.__file__).resolve().is_relative_to(
         repo_root / "agent-contract/src"
     ), "Install the built wheel in a fresh venv; do not test editable source."
-    assert metadata.version("autogenesis-agent-contract") == contract.identity.contract_version == "2.0.0"
+    assert metadata.version("autogenesis-agent-contract") == contract.identity.contract_version == "2.1.0"
     assert contract.identity.schema_version == 2
     raw = assets().joinpath("manifest.json").read_bytes()
     manifest = json.loads(raw)
@@ -42,9 +42,16 @@ def test_installed_wheel_release_identity_and_inventory(contract, repo_root):
     paths.update(f"workflows/{name}.md" for name in (
         "execute_scenario", "generate_scenario_test", "execute_natural_language_task"
     ))
-    paths.update(f"skills/{name}/SKILL.md" for name in ("autogenesis-setup", "autogenesis-run"))
+    paths.add("skills/autogenesis/SKILL.md")
+    paths.update(f"references/{name}.md" for name in (
+        "install", "readiness-common", "appium-environment", "android-readiness",
+        "ios-simulator-readiness", "ios-real-device-readiness", "macos-readiness",
+        "windows-readiness", "execution-common", "android-execution",
+        "apple-execution", "windows-execution",
+    ))
     paths.add("schemas/secret-reference.schema.json")
     paths.update(f"schemas/{name}.schema.json" for name in ("manifest", "identity", "arguments"))
+    paths.add("appium-skills/manifest.json")
     assert set(manifest["assets"]) == paths
     for path, digest in manifest["assets"].items():
         content = assets().joinpath(path).read_bytes()
@@ -54,6 +61,16 @@ def test_installed_wheel_release_identity_and_inventory(contract, repo_root):
     schema = json.loads(assets().joinpath("schemas/manifest.schema.json").read_bytes())
     Draft202012Validator(schema).validate(manifest)
     assert load_contract(contract.identity).identity == contract.identity
+def test_internal_references_are_held_and_allowlisted(contract, monkeypatch):
+    expected = assets().joinpath("references/android-readiness.md").read_text(encoding="utf-8")
+    monkeypatch.setattr(implementation, "read_asset", lambda *_args, **_kwargs: pytest.fail("reread"))
+    assert contract.read_reference("android-readiness") == expected
+    for name in ("", "../android-readiness", "Android-Readiness", "unknown", None):
+        with pytest.raises(ContractError) as caught:
+            contract.read_reference(name)
+        assert caught.value.code == CONTRACT_INTEGRITY_ERROR
+        assert caught.value.reason == "unknown_reference"
+
 
 
 def test_immutable_order_and_untrusted_data_encoding(contract):
@@ -78,7 +95,21 @@ def test_immutable_order_and_untrusted_data_encoding(contract):
     with pytest.raises(TypeError):
         contract._workflows["execute_scenario"] = "disabled"
     with pytest.raises(FrozenInstanceError):
-        contract.identity.contract_version = "2.0.0"
+        contract.identity.contract_version = "2.1.0"
+
+
+def test_canonical_skill_bytes_are_held_after_one_verified_load(contract, monkeypatch):
+    expected = {"autogenesis": assets().joinpath("skills/autogenesis/SKILL.md").read_bytes()}
+    monkeypatch.setattr(implementation, "read_asset", lambda *_args, **_kwargs: pytest.fail("reread"))
+    assert {name: contract.read_skill(name) for name in expected} == expected
+
+
+@pytest.mark.parametrize("name", ["", "Autogenesis", "../autogenesis", "autogenesis-run", "unknown", None])
+def test_canonical_skill_bytes_reject_unknown_names(contract, name):
+    with pytest.raises(ContractError) as caught:
+        contract.read_skill(name)
+    assert caught.value.code == CONTRACT_INTEGRITY_ERROR
+    assert caught.value.reason == "unknown_skill"
 
 
 def test_absent_appendix_is_explicit_empty_block(contract):
@@ -154,7 +185,8 @@ def copied_assets(tmp_path, monkeypatch):
 @pytest.mark.parametrize("path,mode", [
     ("core-policy.md", "edit"),
     ("workflows/generate_scenario_test.md", "missing"),
-    ("skills/autogenesis-run/SKILL.md", "crlf"),
+    ("skills/autogenesis/SKILL.md", "crlf"),
+    ("references/windows-readiness.md", "edit"),
     ("schemas/arguments.schema.json", "edit"),
     ("manifest.json", "edit"),
     ("manifest.json", "missing"),
@@ -186,7 +218,7 @@ def test_rewriting_asset_and_manifest_does_not_bypass_release_pin(copied_assets)
 
 @pytest.mark.parametrize("field,value,code", [
     ("schema_version", 3, CONTRACT_INTEGRITY_ERROR),
-    ("contract_version", "2.0.1", CONTRACT_MISMATCH),
+    ("contract_version", "2.1.1", CONTRACT_MISMATCH),
     ("assets", {"../../outside": "0" * 64}, CONTRACT_INTEGRITY_ERROR),
 ])
 def test_unsupported_manifest_fields_fail_even_with_matching_candidate_pin(copied_assets, monkeypatch, field, value, code):
@@ -205,8 +237,8 @@ def test_unsupported_manifest_fields_fail_even_with_matching_candidate_pin(copie
 @pytest.mark.parametrize("identity", [
     ContractIdentity("3.0.0", "0" * 64),
     ContractIdentity("1.2.0", "0" * 64),
-    ContractIdentity("2.0.0", "0" * 64, 3),
-    {"contract_version": "2.0.0"},
+    ContractIdentity("2.1.0", "0" * 64, 3),
+    {"contract_version": "2.1.0"},
 ])
 def test_expected_identity_is_exact(identity):
     with pytest.raises(ContractError) as caught:
@@ -215,7 +247,7 @@ def test_expected_identity_is_exact(identity):
 
 
 def test_expected_schema_is_exact_even_when_version_and_hash_match(contract):
-    expected = ContractIdentity("2.0.0", contract.identity.manifest_sha256, 3)
+    expected = ContractIdentity("2.1.0", contract.identity.manifest_sha256, 3)
     with pytest.raises(ContractError) as caught:
         load_contract(expected)
     assert caught.value.code == CONTRACT_MISMATCH

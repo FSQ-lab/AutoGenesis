@@ -4,10 +4,10 @@ on:
   pull_request:
     branches:
       - main
-      - feature/agent-integration
+      - feature/agent-integration-v3
   push:
     branches:
-      - feature/agent-integration
+      - feature/agent-integration-v3
   workflow_dispatch:
 
 permissions:
@@ -86,3 +86,49 @@ jobs:
       - name: Build documentation
         working-directory: docs
         run: pnpm run build
+
+  candidate-channel:
+    name: Build exact Candidate channel
+    runs-on: ubuntu-24.04
+    env:
+      CANDIDATE_COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}
+    steps:
+      - name: Checkout exact Candidate commit
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: ${{ env.CANDIDATE_COMMIT }}
+      - name: Setup Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: '3.12'
+      - name: Install pinned build and lock tooling
+        run: python -m pip --disable-pip-version-check install 'build==1.2.2.post1' 'uv==0.12.5'
+      - name: Build all Candidate wheels
+        run: |
+          python -m build --wheel --outdir dist agent-contract
+          python -m build --wheel --outdir dist appium-mcp-server
+          python -m build --wheel --outdir dist pywinauto-mcp-server
+          python -m build --wheel --outdir dist autogenesis-cli
+      - name: Resolve one universal hashed dependency lock
+        run: |
+          printf '%s\n' dist/*.whl > candidate-requirements.in
+          uv pip compile --universal --generate-hashes \
+            --no-emit-package autogenesis-agent-contract \
+            --no-emit-package autogenesis-appium-mcp \
+            --no-emit-package autogenesis-windows-mcp \
+            --no-emit-package autogenesis-cli \
+            candidate-requirements.in --output-file candidate-dependencies.lock
+      - name: Build commit-bound Candidate bundle
+        run: >-
+          python agent-contract/tools/build_candidate_release.py
+          --wheel-dir dist
+          --output-dir candidate-channel
+          --base-url .
+          --commit "${CANDIDATE_COMMIT}"
+          --dependency-lock candidate-dependencies.lock
+      - name: Upload exact Candidate channel
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: autogenesis-candidate-${{ env.CANDIDATE_COMMIT }}
+          path: candidate-channel
+          if-no-files-found: error

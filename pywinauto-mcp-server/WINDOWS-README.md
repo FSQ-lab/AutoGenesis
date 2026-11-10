@@ -1,22 +1,21 @@
 # AutoGenesis Windows MCP package
 
-Issue #26 evolves the Windows runtime as **autogenesis-windows-mcp**
-(version 0.4.0), importable as **autogenesis_windows_mcp**, with the console
-command **autogenesis-windows-mcp**. Python 3.10+ and Windows are required for
-serving automation tools. Linux CI checks package metadata/imports only.
+Issue #30 carries **autogenesis-windows-mcp** version 0.5.0 forward with the
+Agent Contract 2.1.0 identity. It remains importable as
+**autogenesis_windows_mcp** with command **autogenesis-windows-mcp**. Python
+3.10+ and Windows are required; Linux CI checks metadata/imports only.
 
 <!-- mcp-name: io.github.FSQ-lab/autogenesis-windows -->
 
 ## Install in a business project
 
-No AutoGenesis checkout is needed. From a Windows business directory, create an
-isolated environment and use the machine's configured package index; do not
-bypass its mirror or trust policy. The pinned Runtime installs its exact Agent
-Contract dependency:
+Build artifacts must contain both the Windows Runtime 0.5.0 wheel and Agent
+Contract 2.1.0 wheel. From any Windows business directory, without a
+checkout of AutoGenesis:
 
 ```powershell
 python -m venv .venv
-.venv/Scripts/python -m pip install autogenesis-windows-mcp==0.4.0
+.venv/Scripts/python -m pip install C:/artifacts/autogenesis_agent_contract-2.1.0-py3-none-any.whl C:/artifacts/autogenesis_windows_mcp-0.5.0-py3-none-any.whl
 .venv/Scripts/autogenesis-windows-mcp --config ./apps.json --app notepad --project-root .
 ```
 
@@ -26,12 +25,21 @@ does not create log files or write into the installed package. Close client
 stdin or send SIGINT (Ctrl+C) to stop the server. Disconnecting does not invoke
 the app_close automation tool or terminate the user's application.
 
-Maintainers testing unpublished builds may substitute reviewed local Runtime and
-Contract wheels instead of package-index coordinates.
+With uv installed, isolated execution from local artifacts is also supported:
 
-The runtime depends exactly on autogenesis-agent-contract==2.0.0 and requires
+```powershell
+uvx --with C:/artifacts/autogenesis_agent_contract-2.1.0-py3-none-any.whl --from C:/artifacts/autogenesis_windows_mcp-0.5.0-py3-none-any.whl autogenesis-windows-mcp --config ./apps.json --app notepad --project-root .
+```
+
+After these versions are published to the configured package index:
+
+```powershell
+uvx --from autogenesis-windows-mcp==0.5.0 autogenesis-windows-mcp --config ./apps.json --app notepad --project-root .
+```
+
+The runtime depends exactly on autogenesis-agent-contract==2.1.0 and requires
 manifest SHA-256
-4367a2e388d0d5cb41a415b25b6a58e25025f1da6749bfdffe87a37c60a0c9d3.
+3768d673273fc82609a94a218a355622233e10892a9f2392688711aa4572d32c.
 Missing, corrupt or incompatible contract assets fail startup.
 
 Standard MCP Registry metadata is `pywinauto-mcp-server/server.json`. From a
@@ -98,9 +106,16 @@ process incarnation or its transferred child, including after launcher exit.
 Process creation, trusted top-level window discovery, connection, visibility,
 enabled state and initial binding share one monotonic launch budget. The runtime
 polls readiness at an internal 500 ms interval and uses cancellable asynchronous
-waits; it does not add a probe or sleep after the configured deadline. Multiple
-title-matched windows belonging to the same launch are rejected as ambiguous
-rather than selecting one arbitrarily.
+waits; it does not add a probe or sleep after the configured deadline. Before
+process creation it records every top-level UIA identity. A newly observed
+title-matched window is eligible when it belongs to the launcher process tree.
+For a single-process application such as modern Notepad, a new window may
+instead belong to an exact pre-launch process incarnation that already owned a
+matching window. The process must also match the configured executable path or,
+for packaged modern Notepad, the canonical Windows Notepad package family. That
+fallback must remain the sole eligible identity across two uninterrupted polls
+before binding. Pre-existing identities are never eligible, even if their title
+changes. Multiple eligible new windows are rejected as ambiguous.
 
 `app_launch` failures have a fixed, secret-safe response contract. Alongside
 `status: "error"` and an empty `data` object, responses include `error_code`,
@@ -134,6 +149,12 @@ reincarnated element, identity mismatch, or invalid generation invalidates the
 session and fails the operation; ordinary tools do not reconnect by title or
 restart the application. A subsequent explicit `app_launch` may establish a new
 session.
+
+`app_close` sends close only to the pinned top-level window and never terminates
+its owning process. For modern Notepad, it invokes that selected window's unique
+WinUI discard confirmation when required. Failure to close the selected window
+or identify one selected confirmation leaves the binding intact and returns
+`AUTOGENESIS_APP_CLOSE_FAILED`.
 
 ## Source execution
 

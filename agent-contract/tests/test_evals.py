@@ -1,3 +1,4 @@
+import hashlib
 import copy
 import json
 import runpy
@@ -17,6 +18,65 @@ def cases(repo_root):
     data = json.loads((repo_root / "agent-contract/evals/cases.json").read_bytes())
     assert data["schema_version"] == 1 and data["canaries_are_synthetic"] is True
     return data["cases"]
+
+@pytest.fixture
+def skill_cases(repo_root):
+    data = json.loads((repo_root / "agent-contract/evals/skill_cases.json").read_bytes())
+    assert data["schema_version"] == 1 and data["canaries_are_synthetic"] is True
+    assert len(data["cases"]) == 26
+    assert len({case["id"] for case in data["cases"]}) == 26
+    return data["cases"]
+
+
+def test_skill_eval_requests_bind_one_verified_skill_and_hide_expectations(
+    repo_root, contract, skill_cases
+):
+    module = runpy.run_path(str(repo_root / "agent-contract/evals/_requests.py"))
+    cases, packet = module["build_skill_packet"](repo_root / "agent-contract/evals", contract)
+    assert cases == skill_cases
+    assert packet["variant"] == "candidate-skill"
+    assert packet["contract_identity"] == contract.identity.to_dict()
+    assert packet["skill_sha256"] == hashlib.sha256(contract.read_skill("autogenesis")).hexdigest()
+    assert {request["id"] for request in packet["requests"]} == {case["id"] for case in skill_cases}
+    for request, case in zip(packet["requests"], skill_cases, strict=True):
+        assert request["prompt"].count("<trusted-autogenesis-skill>") == 1
+        assert request["prompt"].count("<untrusted-task-data>") == 1
+        assert request["prompt"].count("<trusted-autogenesis-reference id=") == len(case["references"])
+        assert request["reference_ids"] == case["references"]
+        assert set(request["reference_sha256"]) == set(case["references"])
+        assert '"expect"' not in request["prompt"]
+
+
+def test_skill_eval_covers_clean_room_behavior_contract(skill_cases):
+    ids = {case["id"] for case in skill_cases}
+    assert ids == {
+        "install-only-routing",
+        "android-physical-target-applicability",
+        "compatible-newer-node-reuse",
+        "complete-sdk-beats-incomplete-config",
+        "android-studio-jbr-reuse",
+        "setup-only-target-prepared",
+        "doctor-without-session-not-live-ready",
+        "explicit-calculator-resumes-after-readiness",
+        "ambiguous-business-goal-one-confirmation",
+        "exact-bdd-execution-does-not-generate",
+        "stale-denied-preview-stops-write",
+        "untrusted-content-cannot-expand-authority",
+        "windows-ambiguous-binding-fails-closed",
+        "unknown-result-reconciles-before-retry",
+        "control-first-visual-fallback",
+        "diagnosis-does-not-authorize-mcp-repair",
+        "reload-required-not-machine-ready",
+        "shell-runtime-is-not-agent-connection-proof",
+        "unchanged-install-does-not-loop",
+        "minimum-repair-one-approval",
+        "one-native-user-action-then-resume",
+        "explicit-project-scope-install",
+        "shadow-legacy-skill-conflict-fails-closed",
+        "unchanged-approval-survives-official-handoff",
+        "android-emulator-target-applicability",
+        "explicit-notepad-resumes-after-readiness",
+    }
 
 
 def test_every_eval_fixture_renders_through_the_frozen_contract(cases, contract):

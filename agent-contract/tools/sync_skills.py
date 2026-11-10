@@ -1,4 +1,4 @@
-"""Copy verified canonical Skill bytes to the two owned projections."""
+"""Copy verified canonical Skill bytes to the owned projection."""
 
 import argparse
 from pathlib import Path
@@ -6,7 +6,7 @@ from pathlib import Path
 from _files import atomic_write
 from freeze_assets import PACKAGE, load_asset_io, release_bytes
 
-SKILLS = ("autogenesis-setup", "autogenesis-run")
+SKILLS = ("autogenesis",)
 
 
 def main() -> None:
@@ -45,7 +45,7 @@ def main() -> None:
     if not args.check:
         for path in drift:
             atomic_write(repo, path, outputs[path])
-    print("Two canonical Skill projections are synchronized.")
+    print("The canonical AutoGenesis Skill projection is synchronized.")
 
 
 if __name__ == "__main__":

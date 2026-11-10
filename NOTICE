@@ -12,6 +12,15 @@ THIRD PARTY SOFTWARE NOTICES AND INFORMATION
 This project incorporates components from the projects listed below.
 
 
+Appium Agent Skills snapshot (agent-contract/)
+------------------------------------------------
+
+Source: https://github.com/appium/skills
+Commit: e907024c210fe024c956ed9c74146fc27b1dd013
+License: Apache-2.0
+Copyright: OpenJS Foundation and other contributors
+The exact upstream license and attribution are bundled with the snapshot.
+
 Python Dependencies (appium-mcp-server/)
 -----------------------------------------
 

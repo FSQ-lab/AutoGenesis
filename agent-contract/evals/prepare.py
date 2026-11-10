@@ -19,8 +19,8 @@ def main() -> None:
     fixtures = Path(__file__).resolve().parent
     contract = load_contract()
     # run_path works under python -I without adding the checkout to sys.path.
-    builder = runpy.run_path(str(fixtures / "_requests.py"))["build_packets"]
-    _, packets = builder(fixtures, contract)
+    module = runpy.run_path(str(fixtures / "_requests.py"))
+    _, packets = module["build_packets"](fixtures, contract)
     for variant, value in packets.items():
         descriptor, temporary = tempfile.mkstemp(prefix=".eval-", dir=output)
         try:
@@ -30,6 +30,15 @@ def main() -> None:
             os.replace(temporary, output / f"{variant}-requests.json")
         finally:
             Path(temporary).unlink(missing_ok=True)
+    _, skill_packet = module["build_skill_packet"](fixtures, contract)
+    descriptor, temporary = tempfile.mkstemp(prefix=".eval-", dir=output)
+    try:
+        with os.fdopen(descriptor, "w", encoding="utf-8", newline="\n") as stream:
+            json.dump(skill_packet, stream, indent=2, ensure_ascii=True)
+            stream.write("\n")
+        os.replace(temporary, output / "skill-requests.json")
+    finally:
+        Path(temporary).unlink(missing_ok=True)
     print("Prepared paired eval requests. Agent behavior has not been evaluated.")
 
 

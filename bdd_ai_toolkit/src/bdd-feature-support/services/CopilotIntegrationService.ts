@@ -8,6 +8,8 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
+import * as os from 'os';
+import { createHash } from 'crypto';
 import { Scenario, Background } from '../core/gherkin/types';
 import { ConfigManager } from '../utils/ConfigManager';
 
@@ -154,41 +156,64 @@ export class CopilotIntegrationService {
     }
   }
 
-  /**
-   * Check if a specific skill exists in the current workspace repository
-   * Looks for .github/skills/{skillName}/SKILL.md in workspace folders
-   * @param skillName Name of the skill to search for
-   * @returns true if the skill exists
-   */
-  hasSkillInWorkspace(skillName: string): boolean {
-    const workspaceFolders = vscode.workspace.workspaceFolders;
-    if (!workspaceFolders) {
-      return false;
-    }
+  /** Hold canonical Skill bytes from the selected Feature's discovery scope. */
+  loadSkillContent(skillName: string, featureFilePath: string):
+    { status: 'ready'; content: string } | { status: 'absent' | 'invalid' } {
+    const relative = ['.agents', 'skills', skillName, 'SKILL.md'];
+    const expectedSha256 = '1d1bfffc3e467a4a6cafbbf860740a1ee58f33dad522336779f0da8107464771';
+    const selected = vscode.workspace.getWorkspaceFolder(vscode.Uri.file(featureFilePath));
+    const projectSkill = selected && path.join(selected.uri.fsPath, ...relative);
+    const userSkill = path.join(os.homedir(), ...relative);
 
-    for (const folder of workspaceFolders) {
-      const skillPath = path.join(
-        folder.uri.fsPath,
-        '.github',
-        'skills',
-        skillName,
-        'SKILL.md'
-      );
-      if (fs.existsSync(skillPath)) {
-        return true;
+    const held = (candidate: string):
+      { status: 'ready'; content: string } | { status: 'absent' | 'invalid' } => {
+      let descriptor: number | undefined;
+      try {
+        const expected = fs.lstatSync(candidate);
+        if (!expected.isFile() || expected.isSymbolicLink() || expected.size <= 0 || expected.size > 256 * 1024) return { status: 'invalid' };
+        const noFollow = process.platform === 'win32' ? 0 : fs.constants.O_NOFOLLOW;
+        descriptor = fs.openSync(candidate, fs.constants.O_RDONLY | noFollow);
+        const opened = fs.fstatSync(descriptor);
+        if (opened.dev !== expected.dev || opened.ino !== expected.ino || opened.size !== expected.size) return { status: 'invalid' };
+        const raw = fs.readFileSync(descriptor);
+        const final = fs.fstatSync(descriptor);
+        if (final.dev !== opened.dev || final.ino !== opened.ino || final.size !== opened.size) return { status: 'invalid' };
+        if (createHash('sha256').update(raw).digest('hex') !== expectedSha256) return { status: 'invalid' };
+        return { status: 'ready', content: raw.toString('utf8') };
+      } catch (error) {
+        const code = (error as NodeJS.ErrnoException).code;
+        return { status: code === 'ENOENT' ? 'absent' : 'invalid' };
+      } finally {
+        if (descriptor !== undefined) fs.closeSync(descriptor);
       }
+    };
+
+    // Project scope has precedence; invalid bytes fail closed rather than switching scope.
+    if (projectSkill) {
+      const project = held(projectSkill);
+      if (project.status !== 'absent') return project;
     }
-    return false;
+    return held(userSkill);
   }
 
-  /**
-   * Generate a skill invocation command for Copilot
-   * @param skillName Name of the skill
-   * @param scenarioName Name of the scenario
-   * @returns Skill invocation string (e.g. "/autogenesis-run Scenario Name")
-   */
-  generateSkillCommand(skillName: string, scenarioName: string): string {
-    return `/${skillName} ${scenarioName}`;
+  /** Generate an invocation bound to the exact held canonical Skill bytes. */
+  generateSkillCommand(
+    skillName: string,
+    scenarioName: string,
+    featureFilePath: string,
+    lineNumber: number,
+    skillContent: string
+  ): string {
+    const encode = (value: unknown) => JSON.stringify(value).replace(/[<>&]/g, character =>
+      `\\u${character.charCodeAt(0).toString(16).padStart(4, '0')}`
+    );
+    const authenticated = encode({
+      name: skillName,
+      sha256: createHash('sha256').update(skillContent).digest('hex'),
+      content: skillContent,
+    });
+    const selection = encode({ featureFilePath, lineNumber, scenarioName });
+    return `Apply this authenticated AutoGenesis Skill snapshot exactly: ${authenticated}\nExecute only the selected Scenario data: ${selection}`;
   }
 
   /**

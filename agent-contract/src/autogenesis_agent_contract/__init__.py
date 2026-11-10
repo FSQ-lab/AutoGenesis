@@ -1,6 +1,7 @@
-"""Canonical AutoGenesis Agent Contract, release 2.0.0 / schema 2."""
+"""Canonical AutoGenesis Agent Contract, release 2.1.0 / schema 2."""
 
 from .appendix import ProjectAppendix, load_project_appendix
+from .appium_skills import AppiumSkillsBundle, load_appium_skills
 from .contract import AgentContract, load_contract
 from .errors import (
     CONTRACT_INTEGRITY_ERROR,
@@ -36,6 +37,7 @@ from .secret_ref import (
 
 __all__ = [
     "AgentContract", "ContractIdentity", "RuntimeContractRequirement",
+    "AppiumSkillsBundle", "load_appium_skills",
     "ProjectAppendix", "ContractError", "load_contract", "load_project_appendix",
     "register_mcp", "CONTRACT_MISMATCH", "CONTRACT_INTEGRITY_ERROR",
     "PROJECT_INSTRUCTIONS_INVALID", "SecretRef", "UnboundSecret", "SecretInput",

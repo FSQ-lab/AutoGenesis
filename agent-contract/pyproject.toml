@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "autogenesis-agent-contract"
-version = "2.0.0"
+version = "2.1.0"
 description = "Versioned AutoGenesis policy, workflows, and MCP prompt projections"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -17,11 +17,14 @@ Repository = "https://github.com/FSQ-lab/AutoGenesis"
 [project.optional-dependencies]
 test = ["pytest>=8.3,<9"]
 
+[tool.setuptools]
+include-package-data = true
+
 [tool.setuptools.packages.find]
 where = ["src"]
 
 [tool.setuptools.package-data]
-autogenesis_agent_contract = ["py.typed", "assets/*.json", "assets/*.md", "assets/workflows/*.md", "assets/skills/*/SKILL.md", "assets/schemas/*.json"]
+autogenesis_agent_contract = ["py.typed", "assets/*.json", "assets/*.md", "assets/workflows/*.md", "assets/references/*.md", "assets/skills/*/SKILL.md", "assets/schemas/*.json"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

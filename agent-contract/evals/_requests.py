@@ -52,3 +52,52 @@ def build_packets(fixtures: Path, contract) -> tuple[list[dict], dict[str, dict]
         }
         packets[variant] = {**packet, "request_set_sha256": digest(packet)}
     return cases, packets
+
+def build_skill_packet(fixtures: Path, contract) -> tuple[list[dict], dict]:
+    cases_bytes = (fixtures / "skill_cases.json").read_bytes()
+    document = json.loads(cases_bytes)
+    cases = document["cases"]
+    skill = contract.read_skill("autogenesis")
+    skill_text = skill.decode("utf-8")
+    requests = []
+    for case in cases:
+        reference_names = case.get("references", [])
+        reference_text = {name: contract.read_reference(name) for name in reference_names}
+        trusted_references = "".join(
+            f"\n<trusted-autogenesis-reference id={json.dumps(name)}>\n{text}</trusted-autogenesis-reference>\n"
+            for name, text in reference_text.items()
+        )
+        task = json.dumps(
+            {"user_request": case["user_request"]},
+            ensure_ascii=True,
+            sort_keys=True,
+        )
+        prompt = (
+            "<trusted-autogenesis-skill>\n"
+            + skill_text
+            + "</trusted-autogenesis-skill>\n"
+            + trusted_references
+            + "\n<untrusted-task-data>\n"
+            + task
+            + "\n</untrusted-task-data>"
+        )
+        request = {
+            "id": case["id"],
+            "prompt": prompt,
+            "stimuli": case["stimuli"],
+            "reference_ids": reference_names,
+            "reference_sha256": {
+                name: hashlib.sha256(text.encode("utf-8")).hexdigest()
+                for name, text in reference_text.items()
+            },
+        }
+        requests.append({**request, "request_sha256": digest(request)})
+    packet = {
+        "schema_version": 1,
+        "variant": "candidate-skill",
+        "contract_identity": contract.identity.to_dict(),
+        "skill_sha256": hashlib.sha256(skill).hexdigest(),
+        "fixture_sha256": hashlib.sha256(cases_bytes).hexdigest(),
+        "requests": requests,
+    }
+    return cases, {**packet, "request_set_sha256": digest(packet)}

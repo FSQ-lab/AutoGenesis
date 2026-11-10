@@ -2,7 +2,7 @@
 
 Installable stdio MCP runtime for BDD automation on iOS, Android, and macOS through Appium.
 
-The runtime requires `autogenesis-agent-contract==2.0.0`. Launch it with an explicit configuration and business-project root:
+The runtime requires `autogenesis-agent-contract==2.1.0`. Launch it with an explicit configuration and business-project root:
 
 ```bash
 autogenesis-appium-mcp --platform android --config /absolute/business/appium.json --project-root /absolute/business

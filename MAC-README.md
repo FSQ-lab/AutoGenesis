@@ -8,15 +8,13 @@ permissions for the application driving automation.
 
 ## Install from a business project
 
-No AutoGenesis checkout is needed. Create an isolated environment and use the
-machine's configured package index; do not bypass its mirror or trust policy.
-The pinned Runtime installs its exact Agent Contract dependency:
+Obtain the built runtime and Agent Contract wheels from the Integration Lead.
+No AutoGenesis checkout is needed. In an activated virtual environment:
 
 ```bash
-python -m venv .venv
-.venv/bin/python -m pip install autogenesis-appium-mcp==0.4.0
-.venv/bin/python -c "from importlib.resources import files; from pathlib import Path; Path('appium.json').write_bytes(files('autogenesis_appium_mcp').joinpath('conf/appium_conf.template.json').read_bytes())"
-.venv/bin/autogenesis-appium-mcp --platform mac --config /absolute/business/appium.json --project-root /absolute/business
+python -m pip install /absolute/wheels/autogenesis_agent_contract-2.1.0-py3-none-any.whl /absolute/wheels/autogenesis_appium_mcp-0.5.0-py3-none-any.whl
+python -c "from importlib.resources import files; from pathlib import Path; Path('appium.json').write_bytes(files('autogenesis_appium_mcp').joinpath('conf/appium_conf.template.json').read_bytes())"
+autogenesis-appium-mcp --platform mac --config /absolute/business/appium.json --project-root /absolute/business
 ```
 
 The default transport is **stdio**. The default platform is iOS, so pass
@@ -24,11 +22,20 @@ The default transport is **stdio**. The default platform is iOS, so pass
 Appium or a live application; automation calls create sessions when requested.
 stdout is reserved for MCP; diagnostics use stderr.
 
-Maintainers testing unpublished builds may substitute reviewed local Runtime and
-Contract wheels instead of package-index coordinates.
+With uvx and local artifacts:
 
-Agent Contract is pinned to **2.0.0**, manifest SHA-256
-`4367a2e388d0d5cb41a415b25b6a58e25025f1da6749bfdffe87a37c60a0c9d3`.
+```bash
+uvx --from /absolute/wheels/autogenesis_appium_mcp-0.5.0-py3-none-any.whl --with /absolute/wheels/autogenesis_agent_contract-2.1.0-py3-none-any.whl autogenesis-appium-mcp --platform mac --config /absolute/business/appium.json --project-root /absolute/business
+```
+
+Once both packages are published to the configured index:
+
+```bash
+uvx --from autogenesis-appium-mcp==0.5.0 autogenesis-appium-mcp --platform mac --config /absolute/business/appium.json --project-root /absolute/business
+```
+
+Agent Contract is pinned to **2.1.0**, manifest SHA-256
+`3768d673273fc82609a94a218a355622233e10892a9f2392688711aa4572d32c`.
 A mismatched or corrupt contract prevents startup.
 
 Standard MCP Registry metadata is `appium-mcp-server/server.json`. From a source
@@ -40,15 +47,12 @@ python tools/render_mcp_descriptor.py --server appium --platform mac --config /a
 
 ## Configure Mac2
 
-Follow the [macOS Appium Setup Guide](appium-mcp-server/docs/macOS_Appium_Setup_Guide.md)
-for Xcode/Appium setup. Grant Terminal and the MCP client's host application
-Accessibility permission in System Settings → Privacy & Security. Grant Screen
-Recording permission if needed for screenshots. Before executing automation:
-
-```bash
-appium driver install mac2
-appium server --port 4723
-```
+Invoke `autogenesis` for local Mac2 preparation or execution. It loads the pinned
+internal official `setup-mac2` workflow, then the Coding Agent performs its
+environment and doctor steps through the normal terminal. Doctor/server-smoke
+completion is diagnostic evidence; Ready also requires matching MCP identity, a
+real Mac2 session, and observed UI. Grant Accessibility or Screen Recording only
+after reviewing the exact request.
 
 Set the Mac profile in the business config, for example:
 
@@ -121,7 +125,7 @@ replaces the target. Default output is business-local
 
 From the AutoGenesis repository root, in an activated development environment:
 ```bash
-python -m pip install /absolute/wheels/autogenesis_agent_contract-2.0.0-py3-none-any.whl -e ./appium-mcp-server
+python -m pip install /absolute/wheels/autogenesis_agent_contract-2.1.0-py3-none-any.whl -e ./appium-mcp-server
 python appium-mcp-server/simple_server.py --platform mac --config /absolute/business/appium.json --project-root /absolute/business
 ```
 

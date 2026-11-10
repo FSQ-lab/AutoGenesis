@@ -18,6 +18,8 @@ source order, including their BDD keywords. Never merge, reorder, skip, or add
 steps. A step may need several tool calls, each checked before proceeding.
 
 Allow at most three total attempts per operation, including the first attempt.
+Each supplied BDD step, requested action, and assertion is a distinct operation;
+only retries of the same intent share its operation identity and budget.
 Retry only a retryable failure, using evidence to adjust the same operation
 within the original scope. Do not reset the budget by renaming or splitting
 an operation, switching tools, or restarting a workflow. Stop immediately on

@@ -40,41 +40,37 @@ Open VS Code Extensions (`Ctrl+Shift+X` / `Cmd+Shift+X`) → Search "BDD AI Tool
    
    Click **"Auto-Resolve"** if any issues are detected
 
-3. **Choose Platform & Click Setup**
-   
+3. **Configure the Canonical Runtime**
+
+   Create `bdd_ai_conf.json` in the project root before running setup. Use the
+   installed Runtime's documented schema:
+   - Windows: `PYWINAUTO_CONFIG.apps_config.edge` or `.chrome`, matching the
+     selected browser.
+   - Appium: `APPIUM_DRIVER_CONFIGS.mac` on macOS or `.android` on Windows.
+
+   Keep credentials as environment references. The Extension rejects a missing,
+   unreadable, or unselected profile instead of writing an unusable MCP entry.
+
+4. **Choose Platform & Click Setup**
+
    Select your target platform:
    - **Windows** - Browser automation
    - **Appium** - For macOS and mobile testing (iOS/Android)
-   
-   Click **"Setup"** button to configure the selected platform
 
-   > **macOS users**: Before using Appium, you need to manually start the Appium server first. Run the provided script:
-   > ```bash
-   > cd appium-mcp-server/docs
-   > ./start_appium_on_mac.sh
-   > ```
-   > For detailed setup instructions, see [macOS Appium Setup Guide](../appium-mcp-server/docs/macOS_Appium_Setup_Guide.md).
+   Click **"Setup"** to register the canonical installed Runtime through the
+   Extension's MCP provider. If `bdd_ai_conf.json` changes, run setup again.
 
-4. **Configure Automation Platform**
-   
-   Open `bdd_ai_conf.json` in the project root and update the configuration for your target platform, such as:
-   - Account credentials (e.g. BrowserStack `userName`, `accessKey`)
-   - App `bundleId` or `appPackage`/`appActivity`
-   - Device name, platform version, etc.
+   > **Local Appium users**: invoke the canonical `autogenesis` Skill. It loads
+   > the pinned supported official Appium workflow and guides the Coding Agent's
+   > terminal diagnosis before the canonical installed Appium MCP starts.
 
-5. **Open MCP Configuration File**
-   
-   Click **"Open"** button to view/edit the MCP configuration file
-   
-   The config file will be opened in the editor
+5. **Inspect the Registered Server**
 
-6. **Start MCP Server**
-   
-   In the opened configuration file, click the **"Start"** button (CodeLens action)
-   
-   This launches the MCP server
+   Run **MCP: List Servers** from the Command Palette. The Extension supplies the
+   canonical stdio definition directly; it does not create or modify
+   `.vscode/mcp.json`.
 
-7. **Verify Connection in GitHub Copilot**
+6. **Verify Connection in GitHub Copilot**
    
    - Open GitHub Copilot Chat
    - Check MCP connections panel
@@ -90,7 +86,7 @@ Now you're ready to use AI-powered test automation!
 3. Click **"Send to Copilot"** above the scenario
 4. AI generates automation code automatically
 
-> If `.github/skills/autogenesis-run/SKILL.md` exists in the workspace, the extension sends `/autogenesis-run <Scenario Name>` to Copilot instead of the default prompt.
+> If `.github/skills/autogenesis/SKILL.md` exists, the extension sends `/autogenesis <Scenario Name>` to Copilot instead of the fallback prompt.
 
 **Replaying** (Execute tests):
 1. Open a `.feature` file with recorded scenarios
@@ -128,7 +124,7 @@ Customize how AI generates code:
 - `${scenario_text}` - Full scenario content
 - `${feature_file_path}` - Path to feature file
 
-> **Note**: This prompt is used as fallback when the `autogenesis-run` skill is not present in the workspace.
+> **Note**: This prompt is used as fallback when the `autogenesis` Skill is not present in the workspace.
 
 ---
 

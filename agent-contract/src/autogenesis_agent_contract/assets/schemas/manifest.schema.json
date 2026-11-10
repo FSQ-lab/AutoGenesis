@@ -6,23 +6,35 @@
   "required": ["schema_version", "contract_version", "assets"],
   "properties": {
     "schema_version": {"const": 2},
-    "contract_version": {"const": "2.0.0"},
+    "contract_version": {"const": "2.1.0"},
     "assets": {
       "type": "object",
-      "minProperties": 10,
-      "maxProperties": 10,
+      "minProperties": 22,
+      "maxProperties": 22,
       "propertyNames": {
         "enum": [
           "core-policy.md",
           "workflows/execute_scenario.md",
           "workflows/generate_scenario_test.md",
           "workflows/execute_natural_language_task.md",
-          "skills/autogenesis-setup/SKILL.md",
-          "skills/autogenesis-run/SKILL.md",
+          "skills/autogenesis/SKILL.md",
+          "references/install.md",
+          "references/readiness-common.md",
+          "references/appium-environment.md",
+          "references/android-readiness.md",
+          "references/ios-simulator-readiness.md",
+          "references/ios-real-device-readiness.md",
+          "references/macos-readiness.md",
+          "references/windows-readiness.md",
+          "references/execution-common.md",
+          "references/android-execution.md",
+          "references/apple-execution.md",
+          "references/windows-execution.md",
           "schemas/manifest.schema.json",
           "schemas/identity.schema.json",
           "schemas/arguments.schema.json",
-          "schemas/secret-reference.schema.json"
+          "schemas/secret-reference.schema.json",
+          "appium-skills/manifest.json"
         ]
       },
       "additionalProperties": {"type": "string", "pattern": "^[0-9a-f]{64}$"}

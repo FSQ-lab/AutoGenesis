@@ -8,7 +8,7 @@ Do not begin implementation unless the issue is Ready: scope, non-goals, interfa
 
 ## Role separation
 
-The implementer must not approve or accept its own work. Independent reviewer and acceptor sessions are required. Security review is mandatory for secrets, configuration writes, process execution, downloads, filesystem scope, approval flows, and prompt-injection surfaces.
+The implementer must not approve its own behavior change. Use one independent reviewer for ordinary changes. Secrets, configuration writes, process execution, downloads, filesystem scope, approval flows, and prompt-injection surfaces require explicit security coverage, which a qualified independent reviewer may provide in the same review. A separate acceptor is required only when the issue or release gate calls for clean-environment black-box acceptance, installation/compatibility acceptance, or release acceptance.
 
 ## Scope discipline
 

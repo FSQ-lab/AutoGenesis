@@ -40,6 +40,7 @@ class LaunchHarness:
         self.probes = 0
         self.process_handle = FakeHandle()
         self.thread_handle = FakeHandle()
+        self.started = False
 
         harness = self
 
@@ -62,6 +63,8 @@ class LaunchHarness:
                 assert backend == "uia"
 
             def windows(self, **kwargs):
+                if not harness.started:
+                    return []
                 harness.probes += 1
                 return list(harness.windows())
 
@@ -93,6 +96,7 @@ class LaunchHarness:
         def create_process(*args):
             clock.now += self.process_start_seconds
             self.launched_at = clock.now
+            self.started = True
             return self.process_handle, self.thread_handle, 11, 1
 
         monkeypatch.setattr(app_session, "_monotonic", clock.monotonic)
@@ -106,7 +110,6 @@ class LaunchHarness:
         monkeypatch.setattr(app_session.psutil, "Process", FakeProcess)
         monkeypatch.setattr(app_session, "Desktop", FakeDesktop)
         monkeypatch.setattr(app_session, "Application", FakeApplication)
-        monkeypatch.setattr(manager, "kill_app_process_by_path", lambda: None)
 
 
 def window(clock, handle=101, visible_at=0.0, enabled_at=0.0):
@@ -190,7 +193,7 @@ async def test_launch_polls_visibility_and_enabled_state_within_one_budget(monke
     assert await launch(app) is True
     assert clock.now == 1
     assert clock.sleeps == [0.5, 0.5]
-    assert harness.probes == 3
+    assert harness.probes == 1
 
 
 @pytest.mark.anyio
@@ -250,6 +253,30 @@ async def test_process_start_consumes_the_same_launch_budget(monkeypatch):
     assert clock.now == 1
     assert harness.probes == 0
     assert clock.sleeps == []
+
+@pytest.mark.anyio
+async def test_expired_baseline_budget_does_not_start_process(monkeypatch):
+    from autogenesis_windows_mcp import app_session
+
+    clock = FakeClock()
+    app = manager(timeout=1)
+    LaunchHarness(monkeypatch, app, clock, lambda: [])
+
+    def slow_baseline():
+        clock.now = 1
+        return []
+
+    monkeypatch.setattr(app, "_all_windows", slow_baseline)
+    monkeypatch.setattr(
+        app_session.win32process,
+        "CreateProcess",
+        lambda *args: pytest.fail("Process started after the launch deadline."),
+    )
+
+    with pytest.raises(app_session._LaunchTimeout):
+        await launch(app)
+
+    assert clock.now == 1
 
 
 @pytest.mark.anyio

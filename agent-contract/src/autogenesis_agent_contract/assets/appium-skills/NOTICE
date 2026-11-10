@@ -1,0 +1,8 @@
+Appium Agent Skills
+Copyright OpenJS Foundation and other contributors, https://openjsf.org/
+Source: https://github.com/appium/skills
+Pinned commit: e907024c210fe024c956ed9c74146fc27b1dd013
+License: Apache License 2.0; see LICENSE in this directory.
+
+The upstream files under skills/, contexts/, and tools/ are redistributed without modification.
+AutoGenesis routing, integrity verification, installation, and readiness behavior are separate FSQ-lab work.
