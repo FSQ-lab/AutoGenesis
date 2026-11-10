@@ -58,11 +58,23 @@ jobs:
           --release-manifest registry-evidence/release-manifest.json
           --release-manifest-url https://github.com/FSQ-lab/AutoGenesis/releases/download/agent-contract-v2.1.0/release-manifest.json
           --dependency-lock release-dependencies.lock
+      - name: Record externally reviewed Skill asset bytes
+        run: >-
+          python tools/verify_registry_metadata.py
+          --release-manifest registry-evidence/release-manifest.json
+          --skill-asset-dir skill-release
+          --write-skill-review-manifest registry-evidence/skill-review-manifest.json
       - name: Upload immutable Skill release assets
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: release-autogenesis-skills-2.1.0
           path: skill-release
+          if-no-files-found: error
+      - name: Upload external Skill review manifest
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: release-autogenesis-skills-review-2.1.0
+          path: registry-evidence/skill-review-manifest.json
           if-no-files-found: error
       - name: Upload Agent Contract wheel
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
@@ -211,29 +223,287 @@ jobs:
       GH_TOKEN: ${{ github.token }}
       RELEASE_TAG: agent-contract-v2.1.0
     steps:
+      - name: Checkout verifier
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - name: Setup Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: '3.12'
       - name: Download verified Skill assets
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: release-autogenesis-skills-2.1.0
           path: skill-release
-      - name: Create or verify immutable Skill release
+      - name: Download external Skill review manifest
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: release-autogenesis-skills-review-2.1.0
+          path: review
+      - name: Download reviewed release manifest
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: pypi-release-manifest
+          path: review
+      - name: Require complete same-run reviewed Skill candidate
+        run: >-
+          python tools/verify_registry_metadata.py
+          --release-manifest review/release-manifest.json
+          --skill-asset-dir skill-release
+          --skill-review-manifest review/skill-review-manifest.json
+          --verify-skill-review-manifest
+      - name: Complete draft before immutable publication
         run: |
           set -euo pipefail
-          if gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            mkdir existing-release
-            gh release download "$RELEASE_TAG" --dir existing-release --repo "$GITHUB_REPOSITORY"
-            for asset in skill-release/*; do
-              cmp "$asset" "existing-release/$(basename "$asset")"
+          shopt -s nullglob dotglob
+          readonly MAX_RELEASE_ASSETS=16
+          readonly MAX_RELEASE_ASSET_BYTES=8388608
+          readonly MAX_RELEASE_TOTAL_BYTES=33554432
+          created_tag=false
+          draft_id=""
+          published=false
+          release_safe_for_tag_cleanup=true
+
+          resolve_tag_commit() {
+            local matches object_type object_sha depth tag_object
+            matches="$(
+              gh api "repos/${GITHUB_REPOSITORY}/git/matching-refs/tags/${RELEASE_TAG}" \
+                --jq "[.[] | select(.ref == \"refs/tags/${RELEASE_TAG}\")]"
+            )"
+            test "$(jq -er 'length | select(. <= 1)' <<< "$matches")" -le 1
+            if [[ "$(jq -r 'length' <<< "$matches")" == "0" ]]; then
+              return 1
+            fi
+            object_type="$(jq -er '.[0].object.type' <<< "$matches")"
+            object_sha="$(jq -er '.[0].object.sha | select(test("^[0-9a-f]{40}$"))' <<< "$matches")"
+            for depth in {1..5}; do
+              if [[ "$object_type" == "commit" ]]; then
+                printf '%s\n' "$object_sha"
+                return 0
+              fi
+              test "$object_type" = "tag"
+              tag_object="$(gh api "repos/${GITHUB_REPOSITORY}/git/tags/${object_sha}")"
+              object_type="$(jq -er '.object.type' <<< "$tag_object")"
+              object_sha="$(jq -er '.object.sha | select(test("^[0-9a-f]{40}$"))' <<< "$tag_object")"
             done
+            echo "Release tag annotation depth exceeds the safety bound." >&2
+            return 2
+          }
+
+          require_exact_tag() {
+            local resolved
+            resolved="$(resolve_tag_commit)"
+            if [[ "$resolved" != "$GITHUB_SHA" ]]; then
+              echo "Release tag does not resolve to the reviewed commit." >&2
+              return 1
+            fi
+          }
+
+          require_release_identity() {
+            local release_id="$1"
+            local expected_draft="$2"
+            local document
+            document="$(gh api "repos/${GITHUB_REPOSITORY}/releases/${release_id}")"
+            jq -e \
+              --argjson id "$release_id" \
+              --arg tag "$RELEASE_TAG" \
+              --arg target "$GITHUB_SHA" \
+              --argjson draft "$expected_draft" \
+              '.id == $id and .tag_name == $tag and .target_commitish == $target and .draft == $draft' \
+              <<< "$document" >/dev/null
+            printf '%s\n' "$document"
+          }
+
+          delete_exact_draft() {
+            local release_id="$1"
+            require_release_identity "$release_id" true >/dev/null
+            gh api --method DELETE "repos/${GITHUB_REPOSITORY}/releases/${release_id}"
+          }
+
+          delete_created_tag() {
+            local direct_type direct_sha matches
+            matches="$(
+              gh api "repos/${GITHUB_REPOSITORY}/git/matching-refs/tags/${RELEASE_TAG}" \
+                --jq "[.[] | select(.ref == \"refs/tags/${RELEASE_TAG}\")]"
+            )"
+            test "$(jq -er 'length | select(. == 1)' <<< "$matches")" = "1"
+            direct_type="$(jq -er '.[0].object.type' <<< "$matches")"
+            direct_sha="$(jq -er '.[0].object.sha' <<< "$matches")"
+            test "$direct_type" = "commit"
+            test "$direct_sha" = "$GITHUB_SHA"
+            gh api --method DELETE "repos/${GITHUB_REPOSITORY}/git/refs/tags/${RELEASE_TAG}"
+          }
+
+          recover_uncaptured_draft() {
+            local releases matches recovered_id
+            releases="$(gh api "repos/${GITHUB_REPOSITORY}/releases?per_page=100")" || return 1
+            matches="$(
+              jq --arg tag "$RELEASE_TAG" '[.[] | select(.tag_name == $tag)]' <<< "$releases"
+            )"
+            test "$(jq -er 'length | select(. <= 1)' <<< "$matches")" -le 1
+            if [[ "$(jq -r 'length' <<< "$matches")" == "0" ]]; then
+              return 0
+            fi
+            recovered_id="$(
+              jq -er \
+                --arg tag "$RELEASE_TAG" \
+                --arg target "$GITHUB_SHA" \
+                '.[0]
+                 | select(.draft == true and .tag_name == $tag and .target_commitish == $target)
+                 | .id
+                 | select(type == "number")' \
+                <<< "$matches"
+            )"
+            delete_exact_draft "$recovered_id"
+          }
+
+
+          cleanup_draft() {
+            if [[ "$published" == "true" ]]; then
+              return
+            fi
+            if [[ -z "$draft_id" && "$release_safe_for_tag_cleanup" == "false" ]]; then
+              if recover_uncaptured_draft; then
+                release_safe_for_tag_cleanup=true
+              fi
+            fi
+            if [[ -n "$draft_id" ]]; then
+              if delete_exact_draft "$draft_id"; then
+                release_safe_for_tag_cleanup=true
+              else
+                release_safe_for_tag_cleanup=false
+              fi
+            fi
+            if [[ "$created_tag" == "true" && "$release_safe_for_tag_cleanup" == "true" ]]; then
+              delete_created_tag || true
+            fi
+          }
+          trap cleanup_draft EXIT
+
+          verify_release_assets() {
+            local release_id="$1"
+            local expected_draft="$2"
+            local temporary release_json asset_id asset_name asset_size blocks
+            temporary="$(mktemp -d)"
+            release_json="$(require_release_identity "$release_id" "$expected_draft")"
+            jq -e \
+              --argjson max_count "$MAX_RELEASE_ASSETS" \
+              --argjson max_size "$MAX_RELEASE_ASSET_BYTES" \
+              --argjson max_total "$MAX_RELEASE_TOTAL_BYTES" \
+              '.assets as $assets
+               | ($assets | length) > 0
+               and ($assets | length) <= $max_count
+               and ([$assets[].name] | length == (unique | length))
+               and (all($assets[];
+                 (.id | type) == "number"
+                 and .id > 0
+                 and .id == (.id | floor)
+                 and (.name | type) == "string"
+                 and .state == "uploaded"
+                 and (.size | type) == "number"
+                 and .size == (.size | floor)
+                 and .size > 0
+                 and .size <= $max_size))
+               and ([$assets[].size] | add) <= $max_total' \
+              <<< "$release_json" >/dev/null
+            jq -S '[.assets[] | {filename: .name, size}] | sort_by(.filename)' \
+              <<< "$release_json" > "$temporary/release-assets.json"
+            jq -S '[.assets[] | {filename, size}] | sort_by(.filename)' \
+              review/skill-review-manifest.json > "$temporary/reviewed-assets.json"
+            cmp "$temporary/reviewed-assets.json" "$temporary/release-assets.json"
+            mkdir "$temporary/downloaded"
+            while IFS=$'\t' read -r asset_id asset_name asset_size; do
+              [[ "$asset_id" =~ ^[0-9]+$ ]]
+              [[ "$asset_size" =~ ^[0-9]+$ ]]
+              blocks="$(( (asset_size + 1023) / 1024 + 1 ))"
+              (
+                ulimit -f "$blocks"
+                gh api \
+                  -H 'Accept: application/octet-stream' \
+                  "repos/${GITHUB_REPOSITORY}/releases/assets/${asset_id}" \
+                  > "$temporary/downloaded/${asset_name}"
+              )
+              test "$(stat -c '%s' "$temporary/downloaded/${asset_name}")" = "$asset_size"
+              cmp "skill-release/${asset_name}" "$temporary/downloaded/${asset_name}"
+            done < <(jq -r '.assets[] | [.id, .name, .size] | @tsv' <<< "$release_json")
+            rm -rf "$temporary"
+          }
+
+          if resolved_tag="$(resolve_tag_commit)"; then
+            if [[ "$resolved_tag" != "$GITHUB_SHA" ]]; then
+              echo "Pre-existing release tag resolves to another commit." >&2
+              exit 1
+            fi
           else
-            gh release create "$RELEASE_TAG" skill-release/* \
-              --repo "$GITHUB_REPOSITORY" \
-              --target "$GITHUB_SHA" \
-              --title "AutoGenesis Agent Contract 2.1.0" \
-              --notes "Canonical AutoGenesis Agent Skills and verified Agent Install Prompt."
+            status="$?"
+            test "$status" = "1"
+            gh api --method POST "repos/${GITHUB_REPOSITORY}/git/refs" \
+              -f ref="refs/tags/${RELEASE_TAG}" \
+              -f sha="$GITHUB_SHA" >/dev/null
+            created_tag=true
+            require_exact_tag
           fi
-          immutable="$(gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${RELEASE_TAG}" --jq '.immutable')"
-          test "$immutable" = "true"
+
+          if gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" \
+            --json databaseId,isDraft,isImmutable,tagName,targetCommitish > existing-release.json 2>/dev/null; then
+            existing_id="$(jq -er '.databaseId | select(type == "number")' existing-release.json)"
+            existing_draft="$(jq -er 'if .isDraft == true then "true" elif .isDraft == false then "false" else error("invalid draft state") end' existing-release.json)"
+            test "$(jq -er '.tagName' existing-release.json)" = "$RELEASE_TAG"
+            test "$(jq -er '.targetCommitish' existing-release.json)" = "$GITHUB_SHA"
+            if [[ "$existing_draft" == "false" ]]; then
+              published=true
+              immutable="$(jq -er 'if .isImmutable == true then "true" elif .isImmutable == false then "false" else error("invalid immutable state") end' existing-release.json)"
+              if [[ "$immutable" != "true" ]]; then
+                echo "The public release identity is burned by a mutable release; refusing reuse." >&2
+                exit 1
+              fi
+              require_exact_tag
+              verify_release_assets "$existing_id" false
+              trap - EXIT
+              exit 0
+            fi
+            delete_exact_draft "$existing_id"
+          fi
+
+          release_safe_for_tag_cleanup=false
+          gh release create "$RELEASE_TAG" --draft \
+            --repo "$GITHUB_REPOSITORY" \
+            --target "$GITHUB_SHA" \
+            --title "AutoGenesis 1.1.1 Skills Preview" \
+            --notes "AutoGenesis 1.1.1 Skills Preview: canonical Agent Skills and verified Agent Install Prompt. Technical package identities remain Contract 2.1.0, Appium/Windows 0.5.0, and CLI 0.2.0."
+          draft_id="$(
+            gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" \
+              --json databaseId,isDraft,tagName,targetCommitish \
+              --jq "select(.isDraft == true and .tagName == \"${RELEASE_TAG}\" and .targetCommitish == \"${GITHUB_SHA}\") | .databaseId"
+          )"
+          [[ "$draft_id" =~ ^[0-9]+$ ]]
+          require_release_identity "$draft_id" true >/dev/null
+          gh release upload "$RELEASE_TAG" skill-release/* --repo "$GITHUB_REPOSITORY"
+          verify_release_assets "$draft_id" true
+          require_release_identity "$draft_id" true >/dev/null
+          require_exact_tag
+
+          published_json="$(
+            gh api --method PATCH "repos/${GITHUB_REPOSITORY}/releases/${draft_id}" \
+              -F draft=false
+          )"
+          published=true
+          jq -e \
+            --argjson id "$draft_id" \
+            --arg tag "$RELEASE_TAG" \
+            --arg target "$GITHUB_SHA" \
+            '.id == $id and .tag_name == $tag and .target_commitish == $target and .draft == false' \
+            <<< "$published_json" >/dev/null
+          require_exact_tag
+          published_immutable="$(
+            require_release_identity "$draft_id" false \
+              | jq -er 'if .immutable == true then "true" elif .immutable == false then "false" else error("invalid immutable state") end'
+          )"
+          if [[ "$published_immutable" != "true" ]]; then
+            echo "Published Skill release is mutable; its tag and evidence are preserved and identity reuse is blocked." >&2
+            exit 1
+          fi
+          verify_release_assets "$draft_id" false
+          trap - EXIT
 
   publish-registry:
     name: Publish Appium and Windows Registry records
@@ -249,29 +519,89 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - name: Setup Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: '3.12'
+      - name: Download reviewed release manifest
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: pypi-release-manifest
+          path: release
+      - name: Require absent or exact Registry versions
+        id: registry-preflight
+        run: |
+          set -euo pipefail
+          python tools/verify_registry_metadata.py \
+            --release-manifest release/release-manifest.json \
+            --preflight-registry-release \
+            --registry-plan registry-plan.json
+          appium="$(jq -er '.appium | select(. == "absent" or . == "exact")' registry-plan.json)"
+          windows="$(jq -er '.windows | select(. == "absent" or . == "exact")' registry-plan.json)"
+          printf 'appium=%s\nwindows=%s\n' "$appium" "$windows" >> "$GITHUB_OUTPUT"
       - name: Install cosign
+        if: steps.registry-preflight.outputs.appium == 'absent' || steps.registry-preflight.outputs.windows == 'absent'
         uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
       - name: Download and verify mcp-publisher
+        if: steps.registry-preflight.outputs.appium == 'absent' || steps.registry-preflight.outputs.windows == 'absent'
         run: |
           set -euo pipefail
           os="$(uname -s | tr '[:upper:]' '[:lower:]')"
           arch="$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/')"
+          readonly MAX_PUBLISHER_ARCHIVE_BYTES=33554432
+          readonly MAX_SIGSTORE_BUNDLE_BYTES=4194304
+          readonly MAX_PUBLISHER_BINARY_BYTES=134217728
           archive="mcp-publisher_${os}_${arch}.tar.gz"
+          bundle="${archive}.sigstore.json"
           base_url="https://github.com/modelcontextprotocol/registry/releases/download/${MCP_PUBLISHER_VERSION}"
-          curl --fail --location --silent --show-error --output "$archive" "$base_url/$archive"
-          curl --fail --location --silent --show-error --output "$archive.sigstore.json" "$base_url/$archive.sigstore.json"
+          curl --fail --location --silent --show-error --connect-timeout 15 --max-time 120 \
+            --max-filesize "$MAX_PUBLISHER_ARCHIVE_BYTES" \
+            --output "$archive" "$base_url/$archive"
+          test "$(stat -c '%s' "$archive")" -le "$MAX_PUBLISHER_ARCHIVE_BYTES"
+          curl --fail --location --silent --show-error --connect-timeout 15 --max-time 120 \
+            --max-filesize "$MAX_SIGSTORE_BUNDLE_BYTES" \
+            --output "$bundle" "$base_url/$bundle"
+          test "$(stat -c '%s' "$bundle")" -le "$MAX_SIGSTORE_BUNDLE_BYTES"
           cosign verify-blob \
-            --bundle "$archive.sigstore.json" \
+            --bundle "$bundle" \
             --certificate-identity "https://github.com/modelcontextprotocol/registry/.github/workflows/release.yml@refs/tags/${MCP_PUBLISHER_VERSION}" \
             --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \
             "$archive"
-          tar xzf "$archive" mcp-publisher
-          rm -f "$archive" "$archive.sigstore.json"
+          (
+            ulimit -f "$(( (MAX_PUBLISHER_BINARY_BYTES + 1023) / 1024 + 1 ))"
+            tar xzf "$archive" mcp-publisher
+          )
+          test "$(stat -c '%s' mcp-publisher)" -le "$MAX_PUBLISHER_BINARY_BYTES"
+          rm -f "$archive" "$bundle"
       - name: Authenticate organization namespace
+        if: steps.registry-preflight.outputs.appium == 'absent' || steps.registry-preflight.outputs.windows == 'absent'
         run: ./mcp-publisher login github-oidc
-      - name: Publish Appium Registry record
+      - name: Publish absent Appium Registry record
+        if: steps.registry-preflight.outputs.appium == 'absent'
         working-directory: appium-mcp-server
         run: ../mcp-publisher publish
-      - name: Publish Windows Registry record
+      - name: Verify exact Appium Registry record
+        run: >-
+          python tools/verify_registry_metadata.py
+          --release-manifest release/release-manifest.json
+          --verify-registry-record appium
+          --registry-attempts 8
+          --registry-delay-seconds 5
+      - name: Publish absent Windows Registry record
+        if: steps.registry-preflight.outputs.windows == 'absent'
         working-directory: pywinauto-mcp-server
         run: ../mcp-publisher publish
+      - name: Verify exact Windows Registry record
+        run: >-
+          python tools/verify_registry_metadata.py
+          --release-manifest release/release-manifest.json
+          --verify-registry-record windows
+          --registry-attempts 8
+          --registry-delay-seconds 5
+      - name: Prove both exact active latest Registry records
+        run: >-
+          python tools/verify_registry_metadata.py
+          --release-manifest release/release-manifest.json
+          --verify-registry-release
+          --registry-attempts 8
+          --registry-delay-seconds 5
