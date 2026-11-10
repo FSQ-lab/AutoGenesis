@@ -23,8 +23,8 @@ def cases(repo_root):
 def skill_cases(repo_root):
     data = json.loads((repo_root / "agent-contract/evals/skill_cases.json").read_bytes())
     assert data["schema_version"] == 1 and data["canaries_are_synthetic"] is True
-    assert len(data["cases"]) == 15
-    assert len({case["id"] for case in data["cases"]}) == 15
+    assert len(data["cases"]) == 26
+    assert len({case["id"] for case in data["cases"]}) == 26
     return data["cases"]
 
 
@@ -65,6 +65,17 @@ def test_skill_eval_covers_clean_room_behavior_contract(skill_cases):
         "windows-ambiguous-binding-fails-closed",
         "unknown-result-reconciles-before-retry",
         "control-first-visual-fallback",
+        "diagnosis-does-not-authorize-mcp-repair",
+        "reload-required-not-machine-ready",
+        "shell-runtime-is-not-agent-connection-proof",
+        "unchanged-install-does-not-loop",
+        "minimum-repair-one-approval",
+        "one-native-user-action-then-resume",
+        "explicit-project-scope-install",
+        "shadow-legacy-skill-conflict-fails-closed",
+        "unchanged-approval-survives-official-handoff",
+        "android-emulator-target-applicability",
+        "explicit-notepad-resumes-after-readiness",
     }
 
 

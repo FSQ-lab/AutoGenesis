@@ -58,6 +58,34 @@ def test_single_skill_exposes_three_layer_routing_and_runtime_seams(repo_root):
     assert "recording/generation request" in policy and "generate_scenario_test" in policy
 
 
+def test_guided_install_and_readiness_references_are_operational(repo_root):
+    policy = (repo_root / f".github/skills/{NAME}/SKILL.md").read_text(encoding="utf-8")
+    references = repo_root / "agent-contract/src/autogenesis_agent_contract/assets/references"
+    install = (references / "install.md").read_text(encoding="utf-8")
+    readiness = (references / "readiness-common.md").read_text(encoding="utf-8")
+    appium = (references / "appium-environment.md").read_text(encoding="utf-8")
+    android = (references / "android-readiness.md").read_text(encoding="utf-8")
+
+    assert "install, activation, repair, or diagnosis" in policy
+    assert "actual MCP initialize" not in policy  # detailed proof belongs to the reference
+    assert all(value in install for value in (
+        "`install`", "`activate`", "`repair`", "`diagnose`",
+        "autogenesis install --scope <user|project>",
+        "MCP initialize", "prompts/tools/resources",
+        "configured/reload-required",
+    ))
+    assert all(value in readiness for value in (
+        '"requestScope"', '"layers"', '"environment"', '"changes"',
+        '"approval"', '"runtimeEvidence"', '"ownership"',
+        '"requiredAction"', '"resumeContext"',
+    ))
+    assert "configured, detected, selected, and rejected" in appium
+    assert "process.execPath" in appium and "one temporary task environment" in appium
+    assert "Android Studio JBR" in android
+    assert "incomplete configured root must not hide a complete conventional root" in android
+    assert "physical route does not require emulator package" in android
+
+
 def test_skill_release_assets_match_contract_and_bootstrap_prompt(tmp_path, repo_root):
     output = tmp_path / "release"
     base = "https://example.invalid/releases/agent-contract-v2.1.0"
