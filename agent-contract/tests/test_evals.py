@@ -51,6 +51,11 @@ def test_skill_eval_covers_clean_room_behavior_contract(skill_cases):
     ids = {case["id"] for case in skill_cases}
     assert ids == {
         "install-only-routing",
+        "install-prompt-checksums-do-not-replace-external-anchor",
+        "install-prompt-disposable-environment-approval",
+        "install-prompt-existing-environment-path-rejected",
+        "install-prompt-failure-cleanup-is-owned-and-scoped",
+        "install-prompt-source-credential-canaries-never-read",
         "android-physical-target-applicability",
         "compatible-newer-node-reuse",
         "complete-sdk-beats-incomplete-config",

@@ -334,7 +334,9 @@ def test_candidate_channel_binds_exact_first_party_wheels_and_skill(tmp_path, re
     candidate_checksums = _checksums(output)
     assert set(candidate_checksums) == {path.name for path in output.iterdir()} - {"SHA256SUMS"}
     assert "candidate-install-prompt.txt" in candidate_checksums
-    assert hashlib.sha256((prompt + "mutated").encode()).hexdigest() != candidate_checksums["candidate-install-prompt.txt"]
+    (output / "candidate-install-prompt.txt").write_text(prompt + "mutated", encoding="utf-8")
+    with pytest.raises(AssertionError):
+        _checksums(output)
 
 def test_candidate_channel_rejects_incomplete_wheel_set(tmp_path, repo_root):
     wheel_dir = tmp_path / "wheels"
