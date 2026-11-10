@@ -51,12 +51,11 @@ same Skill and MCP packages.
   execute the Scenario and return a read-only generated-code preview.
 
 > [!IMPORTANT]
-> The release-gated AutoGenesis 1.1.1 Skills Preview cannot commit generated
-> files: after #72 is integrated, live Runtime schemas omit generated-code
-> confirmation and write operations, and recording stops after the preview.
-> Until that integration is present in the exact artifact under review, do not
-> claim or exercise this safe Preview boundary. A preview is never a committed
-> or replayable test.
+> AutoGenesis 1.1.1 Skills Preview cannot commit generated files. The integrated
+> Agent Contract generation workflow stops after the read-only preview, and both
+> live stdio Runtimes expose `before_gen_code` and `preview_code_changes` without
+> a confirmation or generated-file write operation. A preview is never a
+> committed or replayable test.
 
 ```gherkin
 Feature: Calculator
@@ -246,8 +245,8 @@ environment and the explicitly installed Skill bytes as rollback. Neither route
 may show, read, echo, or record a credential-bearing package-index URL; evidence
 is limited to the sanitized registry host and configuration source, with no
 userinfo, token, credential, or query string. Remove the not-public warning only
-after clean final-artifact acceptance confirms the published bytes, #72 safe
-Preview boundary, and advertised support tiers.
+after clean final-artifact acceptance confirms the published bytes, integrated
+safe Preview boundary, and advertised support tiers.
 
 ## Technical references
 
