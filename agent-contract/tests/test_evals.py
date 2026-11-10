@@ -23,8 +23,8 @@ def cases(repo_root):
 def skill_cases(repo_root):
     data = json.loads((repo_root / "agent-contract/evals/skill_cases.json").read_bytes())
     assert data["schema_version"] == 1 and data["canaries_are_synthetic"] is True
-    assert len(data["cases"]) == 26
-    assert len({case["id"] for case in data["cases"]}) == 26
+    assert len(data["cases"]) == 31
+    assert len({case["id"] for case in data["cases"]}) == 31
     return data["cases"]
 
 

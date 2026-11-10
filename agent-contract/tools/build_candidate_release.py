@@ -296,7 +296,7 @@ def main() -> None:
             "Using the disposable environment's absolute Python, install the complete offline-install lock "
             "from that staging directory in one transaction with strict hashes, dependency resolution disabled, "
             "and every locked package force-reinstalled. Never accept an installed distribution as satisfying "
-            "the lock or resolve or replace a first-party Candidate package from an index. Then run "
+            "the lock. Never resolve or replace a first-party Candidate package from an index. Then run "
             "`<absolute-disposable-environment-entrypoint>/autogenesis install --scope <user-or-project> "
             "--project-root <absolute-business-project>` as the sole owner of the Skill write; it must reject "
             "every other canonical or legacy discovery copy."
