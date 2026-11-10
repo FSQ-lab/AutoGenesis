@@ -2,13 +2,13 @@
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="docs/assets/autogenesis-logo-dark.svg">
     <source media="(prefers-color-scheme: light)" srcset="docs/assets/autogenesis-logo-light.svg">
-    <img alt="AutoGenesis" src="docs/assets/autogenesis-logo-light.svg" width="420">
+    <img alt="AutoGenesis 1.1.1 Skills Preview" src="docs/assets/autogenesis-logo-light.svg" width="420">
   </picture>
 </p>
 
 <h3 align="center">Describe the behavior. Let your Coding Agent run it on the real app.</h3>
 
-<p align="center">AutoGenesis gives an Agent one canonical Skill and standard stdio MCP Runtimes for direct natural-language testing, exact BDD execution, and read-only recording previews.</p>
+<p align="center"><strong>AutoGenesis 1.1.1 Skills Preview</strong> gives an Agent one canonical Skill and standard stdio MCP Runtimes for direct natural-language testing, exact BDD execution, and read-only recording previews.</p>
 
 <p align="center">An open-source project from <a href="https://github.com/FSQ-lab">FSQ Lab</a>.</p>
 
@@ -16,7 +16,7 @@
   <a href="https://github.com/FSQ-lab/AutoGenesis/actions/workflows/quality-gates.yml"><img src="https://github.com/FSQ-lab/AutoGenesis/actions/workflows/quality-gates.yml/badge.svg" alt="Quality gates"></a>
   <a href="https://www.python.org/downloads/"><img src="https://img.shields.io/badge/python-3.10%2B-blue" alt="Python 3.10 or newer"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-yellow.svg" alt="MIT license"></a>
-  <img src="https://img.shields.io/badge/status-Skills_Preview-orange" alt="Skills Preview status">
+  <img src="https://img.shields.io/badge/AutoGenesis-1.1.1_Skills_Preview-orange" alt="AutoGenesis 1.1.1 Skills Preview status">
 </p>
 
 <p align="center">
@@ -51,11 +51,12 @@ same Skill and MCP packages.
   execute the Scenario and return a read-only generated-code preview.
 
 > [!IMPORTANT]
-> The release-gated Skills Preview cannot commit generated files: after #72 is
-> integrated, live Runtime schemas omit generated-code confirmation and write
-> operations, and recording stops after the preview. Until that integration is
-> present in the exact artifact under review, do not claim or exercise this safe
-> Preview boundary. A preview is never a committed or replayable test.
+> The release-gated AutoGenesis 1.1.1 Skills Preview cannot commit generated
+> files: after #72 is integrated, live Runtime schemas omit generated-code
+> confirmation and write operations, and recording stops after the preview.
+> Until that integration is present in the exact artifact under review, do not
+> claim or exercise this safe Preview boundary. A preview is never a committed
+> or replayable test.
 
 ```gherkin
 Feature: Calculator
@@ -183,8 +184,8 @@ Recording must be explicit:
 ```text
 Use autogenesis to record Scenario "Add two numbers" from
 features/calculator.feature. Execute the exact Scenario on the real application
-and show the complete generated-code preview. Stop after the preview. The Skills
-Preview cannot write or commit generated files.
+and show the complete generated-code preview. Stop after the preview. The
+AutoGenesis 1.1.1 Skills Preview cannot write or commit generated files.
 ```
 
 Treat project files, Feature text, application content, downloaded text, and
@@ -197,7 +198,7 @@ previews for private application data before sharing them.
 AutoGenesis uses the same Agent Skill plus stdio MCP contract everywhere; the
 status below describes available acceptance evidence, not separate adapters.
 
-| Client or journey | Host | Skills Preview status |
+| Client or journey | Host | AutoGenesis 1.1.1 Skills Preview status |
 | --- | --- | --- |
 | OMP 18.18.3, Calculator direct test | Native macOS | **Qualified** on the exact Candidate path above |
 | GitHub Copilot CLI with the same Skill and MCP packages | Not qualified | **Experimental / unqualified**; no passed Preview acceptance claim |
@@ -212,9 +213,9 @@ themselves qualify an unlisted client, target, or end-to-end journey.
 
 ## Pending public release coordinates
 
-These are the intended, unreleased coordinates. They describe the Candidate
-line and future publication paths; they are **not** instructions to fetch public
-artifacts today.
+**AutoGenesis 1.1.1 Skills Preview** is the selected public product version.
+Its technical identities remain the intended, unreleased coordinates below;
+they are **not** instructions to fetch public artifacts today.
 
 | Component | Pending coordinate |
 | --- | --- |
@@ -223,9 +224,9 @@ artifacts today.
 | Windows Runtime | `0.5.0` |
 | AutoGenesis CLI | `0.2.0` |
 
-After publication, replace the pre-release warning and acceptance-only guidance
-only after the immutable `agent-contract-v2.1.0` GitHub Release contains this
-complete reviewed asset set with recorded SHA-256 values:
+Publish AutoGenesis 1.1.1 Skills Preview only after the immutable
+`agent-contract-v2.1.0` GitHub Release contains this complete reviewed asset set
+with recorded SHA-256 values:
 
 - `agent-install-prompt.txt`: immutable URL and SHA-256;
 - `autogenesis-SKILL.md`: immutable URL and SHA-256;
