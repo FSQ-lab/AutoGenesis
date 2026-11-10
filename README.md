@@ -22,7 +22,7 @@
 <p align="center">
   <a href="#what-autogenesis-does">What it does</a> ·
   <a href="#get-started">Get started</a> ·
-  <a href="#qualified-first-journey">First journey</a> ·
+  <a href="#qualified-evidence-baseline">Evidence baseline</a> ·
   <a href="#support-status">Support</a> ·
   <a href="CONTRIBUTING.md">Contribute</a>
 </p>
@@ -106,8 +106,10 @@ or evidence that every Skills Preview journey is qualified.
 
 ### Before publication: maintainers and independent acceptors only
 
-The commit-bound Candidate channel is not a public onboarding path. A maintainer
-or assigned independent acceptor may use it solely for release acceptance:
+The commit-bound Candidate channel is not a public onboarding path. The current
+release Candidate is **pending clean final-artifact acceptance** and must not be
+called qualified. A maintainer or assigned independent acceptor may use the
+channel solely for release acceptance after all dependencies below are met:
 
 1. Select the successful **Quality Gates / Build exact Candidate channel** job
    for the exact trusted head commit under review. Obtain the artifact through
@@ -118,18 +120,25 @@ or assigned independent acceptor may use it solely for release acceptance:
    downloaded archive bytes against that trusted exact-head CI artifact digest.
    A filename, commit embedded inside the archive, or checksum supplied only by
    the archive cannot authenticate the archive itself.
-3. Extract into a new private directory, then validate the complete internal
-   `SHA256SUMS` set before interpreting `candidate-install-prompt.txt` or any
-   manifest/lock. Stop on any missing, extra, or mismatched asset.
-4. Perform Agent-first and CLI-first acceptance only in a dedicated disposable
+3. **Dependency: [prompt-hardening issue #74](https://github.com/FSQ-lab/AutoGenesis/issues/74).**
+   The current Candidate does not yet prove complete checksum closure between
+   its archive, generated prompt, and internal assets. After #74 merges, merge
+   the updated `main` into this branch and obtain independent re-review before
+   continuing Candidate acceptance. Do not paper over the builder mismatch in
+   onboarding text.
+4. For the post-#74 Candidate, extract into a new private directory and validate
+   the complete internal `SHA256SUMS` set before interpreting
+   `candidate-install-prompt.txt`, any manifest, or any lock. Stop on any
+   missing, extra, or mismatched asset.
+5. Perform Agent-first and CLI-first acceptance only in a dedicated disposable
    Python virtual environment and disposable business project. Delete both to
    roll back; never force-reinstall into an arbitrary active Python environment.
-5. If a third-party registry is required, let the package manager use its
+6. If a third-party registry is required, let the package manager use its
    existing trusted configuration opaquely. Do not read, print, copy, or expose
    credential values or a credential-bearing URL. Evidence may name only the
    sanitized registry host and configuration source; omit userinfo, tokens,
    credentials, and URL query strings.
-6. Require one canonical `autogenesis` Skill, the applicable stdio Runtime,
+7. Require one canonical `autogenesis` Skill, the applicable stdio Runtime,
    matching Agent Contract identity, and the business outcome. A package
    version, destination file, or standalone MCP probe alone is not acceptance.
 
@@ -142,11 +151,12 @@ Skill scope, and document rollback as deleting that environment plus the
 explicitly installed Skill bytes. Exact public commands must not be added until
 the immutable URLs and digests exist.
 
-## Qualified first journey
+## Qualified evidence baseline
 
-This is the single qualified Calculator journey for **OMP 18.18.3 on native
-macOS**. Start from the business project after completing Agent-first
-installation, then ask OMP:
+The accepted **OMP 18.18.3 on native macOS** Calculator evidence at commit
+`e187985` used the direct request below. It is the product's qualified path and
+evidence baseline, not acceptance of the current release Candidate. Issue #70
+still requires the same journey to pass from the clean final artifacts.
 
 ```text
 Use autogenesis to prepare Calculator on this native macOS host, calculate
@@ -156,9 +166,11 @@ only the smallest necessary changes after showing any protected effect set, and
 report the selected environment, actions, assertion, and cleanup.
 ```
 
-A successful journey includes the live `autogenesis` Skill, the Appium stdio MCP
+The baseline included the live `autogenesis` Skill, the Appium stdio MCP
 Runtime, matching Agent Contract identity, a real Calculator session, and an
-observed result of 5. Installation output alone is not acceptance.
+observed result of 5. The current release Candidate remains unqualified until
+clean final-artifact acceptance reproduces that outcome; installation output
+alone is never acceptance.
 
 ### Execute exact BDD instead
 
@@ -199,7 +211,7 @@ status below describes available acceptance evidence, not separate adapters.
 
 | Client or journey | Host | AutoGenesis 1.1.1 Skills Preview status |
 | --- | --- | --- |
-| OMP 18.18.3, Calculator direct test | Native macOS | **Qualified** on the exact Candidate path above |
+| OMP 18.18.3, Calculator direct test | Native macOS | **Qualified path/evidence baseline at `e187985`**; current release Candidate pending clean final-artifact acceptance |
 | GitHub Copilot CLI with the same Skill and MCP packages | Not qualified | **Experimental / unqualified**; no passed Preview acceptance claim |
 | OpenAI Codex with the same Skill and MCP packages | Not qualified | **Experimental / unqualified**; no passed Preview acceptance claim |
 | Stock Pi | Any | **Unsupported**; stock Pi has no MCP support |
@@ -236,7 +248,8 @@ with recorded SHA-256 values:
   `autogenesis-windows-mcp==0.5.0`, and `autogenesis-cli==0.2.0`;
 - `autogenesis-release.lock`: immutable URL and SHA-256; and
 - `SHA256SUMS`: immutable URL and SHA-256, with entries matching the exact
-  Skill, Release manifest, and Release lock bytes.
+  Skill, Release manifest, Release lock, generated prompt, and every published
+  asset after #74 supplies complete checksum closure.
 
 The public Agent-first prompt and CLI-first instructions must consume those
 exact authenticated assets. CLI-first must create a dedicated disposable
@@ -245,14 +258,14 @@ environment and the explicitly installed Skill bytes as rollback. Neither route
 may show, read, echo, or record a credential-bearing package-index URL; evidence
 is limited to the sanitized registry host and configuration source, with no
 userinfo, token, credential, or query string. Remove the not-public warning only
-after clean final-artifact acceptance confirms the published bytes, integrated
+after #74 merges, updated `main` is merged here and independently re-reviewed,
+and clean final-artifact acceptance confirms the published bytes, integrated
 safe Preview boundary, and advertised support tiers.
 
 ## Technical references
 
 These are Runtime and contributor references, not competing onboarding paths:
 
-- [AutoGenesis CLI](autogenesis-cli/README.md)
 - [macOS Runtime](MAC-README.md)
 - [iOS and Android Runtime](MOBILE-README.md)
 - [Windows Runtime](pywinauto-mcp-server/WINDOWS-README.md)
