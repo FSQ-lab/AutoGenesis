@@ -108,8 +108,9 @@ or narration alone is insufficient.
 After Live Ready, load `execution-common` and the applicable execution reference.
 Direct requests use `execute_natural_language_task`. Exact BDD execution sends
 the unchanged Background then Scenario to `execute_scenario`. Only an explicit
-recording/generation request uses `generate_scenario_test`; writes retain the
-existing preview and Runtime approval enforcement.
+recording/generation request uses `generate_scenario_test`; stop after its
+read-only preview and report that generated-file writes are unavailable. Never
+copy, save, shell-write, or otherwise persist the proposed bytes another way.
 
 Prefer semantic controls and bounded state evidence; use visual evidence only
 when required. Reconcile state before retry and never replay an irreversible

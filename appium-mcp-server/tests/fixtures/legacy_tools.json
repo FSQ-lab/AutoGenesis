@@ -30,8 +30,7 @@
   ],
   "gen_code_tool": [
     "async def before_gen_code(feature_file: str='', step_file: str='') -> str:\n    \"\"\"\n        Clear cache and initialize code generation session before executing test case steps.\n        \n        This function should only be called before the first step of a test case execution.\n        It clears any existing code generation cache and sets up a new generation session\n        with a unique ID.\n        \n        Args:\n            feature_file (str, optional): Full absolute path to the .feature file containing BDD scenarios.\n                If not specified, do not provide a random value.\n            step_file (str, optional): Full absolute path to the Python step definition file (.py).\n                If not specified, do not provide a random value.\n                \n        Returns:\n            str: JSON response containing:\n                - status: \"success\" or \"error\"\n                - data: Dictionary with gen_code_id, steps_dir, and step_file_target\n                - error: Error message if operation failed\n         \n        \"\"\"\n    pass",
-    "async def preview_code_changes() -> str:\n    \"\"\"Preview generated test code changes and confirm before applying\"\"\"\n    pass",
-    "async def confirm_code_changes() -> str:\n    \"\"\"Confirm the previewed code changes\"\"\"\n    pass"
+    "async def preview_code_changes() -> str:\n    \"\"\"Return a read-only preview of generated test code changes\"\"\"\n    pass"
   ],
   "ios_driver_tool": [
     "async def dismiss_alert(caller: str, step: str='', scenario: str='', step_raw: str='') -> str:\n    \"\"\"Dismiss alert in app\n        \n        Args:\n            step: step name\n            step_raw: raw original step text\n            scenario: scenario name\n        \"\"\"\n    pass",

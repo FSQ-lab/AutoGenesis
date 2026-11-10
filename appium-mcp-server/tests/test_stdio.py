@@ -295,7 +295,7 @@ def record_evidence(platform, result):
         temporary.replace(root / (platform + ".json"))
 
 
-@pytest.mark.parametrize("platform,count", [("ios", 31), ("android", 30), ("mac", 35)])
+@pytest.mark.parametrize("platform,count", [("ios", 30), ("android", 29), ("mac", 34)])
 def test_stdio_initialize_tools_prompts_identity_config_and_eof(platform, count, tmp_path):
     # Deliberately unreachable: any eager session creation breaks acceptance.
     profile = {
@@ -315,7 +315,8 @@ def test_stdio_initialize_tools_prompts_identity_config_and_eof(platform, count,
         assert initialize["instructions"] == load_contract().instructions
         tools = client.request("tools/list")["result"]["tools"]
         assert len(tools) == count
-        assert {"app_launch", "session_close", "before_gen_code", "preview_code_changes", "confirm_code_changes", "get_current_config"} <= {tool["name"] for tool in tools}
+        assert {"app_launch", "session_close", "before_gen_code", "preview_code_changes", "get_current_config"} <= {tool["name"] for tool in tools}
+        assert "confirm_code_changes" not in {tool["name"] for tool in tools}
         prompts = client.request("prompts/list")["result"]["prompts"]
         assert {prompt["name"] for prompt in prompts} == {
             "execute_scenario", "generate_scenario_test", "execute_natural_language_task",

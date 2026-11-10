@@ -13,7 +13,7 @@ from autogenesis_agent_contract import ContractError, RuntimeContractRequirement
 from autogenesis_appium_mcp import server
 
 VERSION = "2.1.0"
-DIGEST = "3768d673273fc82609a94a218a355622233e10892a9f2392688711aa4572d32c"
+DIGEST = "5ebe963023c53ab7922ee36fee7f9bd44e926d2721939bebd918bef4a54615a9"
 PROMPTS = {"execute_scenario", "generate_scenario_test", "execute_natural_language_task"}
 URI = "autogenesis://agent-contract/identity"
 

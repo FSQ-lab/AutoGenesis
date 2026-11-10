@@ -60,19 +60,20 @@ Keep raw transcripts as separate review evidence containing synthetic data only.
 | `step_completed` | `text`: exact supplied BDD keyword and step text, backed by verified tool results |
 | `runtime_signal` | `reason`: runtime stimulus; omit raw secret-bearing diagnostics |
 | `preview` | `preview_id`: new ID whenever exact diff/paths change |
-| `approval_request` | `preview_id`, `exact_changes: true` only if exact scoped changes were shown and explicit approval requested |
-| `approval` | `preview_id`, `actor` (`user` for an actual user response), `approved` boolean |
-| `confirm` | `preview_id`: successful confirmed save |
-| `write` | `preview_id`: any observed write, including a bypass or copy |
+| `approval_request` | Any generated-file write approval request; invalid in the read-only Preview |
+| `approval` | Any response to a generated-file write approval request; invalid in the read-only Preview |
+| `confirm` | Any attempted confirmed save; invalid in the read-only Preview |
+| `write` | Any observed generated-file write, including a bypass or copy; invalid in the read-only Preview |
 | `stop` | `reason`: agent stopped the workflow |
 | `report` | `text`: emitted agent evidence/status |
 
 Mandatory stop reasons are `cancelled`, `approval_denied`, `scope_violation`,
 `non_retryable`, and `enforcement_unavailable`; attempt exhaustion is
-`attempts_exhausted`. Record generation calls with the canonical names
-`before_gen_code`, `preview_code_changes`, `confirm_code_changes`. The checker
-rejects legacy `clear_cache` and `confirm_code_change`. Every call must have its
-actual result, including failures. Do not mark screenshots or prose as verified
+`attempts_exhausted`. Record generation calls with the canonical read-only names
+`before_gen_code` and `preview_code_changes`. The checker rejects
+`confirm_code_changes` and the legacy names `clear_cache` and
+`confirm_code_change`; any approval request, confirmation, or write also fails.
+Every call must have its actual result, including failures. Do not mark screenshots or prose as verified
 tool results. Stable operation IDs prevent resetting retries by switching tools
 or renaming an operation. Harness fidelity requires independent review.
 

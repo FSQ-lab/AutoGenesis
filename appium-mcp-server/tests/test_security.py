@@ -9,7 +9,7 @@ import pytest
 from mcp.server.fastmcp import FastMCP
 from mcp.server.fastmcp.exceptions import ToolError
 
-from autogenesis_agent_contract import SecretRef, SecretReferenceError, prepare_generation_preview, serialize
+from autogenesis_agent_contract import SecretRef, SecretReferenceError, serialize
 from autogenesis_appium_mcp import server
 from autogenesis_appium_mcp.tools.config_tool import register_config_tools
 from autogenesis_appium_mcp.utils.config_manager import ConfigManager
@@ -26,14 +26,6 @@ def ref(name="AUTOGENESIS_TEST_PASSWORD"):
 def result_payload(result):
     content = result[0] if isinstance(result, tuple) else result
     return json.loads(content[0].text)
-def approval(preview, **overrides):
-    data = preview["data"]
-    return {
-        "preview_id": data["preview_id"],
-        "digest": data["digest"],
-        "approved": True,
-        **overrides,
-    }
 
 
 
@@ -50,18 +42,18 @@ async def test_generation_destination_cannot_escape_business_project(config_path
 
 
 @pytest.mark.anyio
-async def test_confirmation_rejects_stale_base_file(config_path, tmp_path):
+async def test_confirmation_tool_is_unreachable_and_cannot_write(config_path, tmp_path):
     runtime = server.Runtime("ios", config_path, business_root=tmp_path)
     destination = tmp_path / "steps.py"
     destination.write_text("base\n", encoding="utf-8")
-    preview = prepare_generation_preview(tmp_path, destination, "session", "generated\n")
-    runtime.driver.pending_write = preview
-    runtime.driver.proposed_changes = ["generated"]
-    destination.write_text("changed\n", encoding="utf-8")
     try:
-        with pytest.raises(ToolError, match="AUTOGENESIS_GENERATION_PREVIEW_STALE"):
-            await runtime.server.call_tool("confirm_code_changes", approval({"data": preview.to_dict()}))
-        assert destination.read_text(encoding="utf-8") == "changed\n"
+        names = {tool.name for tool in await runtime.server.list_tools()}
+        assert "confirm_code_changes" not in names
+        with pytest.raises(ToolError):
+            await runtime.server.call_tool("confirm_code_changes", {
+                "preview_id": "caller-controlled", "digest": "0" * 64, "approved": True,
+            })
+        assert destination.read_text(encoding="utf-8") == "base\n"
     finally:
         runtime.close()
 
@@ -119,7 +111,7 @@ def test_payload_free_diagnostics_never_render_arguments():
 
 
 @pytest.mark.anyio
-async def test_secret_ref_executes_records_previews_confirms_and_replays(config_path, tmp_path, monkeypatch):
+async def test_secret_ref_executes_records_and_previews_without_write(config_path, tmp_path, monkeypatch):
     from autogenesis_appium_mcp.tools import appium_driver_tool
 
     monkeypatch.setenv("AUTOGENESIS_TEST_PASSWORD", PRIVATE)
@@ -154,23 +146,21 @@ async def test_secret_ref_executes_records_previews_confirms_and_replays(config_
         assert "env:AUTOGENESIS_TEST_PASSWORD" in proposed
         assert "[REDACTED]" not in proposed
 
-        with pytest.raises(ToolError, match="AUTOGENESIS_GENERATION_APPROVAL_REQUIRED"):
-            await runtime.server.call_tool("confirm_code_changes", {})
-        assert not destination.exists()
-        with pytest.raises(ToolError, match="AUTOGENESIS_GENERATION_PREVIEW_MISMATCH"):
-            await runtime.server.call_tool("confirm_code_changes", approval(preview, digest="0" * 64))
-        assert not destination.exists()
-        await runtime.server.call_tool("confirm_code_changes", approval(preview))
-        written = destination.read_text()
-        assert PRIVATE not in written and "[REDACTED]" not in written
         append_payload = preview["data"]["append_payload"]
-        tree = ast.parse(written)
+        tree = ast.parse(append_payload)
         refs = [node for node in ast.walk(tree) if isinstance(node, ast.Dict)
                 and any(isinstance(key, ast.Constant) and key.value == "$secret" for key in node.keys)]
         assert refs
+        assert PRIVATE not in append_payload and "[REDACTED]" not in append_payload
+        assert not destination.exists()
+        with pytest.raises(ToolError):
+            await runtime.server.call_tool("confirm_code_changes", {
+                "preview_id": preview["data"]["preview_id"],
+                "digest": preview["data"]["digest"],
+                "approved": True,
+            })
+        assert not destination.exists()
 
-        # Replay uses the persisted reference and resolves it only for execution.
-        assert written == append_payload
         element.send_keys.reset_mock()
         runtime.driver.gen_code_id = None
         await runtime.server.call_tool("send_keys", {
@@ -216,11 +206,9 @@ async def test_plaintext_secure_input_requires_binding_before_preview(config_pat
         }))
         assert "env:AUTOGENESIS_BOUND_PASSWORD" in preview["data"]["diff_preview"]
         append_payload = preview["data"]["append_payload"]
-        await runtime.server.call_tool("confirm_code_changes", approval(preview))
-        written = destination.read_text()
-        assert PRIVATE not in written
-        assert written == append_payload
-        assert "env:AUTOGENESIS_BOUND_PASSWORD" in written
+        assert PRIVATE not in append_payload
+        assert "env:AUTOGENESIS_BOUND_PASSWORD" in append_payload
+        assert not destination.exists()
     finally:
         runtime.close()
 

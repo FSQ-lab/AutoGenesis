@@ -35,7 +35,7 @@ uvx --from autogenesis-appium-mcp==0.5.0 autogenesis-appium-mcp --platform mac -
 ```
 
 Agent Contract is pinned to **2.1.0**, manifest SHA-256
-`3768d673273fc82609a94a218a355622233e10892a9f2392688711aa4572d32c`.
+`5ebe963023c53ab7922ee36fee7f9bd44e926d2721939bebd918bef4a54615a9`.
 A mismatched or corrupt contract prevents startup.
 
 Standard MCP Registry metadata is `appium-mcp-server/server.json`. From a source
@@ -115,11 +115,11 @@ The installed and source entrypoints expose stdio only.
 Canonical workflows are prompts `execute_scenario`, `generate_scenario_test`,
 and `execute_natural_language_task`. Identity is available at
 `autogenesis://agent-contract/identity`. Use the generation workflow for the
-selected feature/scenario. Preview returns the complete payload, identity, and
-digest; confirmation must echo the identity and digest with `approved=true`.
-The runtime rejects stale base files, escaping paths and symlinks, then atomically
-replaces the target. Default output is business-local
-`features/steps/common_steps.py`; explicit paths must remain inside the project.
+selected feature/scenario. `before_gen_code` records successful operations and
+`preview_code_changes` returns the complete proposed payload, scoped destination,
+identity, and digest without writing it. Recording stops after this read-only
+preview: generated-file writes are unavailable, and the stdio Runtime exposes no
+confirmation, commit, save, or alternate copy route.
 
 ## Source development and existing Behave projects
 

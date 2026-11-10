@@ -19,18 +19,16 @@ async def test_versioned_tool_names_and_secret_ref_schemas(app_config):
     expected = json.loads((Path(__file__).parent / "fixtures/legacy_tool_schemas.json").read_text(encoding="utf-8"))["tools"]
     server = runtime.create_server(app_config)
     actual = {tool.name: tool.inputSchema for tool in await server.list_tools()}
-    assert len(actual) == 22 and set(actual) == set(expected)
-    changed = {"enter_text", "preview_code_changes", "confirm_code_changes"}
+    assert len(actual) == 21 and set(actual) == set(expected)
+    changed = {"enter_text", "preview_code_changes"}
     assert {name: schema for name, schema in actual.items() if name not in changed} == {
         name: schema for name, schema in expected.items() if name not in changed
     }
     assert actual["preview_code_changes"]["properties"]["secret_bindings"]["default"] is None
     variants = actual["enter_text"]["properties"]["content"]["anyOf"]
     assert {variant.get("type", "ref") for variant in variants} == {"string", "ref"}
-    confirm = actual["confirm_code_changes"]["properties"]
-    assert confirm["preview_id"]["default"] == ""
-    assert confirm["digest"]["default"] == ""
-    assert confirm["approved"]["default"] is False
+    assert {"before_gen_code", "preview_code_changes"} <= set(actual)
+    assert "confirm_code_changes" not in actual
     assert not any("config" in name for name in actual)
 
 @pytest.mark.anyio
@@ -646,7 +644,6 @@ def test_runtime_close_releases_binding_without_closing_application(app_config):
     instance.manager._binding = object()
     instance.manager.gen_code_id = "pending"
     instance.manager.gen_code_cache.append({"private": "call"})
-    instance.manager.pending_write = {"private": "write"}
 
     instance.close()
     instance.close()
@@ -656,7 +653,6 @@ def test_runtime_close_releases_binding_without_closing_application(app_config):
     assert instance.manager._binding is None
     assert instance.manager.gen_code_id is None
     assert instance.manager.gen_code_cache == []
-    assert instance.manager.pending_write is None
 
 
 @pytest.mark.anyio
@@ -749,7 +745,7 @@ async def test_canonical_instructions_prompts_and_identity_use_merged_adapter(ap
     server = runtime.create_server(app_config)
     contract = load_contract()
     assert server.instructions == contract.instructions
-    assert runtime.RUNTIME_CONTRACT == RuntimeContractRequirement("2.1.0", "3768d673273fc82609a94a218a355622233e10892a9f2392688711aa4572d32c")
+    assert runtime.RUNTIME_CONTRACT == RuntimeContractRequirement("2.1.0", "5ebe963023c53ab7922ee36fee7f9bd44e926d2721939bebd918bef4a54615a9")
     assert {prompt.name: [(arg.name, arg.required) for arg in prompt.arguments] for prompt in await server.list_prompts()} == {
         "execute_scenario": [("scenario_text", True), ("feature_file_path", False)],
         "generate_scenario_test": [("scenario_text", True), ("feature_file_path", True)],
@@ -769,7 +765,7 @@ async def test_canonical_instructions_prompts_and_identity_use_merged_adapter(ap
     assert {key: identity[key] for key in contract.identity.to_dict()} == contract.identity.to_dict()
 
 
-@pytest.mark.parametrize("version,digest", [("3.0.0", "3768d673273fc82609a94a218a355622233e10892a9f2392688711aa4572d32c"), ("2.1.0", "0" * 64)])
+@pytest.mark.parametrize("version,digest", [("3.0.0", "5ebe963023c53ab7922ee36fee7f9bd44e926d2721939bebd918bef4a54615a9"), ("2.1.0", "0" * 64)])
 def test_contract_drift_fails_closed_before_driver_import(monkeypatch, app_config, version, digest):
     monkeypatch.setattr(runtime, "RUNTIME_CONTRACT", RuntimeContractRequirement(version, digest))
     with pytest.raises(ContractError):

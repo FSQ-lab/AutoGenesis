@@ -19,7 +19,7 @@ from conftest import reference_server
 
 
 @pytest.mark.anyio
-@pytest.mark.parametrize("platform,count", [("ios", 31), ("android", 30), ("mac", 35)])
+@pytest.mark.parametrize("platform,count", [("ios", 30), ("android", 29), ("mac", 34)])
 async def test_versioned_tool_names_and_secret_ref_schemas_without_driver(platform, count, config_path, monkeypatch):
     forbidden = Mock(side_effect=AssertionError("Discovery attempted a device session"))
     monkeypatch.setattr("autogenesis_appium_mcp.driver_session.webdriver.Remote", forbidden)
@@ -28,7 +28,7 @@ async def test_versioned_tool_names_and_secret_ref_schemas_without_driver(platfo
         actual = {tool.name: tool.inputSchema for tool in await runtime.server.list_tools()}
         expected = {tool.name: tool.inputSchema for tool in await reference_server(platform).list_tools()}
         assert len(actual) == count and set(actual) == set(expected)
-        changed = {"app_launch", "send_keys", "preview_code_changes", "confirm_code_changes", "send_keys_on_macos"}
+        changed = {"app_launch", "send_keys", "preview_code_changes", "send_keys_on_macos"}
         assert {name: schema for name, schema in actual.items() if name not in changed} == {
             name: schema for name, schema in expected.items() if name not in changed
         }
@@ -37,10 +37,8 @@ async def test_versioned_tool_names_and_secret_ref_schemas_without_driver(platfo
             assert {variant.get("type", "ref") for variant in variants} == {"string", "ref"}
         argument_items = actual["app_launch"]["properties"]["arguments"]["anyOf"][0]["items"]
         assert argument_items == {"type": "string"}
-        confirm = actual["confirm_code_changes"]["properties"]
-        assert confirm["preview_id"]["default"] == ""
-        assert confirm["digest"]["default"] == ""
-        assert confirm["approved"]["default"] is False
+        assert {"before_gen_code", "preview_code_changes"} <= set(actual)
+        assert "confirm_code_changes" not in actual
         assert runtime.driver.device == platform
         assert runtime.driver._driver is None
         assert runtime.config._observer is None

@@ -16,7 +16,7 @@ from mcp.server.fastmcp import FastMCP
 # These pins belong to the runtime release, independently of the installed wheel.
 required = RuntimeContractRequirement(
     contract_version="2.1.0",
-    manifest_sha256="3768d673273fc82609a94a218a355622233e10892a9f2392688711aa4572d32c",
+    manifest_sha256="5ebe963023c53ab7922ee36fee7f9bd44e926d2721939bebd918bef4a54615a9",
 )
 contract = load_contract(ContractIdentity(required.contract_version, required.manifest_sha256))
 appendix = load_project_appendix("/absolute/business-project")
@@ -61,7 +61,7 @@ register_mcp(server, contract, appendix, required)
   canonical prompt content or identity JSON. Initialize instructions already
   belong to the constructed server, so serving a failed instance is unsupported.
 - `SecretRef` serializes as `{"$secret": "env:NAME"}`. Runtimes retain this
-  reference through recording, preview, confirmation, and generated code, and
+  reference through recording and the read-only generated-code preview, and
   resolve plaintext only inside the current tool execution.
 - `UnboundSecret` serializes as `{"$secret": "unbound:BINDING"}` and blocks
   preview until a Coding Agent supplies an explicit environment-backed binding.
@@ -91,6 +91,10 @@ override, or disable arguments are supported. Scenario text already includes
 applicable Background followed by the selected Scenario, in source order.
 Feature paths are context data: rendering does not read them or authorize writes.
 Only the generation workflow references generation operations.
+
+The generation workflow ends after `preview_code_changes`. The public Preview
+does not expose a generated-file confirmation or commit tool; proposed bytes
+cannot be saved through the Contract's stdio surface or an alternate copy route.
 
 `autogenesis://agent-contract/identity` returns contract identity plus appendix
 presence, the constant relative appendix path, and its separate SHA-256. It
@@ -157,10 +161,10 @@ fetch, include processing, environment expansion, templating, or execution.
 
 Callers must supply secret-free task and domain text, using environment-variable
 references. This package does not detect arbitrary credentials in text. Its
-generation module binds a complete preview to the session, destination, base-file
-state, and digest; confirmation requires explicit approval and atomically replaces
-the file inside the selected project root. Runtime adapters expose that shared
-module through their generation tools.
+generation module binds a complete read-only preview to the session, destination,
+base-file state, and digest. Neither `register_mcp` nor the Runtime adapters
+register a confirmation or commit tool; generated-file writes are unavailable
+through the public stdio surface.
 
 ## Generated sources
 

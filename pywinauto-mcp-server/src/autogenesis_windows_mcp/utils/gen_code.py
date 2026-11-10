@@ -393,7 +393,6 @@ def record_calls(app_manager):
                     warning = "reauthor.send_keystrokes"
                     if warning not in app_manager.recording_warnings:
                         app_manager.recording_warnings.append(warning)
-                    app_manager.pending_write = None
                     app_manager.proposed_changes = None
                     return result
                 call_info = {}
@@ -423,7 +422,6 @@ def record_calls(app_manager):
                     call_info['gen_code_id'] = app_manager.gen_code_id
                     call_info['tool_name'] = func.__name__
                     call_info['tool_params'] = tool_params
-                    app_manager.pending_write = None
                     app_manager.proposed_changes = None
                     app_manager.gen_code_cache.append(call_info)
                     logger.info('record_calls: call_info=[redacted]')

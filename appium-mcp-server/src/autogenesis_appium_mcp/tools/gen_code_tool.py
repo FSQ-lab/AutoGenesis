@@ -6,7 +6,6 @@ from autogenesis_agent_contract import (
     SecretBindings,
     SecretReferenceError,
     apply_bindings,
-    commit_generation_preview,
     prepare_generation_preview,
     validate_generation_destination,
     serialize,
@@ -87,7 +86,7 @@ def register_gen_code_tools(mcp, browser_manager, business_root=None):
     @mcp.tool()
     @log_tool_call
     async def preview_code_changes(secret_bindings: SecretBindings | None = None) -> str:
-        """Preview generated test code changes and confirm before applying"""
+        """Return a read-only preview of generated test code changes."""
         resp = init_tool_response()
         
         if browser_manager.recording_warnings:
@@ -98,7 +97,6 @@ def register_gen_code_tools(mcp, browser_manager, business_root=None):
             return json.dumps(format_tool_response(resp))
         
         bound_cache = serialize(apply_bindings(browser_manager.gen_code_cache, secret_bindings))
-        browser_manager.pending_write = None
         result = gen_code_preview(browser_manager, bound_cache)
         append_payload = result.get("append_payload", "")
         if not append_payload:
@@ -111,37 +109,10 @@ def register_gen_code_tools(mcp, browser_manager, business_root=None):
             browser_manager.gen_code_id,
             append_payload,
         )
-        browser_manager.pending_write = preview
         resp["status"] = "success"
         resp["data"] = {"diff_preview": result.get("diff_preview"), **preview.to_dict()}
 
         return json.dumps(format_tool_response(resp))
 
-    @mcp.tool()
-    @log_tool_call
-    async def confirm_code_changes(
-        preview_id: str = "",
-        digest: str = "",
-        approved: bool = False,
-    ) -> str:
-        """Atomically commit exactly the complete, current, approved preview."""
-        resp = init_tool_response()
-        preview = getattr(browser_manager, "pending_write", None)
-        count = len(browser_manager.proposed_changes or [])
-        destination = commit_generation_preview(
-            preview,
-            preview_id=preview_id,
-            digest=digest,
-            approved=approved,
-        )
-        browser_manager.new_steps_count = count
-        browser_manager.clear_gen_code_cache()
-        resp["status"] = "success"
-        resp["data"] = {
-            "message": "Approved generated code committed atomically",
-            "destination": destination,
-            "new_steps_count": count,
-        }
-        return json.dumps(format_tool_response(resp))
 
 
