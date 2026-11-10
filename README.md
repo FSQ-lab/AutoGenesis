@@ -61,8 +61,8 @@ Feature: Calculator
 
   Scenario: Add two numbers
     Given Calculator is open
-    When I calculate 8 × 7
-    Then the result is 56
+    When I calculate 2 + 3
+    Then the result is 5
 ```
 
 ```mermaid
@@ -181,7 +181,7 @@ installation, then ask OMP:
 
 ```text
 Use autogenesis to prepare Calculator on this native macOS host, calculate
-8 × 7, and verify that the observed result is 56. Perform this as a direct test:
+2 + 3, and verify that the observed result is 5. Perform this as a direct test:
 do not record a Scenario or generate files. Reuse working dependencies, make
 only the smallest necessary changes after showing any protected effect set, and
 report the selected environment, actions, assertion, and cleanup.
@@ -189,7 +189,7 @@ report the selected environment, actions, assertion, and cleanup.
 
 A successful journey includes the live `autogenesis` Skill, the Appium stdio MCP
 Runtime, matching Agent Contract identity, a real Calculator session, and an
-observed result of 56. Installation output alone is not acceptance.
+observed result of 5. Installation output alone is not acceptance.
 
 ### Execute exact BDD instead
 
@@ -203,8 +203,8 @@ Feature: Calculator
 
   Scenario: Add two numbers
     Given Calculator is open
-    When I calculate 8 × 7
-    Then the result is 56
+    When I calculate 2 + 3
+    Then the result is 5
 ```
 
 ### Request a read-only recording preview
