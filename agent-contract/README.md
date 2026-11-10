@@ -16,7 +16,7 @@ from mcp.server.fastmcp import FastMCP
 # These pins belong to the runtime release, independently of the installed wheel.
 required = RuntimeContractRequirement(
     contract_version="2.1.0",
-    manifest_sha256="ca6f1970b994f68e78495819147dbab3daf00e3fc1e44f856be8740a00283ed4",
+    manifest_sha256="33c1cf4b22d21c5cf33a012c78dbfe59265db65bbc9c6b94b22681289a04f79d",
 )
 contract = load_contract(ContractIdentity(required.contract_version, required.manifest_sha256))
 appendix = load_project_appendix("/absolute/business-project")
@@ -100,6 +100,28 @@ cannot be saved through the Contract's stdio surface or an alternate copy route.
 presence, the constant relative appendix path, and its separate SHA-256. It
 never returns appendix text or a user's absolute project path. Its schema is
 `assets/schemas/identity.schema.json`.
+
+## Agent Install Prompt boundary
+
+Candidate and public generators share one fail-closed installation contract. The
+Candidate prompt is externally anchored to one authenticated Actions repository,
+run, commit, and artifact; the public prompt is anchored to one published immutable
+GitHub Release ID, tag, commit, and exact asset set. `SHA256SUMS` is generated only
+after the final prompt and covers every shipped asset except itself. A complete,
+self-consistent copied directory is not an external trust anchor.
+
+Each prompt names a previously absent disposable virtual-environment path dedicated
+to that exact installation and requires explicit approval before its creation. All
+subsequent Python, package, Runtime, CLI, and verification operations use only that
+environment's absolute entrypoints. Failure, cancellation, denial, identity/digest
+mismatch, supersession, and rollback stop owned processes and delete the prompt-created
+environment and prompt-created install state while preserving unrelated state.
+
+Package-source evidence is limited to host-only and config-source-class metadata
+provided without reading full URLs, credentials, environment values, raw pip/uv
+configuration, errors, command output, or evidence payloads. Redaction after reading
+is forbidden. If a trusted secret-free disclosure is unavailable, the source is
+`undisclosed` and installation stops before mutation.
 
 ## Integrity and diagnostics
 

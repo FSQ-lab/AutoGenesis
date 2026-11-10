@@ -47,6 +47,13 @@ def manifest(record=None):
     verifier._validate_release_manifest(document)
     return document
 
+def write_checksum_closure(assets):
+    rows = []
+    for path in sorted(assets.iterdir(), key=lambda item: item.name):
+        if path.name != "SHA256SUMS":
+            rows.append(f"{hashlib.sha256(path.read_bytes()).hexdigest()}  {path.name}\n")
+    (assets / "SHA256SUMS").write_text("".join(rows), encoding="ascii")
+
 
 def pypi_document(urls):
     return {
@@ -245,7 +252,7 @@ class ReleaseVerifierTests(unittest.TestCase):
             (assets / "agent-install-prompt.txt").write_text("install reviewed bytes", encoding="utf-8")
             (assets / "autogenesis-release.lock").write_text("locked bytes", encoding="utf-8")
             (assets / "autogenesis-SKILL.md").write_text("skill bytes", encoding="utf-8")
-            (assets / "SHA256SUMS").write_text("bundle-local checks only", encoding="utf-8")
+            write_checksum_closure(assets)
             review_path = root / "skill-review-manifest.json"
 
             verifier._write_skill_review_manifest(
@@ -265,8 +272,73 @@ class ReleaseVerifierTests(unittest.TestCase):
                 },
             )
             (assets / "agent-install-prompt.txt").write_text("substituted prompt", encoding="utf-8")
+            with self.assertRaisesRegex(verifier.VerificationError, "differs from SHA256SUMS"):
+                verifier._verify_skill_review_manifest(assets, reviewed, release_path)
+
+    def test_checksum_closure_rejects_mutation_extra_missing_and_self_entry(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            assets = Path(temporary)
+            (assets / "agent-install-prompt.txt").write_text("reviewed prompt", encoding="utf-8")
+            (assets / "autogenesis-SKILL.md").write_text("reviewed skill", encoding="utf-8")
+            write_checksum_closure(assets)
+
+            (assets / "agent-install-prompt.txt").write_text("mutated prompt", encoding="utf-8")
+            with self.assertRaisesRegex(verifier.VerificationError, "differs from SHA256SUMS"):
+                verifier._verify_skill_checksum_closure(assets)
+
+            (assets / "agent-install-prompt.txt").write_text("reviewed prompt", encoding="utf-8")
+            (assets / "extra.txt").write_text("unlisted", encoding="utf-8")
+            with self.assertRaisesRegex(verifier.VerificationError, "complete asset set"):
+                verifier._verify_skill_checksum_closure(assets)
+
+            (assets / "extra.txt").unlink()
+            original = (assets / "SHA256SUMS").read_text(encoding="ascii")
+            (assets / "autogenesis-SKILL.md").unlink()
+            with self.assertRaisesRegex(verifier.VerificationError, "complete asset set"):
+                verifier._verify_skill_checksum_closure(assets)
+
+            (assets / "autogenesis-SKILL.md").write_text("reviewed skill", encoding="utf-8")
+            self_digest = hashlib.sha256((assets / "SHA256SUMS").read_bytes()).hexdigest()
+            (assets / "SHA256SUMS").write_text(original + f"{self_digest}  SHA256SUMS\n", encoding="ascii")
+            with self.assertRaisesRegex(verifier.VerificationError, "checksum set is invalid"):
+                verifier._verify_skill_checksum_closure(assets)
+
+    def test_self_consistent_prompt_substitution_still_fails_external_review_anchor(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            assets = root / "skill-release"
+            assets.mkdir()
+            release_path = root / "release-manifest.json"
+            release_raw = json.dumps(manifest(), sort_keys=True).encode()
+            release_path.write_bytes(release_raw)
+            (assets / "release-manifest.json").write_bytes(release_raw)
+            (assets / "agent-install-prompt.txt").write_text("reviewed prompt", encoding="utf-8")
+            (assets / "autogenesis-release.lock").write_text("reviewed lock", encoding="utf-8")
+            (assets / "autogenesis-SKILL.md").write_text("reviewed skill", encoding="utf-8")
+            write_checksum_closure(assets)
+            review_path = root / "skill-review-manifest.json"
+            verifier._write_skill_review_manifest(
+                review_path, assets, release_path, verifier._load_release_manifest(release_path)
+            )
+            reviewed = verifier._load_skill_review_manifest(review_path, PROVENANCE)
+
+            (assets / "agent-install-prompt.txt").write_text("attacker prompt", encoding="utf-8")
+            write_checksum_closure(assets)
+            verifier._verify_skill_checksum_closure(assets)
             with self.assertRaisesRegex(verifier.VerificationError, "external review manifest"):
                 verifier._verify_skill_review_manifest(assets, reviewed, release_path)
+
+    def test_self_consistent_review_manifest_from_another_run_fails_provenance_anchor(self):
+        document = {
+            "schema_version": verifier.SKILL_REVIEW_MANIFEST_SCHEMA,
+            "provenance": dict(PROVENANCE, run_id="9999"),
+            "assets": [{"filename": "SHA256SUMS", "sha256": "a" * 64, "size": 1}],
+        }
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary) / "skill-review-manifest.json"
+            path.write_text(json.dumps(document), encoding="utf-8")
+            with self.assertRaisesRegex(verifier.VerificationError, "current workflow run"):
+                verifier._load_skill_review_manifest(path, PROVENANCE)
 
 
 class RegistryReleaseVerifierTests(unittest.TestCase):
@@ -383,6 +455,30 @@ class ReleaseWorkflowSafetyTests(unittest.TestCase):
         cls.workflow = (
             Path(__file__).resolve().parents[1] / ".github/workflows/publish-mcp-registry.yml"
         ).read_text()
+        cls.candidate_workflow = (
+            Path(__file__).resolve().parents[1] / ".github/workflows/quality-gates.yml"
+        ).read_text()
+
+    def test_final_prompt_build_precedes_checksum_review_and_public_upload(self):
+        workflow = self.workflow
+        build = workflow.index("python agent-contract/tools/build_skill_release.py")
+        review = workflow.index("--write-skill-review-manifest", build)
+        upload = workflow.index("name: Upload immutable Skill release assets", review)
+        publish = workflow.index('gh release upload "$RELEASE_TAG" skill-release/*', upload)
+
+        self.assertLess(build, review)
+        self.assertLess(review, upload)
+        self.assertLess(upload, publish)
+
+    def test_candidate_bundle_is_run_bound_before_exact_artifact_upload(self):
+        workflow = self.candidate_workflow
+        build = workflow.index("python agent-contract/tools/build_candidate_release.py")
+        run_anchor = workflow.index('--workflow-run-id "${{ github.run_id }}"', build)
+        upload = workflow.index("name: Upload exact Candidate channel", run_anchor)
+
+        self.assertLess(build, run_anchor)
+        self.assertLess(run_anchor, upload)
+        self.assertIn("autogenesis-candidate-${{ env.CANDIDATE_COMMIT }}", workflow[upload:])
 
     def test_tag_is_absent_or_exact_before_draft_and_rechecked_around_publish(self):
         workflow = self.workflow

@@ -13,7 +13,7 @@ from mcp.server.fastmcp.exceptions import ResourceError, ToolError
 
 RUNTIME_CONTRACT = RuntimeContractRequirement(
     contract_version="2.1.0",
-    manifest_sha256="ca6f1970b994f68e78495819147dbab3daf00e3fc1e44f856be8740a00283ed4",
+    manifest_sha256="33c1cf4b22d21c5cf33a012c78dbfe59265db65bbc9c6b94b22681289a04f79d",
 )
 
 

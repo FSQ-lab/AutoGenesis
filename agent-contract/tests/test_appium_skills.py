@@ -198,10 +198,13 @@ def test_agent_install_prompt_gates_host_and_converges_on_shared_installer(tmp_p
         "autogenesis-windows-mcp": "0.5.0",
         "autogenesis-cli": "0.2.0",
     }
-    release_manifest.write_text(json.dumps({"wheels": [
-        {"package": package, "version": version, "sha256": str(index) * 64}
-        for index, (package, version) in enumerate(packages.items(), start=1)
-    ]}) + "\n")
+    release_manifest.write_text(json.dumps({
+        "provenance": {"commit": "c" * 40},
+        "wheels": [
+            {"package": package, "version": version, "sha256": str(index) * 64}
+            for index, (package, version) in enumerate(packages.items(), start=1)
+        ],
+    }) + "\n")
     dependency_lock = tmp_path / "release-dependencies.lock"
     dependency_lock.write_text(f"anyio==4.12.0 --hash=sha256:{'a' * 64}\n")
     result = subprocess.run(
@@ -228,15 +231,19 @@ def test_agent_install_prompt_gates_host_and_converges_on_shared_installer(tmp_p
     assert result.returncode == 0, result.stderr
     prompt = (output / "agent-install-prompt.txt").read_text(encoding="utf-8")
     gate = prompt.index("Before any network request")
-    manifest = prompt.index("Download the exact Release manifest")
-    acquire = prompt.index("Download the exact Skill")
-    approve = prompt.index("obtain one approval")
-    install = prompt.index("autogenesis install --scope")
-    assert gate < manifest < acquire < approve < install
+    anchor = prompt.index("published immutable GitHub Release")
+    closure = prompt.index("complete final asset set")
+    approve = prompt.index("Obtain explicit user approval")
+    create = prompt.index("Only after approval, create the approved path")
+    acquire = prompt.index("Download the Release manifest")
+    install = prompt.index("install that same complete lock")
+    assert gate < anchor < closure < approve < create < acquire < install
     assert "Accept only native macOS or native Windows" in prompt
-    assert "reject Linux and WSL before any write" in prompt
-    assert "Release lock's strict hash mode" in prompt
-    assert "exactly one `autogenesis` Skill" in prompt
+    assert "reject Linux and WSL" in prompt
+    assert "exact new absolute disposable virtual-environment path" in prompt
+    assert "source `undisclosed` and stop before installation" in prompt
+    assert "exact asset IDs, names, and sizes" in prompt
+    assert "checksums are internal closure only" in prompt.lower()
 
 
 def test_upstream_provenance_exact_pinned_subset_passes(snapshot_verifier, upstream_export, repo_root):

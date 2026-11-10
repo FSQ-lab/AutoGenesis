@@ -450,6 +450,34 @@ def _skill_asset_records(asset_dir: Path) -> list[dict]:
         )
     return records
 
+def _verify_skill_checksum_closure(asset_dir: Path, records: list[dict] | None = None) -> None:
+    actual = records if records is not None else _skill_asset_records(asset_dir)
+    by_name = {record["filename"]: record for record in actual}
+    sums = by_name.get("SHA256SUMS")
+    if sums is None:
+        raise VerificationError("Skill release checksum set is missing")
+    try:
+        raw = (asset_dir / "SHA256SUMS").read_bytes()
+        text = raw.decode("ascii")
+    except (OSError, UnicodeError):
+        raise VerificationError("Skill release checksum set is invalid") from None
+    if not text.endswith("\n") or "\r" in text:
+        raise VerificationError("Skill release checksum set is invalid")
+    checksums: dict[str, str] = {}
+    for line in text.splitlines():
+        match = re.fullmatch(r"([0-9a-f]{64})  ([A-Za-z0-9][A-Za-z0-9._-]*)", line)
+        if match is None:
+            raise VerificationError("Skill release checksum set is invalid")
+        digest, filename = match.groups()
+        if filename == "SHA256SUMS" or filename in checksums or Path(filename).name != filename:
+            raise VerificationError("Skill release checksum set is invalid")
+        checksums[filename] = digest
+    expected_names = set(by_name) - {"SHA256SUMS"}
+    if set(checksums) != expected_names:
+        raise VerificationError("Skill release checksum set does not cover the complete asset set")
+    if any(checksums[name] != by_name[name]["sha256"] for name in expected_names):
+        raise VerificationError("Skill release asset differs from SHA256SUMS")
+
 
 def _validate_skill_review_manifest(document: dict) -> None:
     if set(document) != {"schema_version", "provenance", "assets"}:
@@ -487,10 +515,12 @@ def _write_skill_review_manifest(
             raise VerificationError("Released manifest differs from the reviewed release manifest")
     except OSError:
         raise VerificationError("Released manifest is unavailable") from None
+    records = _skill_asset_records(asset_dir)
+    _verify_skill_checksum_closure(asset_dir, records)
     document = {
         "schema_version": SKILL_REVIEW_MANIFEST_SCHEMA,
         "provenance": release_manifest["provenance"],
-        "assets": _skill_asset_records(asset_dir),
+        "assets": records,
     }
     _validate_skill_review_manifest(document)
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -511,6 +541,7 @@ def _verify_skill_review_manifest(
 ) -> None:
     expected = review_manifest["assets"]
     actual = _skill_asset_records(asset_dir)
+    _verify_skill_checksum_closure(asset_dir, actual)
     if actual != expected:
         raise VerificationError("Skill release assets differ from the external review manifest")
     released_manifest = asset_dir / "release-manifest.json"

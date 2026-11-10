@@ -15,6 +15,32 @@ from autogenesis_agent_contract._asset_io import MAX_ASSET_BYTES, MAX_MANIFEST_B
 
 NAME = "autogenesis"
 
+def _assert_hardened_install_prompt(prompt, channel):
+    assert f"exact {channel} identity" in prompt
+    assert "exact new absolute disposable virtual-environment path" in prompt
+    assert "Require the environment path to be absent" in prompt
+    assert "pre-existing environment" in prompt
+    assert "explicit user approval" in prompt
+    assert "before creating the environment" in prompt
+    assert "environment's absolute Python or entrypoints only" in prompt
+    assert "failure, cancellation, denial, digest or identity mismatch, supersession, or rollback" in prompt
+    assert "delete only the prompt-created environment" in prompt
+    assert "Preserve every pre-existing environment" in prompt
+    assert "label the source `undisclosed` and stop before installation" in prompt
+    assert "Redaction after reading is forbidden" in prompt
+    assert all(forbidden not in prompt.lower() for forbidden in (
+        "pip config", "uv config", "printenv", "authorization header:",
+    ))
+
+
+def _checksums(output):
+    rows = {}
+    for line in (output / "SHA256SUMS").read_text(encoding="ascii").splitlines():
+        digest, filename = line.split("  ", 1)
+        rows[filename] = digest
+        assert hashlib.sha256((output / filename).read_bytes()).hexdigest() == digest
+    return rows
+
 
 def test_repository_has_one_exact_canonical_skill_projection(repo_root):
     source = resources.files("autogenesis_agent_contract").joinpath(f"assets/skills/{NAME}/SKILL.md").read_bytes()
@@ -74,6 +100,17 @@ def test_guided_install_and_readiness_references_are_operational(repo_root):
         "MCP initialize", "prompts/tools/resources",
         "configured/reload-required",
     ))
+    assert all(value in install for value in (
+        "previously absent disposable virtual environment",
+        "explicit approval before creating it",
+        "only that environment's absolute Python and entrypoints",
+        "exact reviewed Actions artifact or immutable GitHub Release identity",
+        "checksums cover every final asset including the prompt and exclude only themselves",
+        "Redaction after reading is not a safety boundary",
+        "source as `undisclosed` and stop before installation",
+        "cancellation, denial, identity/digest mismatch, supersession, or rollback",
+        "Never delete or repurpose a pre-existing path",
+    ))
     assert all(value in readiness for value in (
         '"requestScope"', '"layers"', '"environment"', '"changes"',
         '"approval"', '"runtimeEvidence"', '"ownership"',
@@ -96,10 +133,13 @@ def test_skill_release_assets_match_contract_and_bootstrap_prompt(tmp_path, repo
         "autogenesis-windows-mcp": "0.5.0",
         "autogenesis-cli": "0.2.0",
     }
-    release_manifest.write_text(json.dumps({"wheels": [
-        {"package": package, "version": version, "sha256": str(index) * 64}
-        for index, (package, version) in enumerate(packages.items(), start=1)
-    ]}) + "\n", encoding="utf-8")
+    release_manifest.write_text(json.dumps({
+        "provenance": {"commit": "c" * 40},
+        "wheels": [
+            {"package": package, "version": version, "sha256": str(index) * 64}
+            for index, (package, version) in enumerate(packages.items(), start=1)
+        ],
+    }) + "\n", encoding="utf-8")
     dependency_lock = tmp_path / "release-dependencies.lock"
     dependency_lock.write_text(f"anyio==4.12.0 --hash=sha256:{'a' * 64}\n", encoding="utf-8")
     result = subprocess.run(
@@ -124,14 +164,12 @@ def test_skill_release_assets_match_contract_and_bootstrap_prompt(tmp_path, repo
         timeout=10,
     )
     assert result.returncode == 0, result.stderr
-    checksums = {}
-    for line in (output / "SHA256SUMS").read_text(encoding="ascii").splitlines():
-        digest, filename = line.split("  ", 1)
-        checksums[filename] = digest
-        assert hashlib.sha256((output / filename).read_bytes()).hexdigest() == digest
+    checksums = _checksums(output)
     assert set(checksums) == {
         "autogenesis-SKILL.md", "autogenesis-release.lock", "release-manifest.json",
+        "agent-install-prompt.txt",
     }
+    assert set(checksums) == {path.name for path in output.iterdir()} - {"SHA256SUMS"}
     prompt = (output / "agent-install-prompt.txt").read_text(encoding="utf-8")
     assert f"{base}/autogenesis-SKILL.md" in prompt
     assert checksums["autogenesis-SKILL.md"] in prompt
@@ -145,6 +183,12 @@ def test_skill_release_assets_match_contract_and_bootstrap_prompt(tmp_path, repo
     assert "exactly one `autogenesis` Skill" in prompt
     assert "stop before running a business task" in prompt
     assert "force-reinstalled" in prompt
+    _assert_hardened_install_prompt(prompt, "public Release")
+    assert "published immutable GitHub Release" in prompt
+    assert "observed positive Release ID" in prompt
+    assert "Checksums are internal closure only" in prompt
+    original_prompt_digest = checksums["agent-install-prompt.txt"]
+    assert hashlib.sha256((prompt + "mutated").encode()).hexdigest() != original_prompt_digest
     extension_service = (
         repo_root / "bdd_ai_toolkit/src/bdd-feature-support/services/CopilotIntegrationService.ts"
     ).read_text(encoding="utf-8")
@@ -239,6 +283,7 @@ def test_candidate_channel_binds_exact_first_party_wheels_and_skill(tmp_path, re
             "--base-url", "https://example.invalid/candidate/abc",
             "--commit", commit,
             "--dependency-lock", str(dependency_lock),
+            "--workflow-run-id", "123456",
         ],
         cwd=repo_root,
         capture_output=True,
@@ -249,9 +294,15 @@ def test_candidate_channel_binds_exact_first_party_wheels_and_skill(tmp_path, re
     assert result.returncode == 0, result.stderr
     manifest_raw = (output / "candidate-manifest.json").read_bytes()
     manifest = json.loads(manifest_raw)
+    assert manifest["schema_version"] == 2
     assert manifest["channel"] == "candidate" and manifest["commit"] == commit
+    assert manifest["provenance"] == {
+        "repository": "FSQ-lab/AutoGenesis",
+        "workflow_run_id": "123456",
+        "artifact": f"autogenesis-candidate-{commit}",
+    }
     assert manifest["first_party_index_fallback"] is False
-    assert manifest["third_party_policy"] == "user-selected-index-with-release-hash-lock"
+    assert manifest["third_party_policy"] == "sanitized-source-with-release-hash-lock"
     assert {wheel["package"]: wheel["version"] for wheel in manifest["wheels"]} == expected
     platforms = {wheel["package"]: wheel["platforms"] for wheel in manifest["wheels"]}
     assert platforms["autogenesis-windows-mcp"] == ["win32"]
@@ -276,9 +327,14 @@ def test_candidate_channel_binds_exact_first_party_wheels_and_skill(tmp_path, re
     assert "complete offline-install lock" in prompt
 
     assert "force-reinstalled" in prompt
-    assert "remove the Candidate packages/environment" in prompt
-    assert "cached Skill/Runtime schemas" in prompt
-    assert "never restore a cached write-capable generated-code inventory" in prompt
+    _assert_hardened_install_prompt(prompt, "Candidate")
+    assert "exact Actions artifact" in prompt
+    assert "workflow run `123456`" in prompt
+    assert "superseded run 42843125727" in prompt
+    candidate_checksums = _checksums(output)
+    assert set(candidate_checksums) == {path.name for path in output.iterdir()} - {"SHA256SUMS"}
+    assert "candidate-install-prompt.txt" in candidate_checksums
+    assert hashlib.sha256((prompt + "mutated").encode()).hexdigest() != candidate_checksums["candidate-install-prompt.txt"]
 
 def test_candidate_channel_rejects_incomplete_wheel_set(tmp_path, repo_root):
     wheel_dir = tmp_path / "wheels"
@@ -301,6 +357,7 @@ def test_candidate_channel_rejects_incomplete_wheel_set(tmp_path, repo_root):
             "--base-url", "https://example.invalid/candidate/abc",
             "--commit", commit,
             "--dependency-lock", str(dependency_lock),
+            "--workflow-run-id", "123456",
         ],
         cwd=repo_root,
         capture_output=True,
@@ -336,11 +393,56 @@ def test_candidate_channel_rejects_unhashed_dependency_lock(tmp_path, repo_root)
             "--base-url", "https://example.invalid/candidate/abc",
             "--commit", commit,
             "--dependency-lock", str(dependency_lock),
+            "--workflow-run-id", "123456",
         ],
         cwd=repo_root, capture_output=True, text=True, check=False, timeout=10,
     )
     assert result.returncode != 0
     assert "dependency lock contains an unpinned or unsafe entry" in result.stderr
+
+@pytest.mark.parametrize("unsafe", [
+    "https://user:SYNTHETIC_URL_SECRET@example.invalid/release",
+    "https://user:SYNTHETIC%2DENCODED%2DSECRET@example.invalid/release",
+    "https://example.invalid/release?token=SYNTHETIC_QUERY_SECRET",
+    "https://example.invalid/release#SYNTHETIC_FRAGMENT_SECRET",
+])
+@pytest.mark.parametrize("builder", ["candidate", "public"])
+def test_release_generators_reject_secret_bearing_asset_locations_without_echo(
+    tmp_path, repo_root, unsafe, builder,
+):
+    output = tmp_path / builder
+    if builder == "candidate":
+        commit = subprocess.run(
+            ["git", "-C", str(repo_root), "rev-parse", "HEAD"],
+            check=True, capture_output=True, text=True,
+        ).stdout.strip()
+        command = [
+            sys.executable,
+            str(repo_root / "agent-contract/tools/build_candidate_release.py"),
+            "--wheel-dir", str(tmp_path / "unused-wheels"),
+            "--output-dir", str(output),
+            "--base-url", unsafe,
+            "--commit", commit,
+            "--dependency-lock", str(tmp_path / "unused.lock"),
+            "--workflow-run-id", "123456",
+        ]
+    else:
+        command = [
+            sys.executable,
+            str(repo_root / "agent-contract/tools/build_skill_release.py"),
+            "--output-dir", str(output),
+            "--base-url", unsafe,
+            "--release-manifest", str(tmp_path / "unused-manifest.json"),
+            "--release-manifest-url", "https://example.invalid/release/release-manifest.json",
+            "--dependency-lock", str(tmp_path / "unused.lock"),
+        ]
+    result = subprocess.run(
+        command, cwd=repo_root, capture_output=True, text=True, check=False, timeout=10,
+    )
+    assert result.returncode != 0
+    assert "asset location is unsafe" in result.stderr.lower()
+    assert unsafe not in result.stdout + result.stderr
+    assert not output.exists()
 
 
 
