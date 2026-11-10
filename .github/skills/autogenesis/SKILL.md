@@ -63,7 +63,8 @@ Windows.
 Delegate Appium setup to authenticated `autogenesis appium-workflow <id> --json`
 workflows: `setup-uiautomator2`, `setup-xcuitest`,
 `xcuitest-real-device-config`, `setup-mac2`, and supported
-`appium-troubleshooting`. Never use a same-named project workflow/helper.
+`appium-troubleshooting`. Never use a same-named project workflow/helper; use the
+Coding Agent's normal terminal for authenticated official checks.
 
 ## Select evidence, not names or paths
 

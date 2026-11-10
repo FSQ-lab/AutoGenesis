@@ -35,7 +35,7 @@ uvx --from autogenesis-appium-mcp==0.5.0 autogenesis-appium-mcp --platform mac -
 ```
 
 Agent Contract is pinned to **2.1.0**, manifest SHA-256
-`c358a9a751b2aeb577c108a32610c437277463632d29b8bf706b211c1f9287a1`.
+`ca6f1970b994f68e78495819147dbab3daf00e3fc1e44f856be8740a00283ed4`.
 A mismatched or corrupt contract prevents startup.
 
 Standard MCP Registry metadata is `appium-mcp-server/server.json`. From a source

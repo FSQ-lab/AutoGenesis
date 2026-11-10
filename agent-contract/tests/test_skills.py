@@ -155,6 +155,7 @@ def test_skill_release_assets_match_contract_and_bootstrap_prompt(tmp_path, repo
     command_handlers = (
         repo_root / "bdd_ai_toolkit/src/bdd-feature-support/utils/CommandHandlers.ts"
     ).read_text(encoding="utf-8")
+    assert "skill.status !== 'ready'" in command_handlers
     assert "skill.status === 'invalid'" in command_handlers
     assert "differs from the authenticated release" in command_handlers
     assert "record-read-only-preview" in extension_service
@@ -162,7 +163,6 @@ def test_skill_release_assets_match_contract_and_bootstrap_prompt(tmp_path, repo
     assert "generated-file writes are unavailable" in extension_service
     assert "generateScenarioText" not in extension_service
     assert "generateBackgroundText" not in extension_service
-    assert "skill.status === 'absent'" in command_handlers
     assert "canonical autogenesis Skill is not installed" in command_handlers
     assert "autogenesis install for one explicit scope" in command_handlers
     assert "generateScenarioText" not in command_handlers

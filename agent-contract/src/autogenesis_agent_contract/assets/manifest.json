@@ -18,7 +18,7 @@
     "schemas/identity.schema.json": "f95e1f2e887cc0ee3877c00a4a96c4c9a6571bfebff47e439e3e50a68186bc4d",
     "schemas/manifest.schema.json": "42f81543e658c1d15a610c643fd1e7e664935178b1bdfb0084b6652d86810a4a",
     "schemas/secret-reference.schema.json": "163041e09fefed32640af4f785b0f29a1876666c210c8099a190cd3509f1404e",
-    "skills/autogenesis/SKILL.md": "a7bfc8d5d8e5bffaa2b74c3d33f1d170fcfe518113b4dc52dac7282d84fd13a0",
+    "skills/autogenesis/SKILL.md": "99e276bde9c95996d9d19c8f548eac41305cea61494a3955c4c6f44563f88f64",
     "workflows/execute_natural_language_task.md": "6f8150bdbae57000cf72089ababb37c7e01b1050e6d95d248dc0ab6f018ffc16",
     "workflows/execute_scenario.md": "e8c41dffcea6043f434e90460e0fdfa74a66465494aa52e8275e759450ef31c7",
     "workflows/generate_scenario_test.md": "87cff5bbc24cb05fa50837d38b3b13ce2dd09acd3653e728d8d9f7c0a18082a3"
