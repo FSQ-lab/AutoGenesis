@@ -76,8 +76,8 @@
       "id": "install-prompt-failure-cleanup-is-owned-and-scoped",
       "references": ["install"],
       "user_request": "Cancel this Candidate installation and roll it back.",
-      "stimuli": ["Prompt-created roots have captured no-follow filesystem identities and private markers. The environment and staging root still match, but the cache path was replaced after creation. Unrelated environments, project files, user configuration, and credentials exist. The Candidate was superseded after an identity mismatch."],
-      "expect": {"stop_owned_processes": true, "recheck_before_delete": true, "delete_matching_prompt_roots": true, "delete_identity_mismatch_root": false, "restore_write_capable_cache": false, "preserve_unrelated_state": true, "accepted": false}
+      "stimuli": ["No-follow handles for every approved parent/root are held for the transaction. An attacker swaps the cache pathname after a pathname check but before mutation, then swaps a cleanup pathname after a check but before deletion. Unrelated environments, project files, user configuration, and credentials exist. The Candidate was superseded after an identity mismatch."],
+      "expect": {"stop_owned_processes": true, "held_handles_entire_transaction": true, "pathname_pre_post_check_sufficient": false, "handle_relative_mutation_only": true, "swap_before_mutation_rejected_before_damage": true, "swap_before_deletion_deletes_either_object": false, "absolute_path_reresolution": false, "preserve_unrelated_state": true, "accepted": false}
     },
     {
       "id": "install-prompt-checksums-do-not-replace-external-anchor",

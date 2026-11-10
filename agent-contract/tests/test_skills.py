@@ -24,15 +24,22 @@ def _assert_hardened_install_prompt(prompt, channel):
     assert "before reserving a root" in prompt
     assert "environment's absolute Python or entrypoints only" in prompt
     assert "failure, cancellation, denial, digest or identity mismatch, supersession, or rollback" in prompt
-    assert "Delete only roots whose current no-follow filesystem identities" in prompt
+    assert "delete only roots whose handle-bound native identities" in prompt
     assert "Preserve every pre-existing environment" in prompt
     assert "treat it as `undisclosed` and stop before installation" in prompt
     assert "Redaction after reading" in prompt and "are forbidden" in prompt
-    assert "atomically and exclusively reserve each approved root" in prompt
-    assert "without following symlinks or reparse points" in prompt
+    assert "open and keep no-follow directory handles for every approved parent" in prompt
+    assert "for the entire transaction" in prompt
     assert "stable filesystem identity" in prompt and "private unpredictable ownership marker" in prompt
-    assert "before and after every mutation and immediately before deletion" in prompt
-    assert "identities and private ownership markers exactly match" in prompt
+    assert "pathname identity check before or after an operation is not sufficient" in prompt
+    assert "swap between check and mutation or deletion must be rejected before damage" in prompt
+    assert "every create, write, traversal, venv, staging, download, extraction, cache, Skill, MCP" in prompt
+    assert "handle-relative no-follow native primitives" in prompt
+    assert "platform-native atomic no-replace semantics" in prompt
+    assert "must never re-resolve an absolute pathname" in prompt
+    assert "stop before mutation and report the operation unsupported" in prompt
+    assert "never fall back to pathname checks" in prompt
+    assert "swap between check and deletion must stop without deleting either object" in prompt
     assert "isolated mode (`-I`, `-E`, `-s`, plus `-S`" in prompt
     assert "all `PYTHON*` variables (including `PYTHONPATH`)" in prompt and "`sitecustomize`" in prompt
     assert "every `PIP_*` and `UV_*` source, auth, config, cache, target, prefix, user, and override variable" in prompt
@@ -123,11 +130,18 @@ def test_guided_install_and_readiness_references_are_operational(repo_root):
         "Redaction after reading is not a safety boundary",
         "becomes `undisclosed`, and stops installation",
         "cancellation, denial, identity/digest mismatch, supersession, or rollback",
-        "Never delete or repurpose a pre-existing or mismatched path",
+        "Never delete or repurpose a pre-existing or mismatched object",
         "PYTHONPATH", "sitecustomize", "offline and no-index",
         "managed-policy`, `user-approved`, `default-public`, or `undisclosed",
         "private unpredictable ownership marker",
-        "before and after each mutation and immediately before deletion",
+        "keep no-follow directory handles for every approved parent",
+        "pathname identity check before or after an operation is insufficient",
+        "swap between check and mutation or deletion before damage",
+        "handle-relative no-follow native primitives",
+        "platform-native atomic no-replace semantics",
+        "never re-resolves an absolute pathname",
+        "never fall back to pathname checks",
+        "swap between check and deletion stops without deleting either object",
     ))
     assert all(value in readiness for value in (
         '"requestScope"', '"layers"', '"environment"', '"changes"',

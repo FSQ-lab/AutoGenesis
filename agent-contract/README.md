@@ -16,7 +16,7 @@ from mcp.server.fastmcp import FastMCP
 # These pins belong to the runtime release, independently of the installed wheel.
 required = RuntimeContractRequirement(
     contract_version="2.1.0",
-    manifest_sha256="fbc589c142c20d15eca44afb264b6debb2c60e9e54e9e77b345ddcce4e8be67e",
+    manifest_sha256="0b3f0e71800ed02c57c10146f6893dac7b864b8a54348c9c3516ab15bd65e145",
 )
 contract = load_contract(ContractIdentity(required.contract_version, required.manifest_sha256))
 appendix = load_project_appendix("/absolute/business-project")
@@ -113,10 +113,13 @@ Release URLs for public assets. `SHA256SUMS` is generated after the final prompt
 covers every shipped asset except itself; self-consistent copied bytes are insufficient.
 
 Each prompt names previously absent disposable environment, staging, download,
-extraction, and cache roots and requires explicit approval before reservation. It then
-atomically reserves each root without following symlinks/reparse points, captures its
-stable identity and a private ownership marker, and rechecks both around mutations and
-before deletion. Cleanup removes only still-matching prompt-owned identities.
+extraction, and cache roots and requires explicit approval before reservation. It keeps
+no-follow handles to every approved parent/root for the entire transaction. Every
+mutation and cleanup is handle-relative and no-follow; final placement is native atomic
+no-replace, and deletion is handle-/identity-bound without pathname re-resolution. A
+pre/post pathname check cannot authorize a mutation or deletion. If macOS/Windows
+tooling or a child cannot preserve the invariant, installation stops before mutation
+as unsupported rather than falling back to pathname checks.
 
 The base Python creates the venv in isolated mode. Every child receives an explicit
 minimal environment that omits all `PYTHON*`, startup customization, and pip/uv source,
