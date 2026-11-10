@@ -17,17 +17,30 @@ NAME = "autogenesis"
 
 def _assert_hardened_install_prompt(prompt, channel):
     assert f"exact {channel} identity" in prompt
-    assert "exact new absolute disposable virtual-environment path" in prompt
-    assert "Require the environment path to be absent" in prompt
-    assert "pre-existing environment" in prompt
+    assert "exact new absolute disposable virtual-environment, staging, download, extraction, and cache roots" in prompt
+    assert "Require every root to be absent" in prompt
+    assert "pre-existing state" in prompt
     assert "explicit user approval" in prompt
-    assert "before creating the environment" in prompt
+    assert "before reserving a root" in prompt
     assert "environment's absolute Python or entrypoints only" in prompt
     assert "failure, cancellation, denial, digest or identity mismatch, supersession, or rollback" in prompt
-    assert "delete only the prompt-created environment" in prompt
+    assert "Delete only roots whose current no-follow filesystem identities" in prompt
     assert "Preserve every pre-existing environment" in prompt
-    assert "label the source `undisclosed` and stop before installation" in prompt
-    assert "Redaction after reading is forbidden" in prompt
+    assert "treat it as `undisclosed` and stop before installation" in prompt
+    assert "Redaction after reading" in prompt and "are forbidden" in prompt
+    assert "atomically and exclusively reserve each approved root" in prompt
+    assert "without following symlinks or reparse points" in prompt
+    assert "stable filesystem identity" in prompt and "private unpredictable ownership marker" in prompt
+    assert "before and after every mutation and immediately before deletion" in prompt
+    assert "identities and private ownership markers exactly match" in prompt
+    assert "isolated mode (`-I`, `-E`, `-s`, plus `-S`" in prompt
+    assert "all `PYTHON*` variables (including `PYTHONPATH`)" in prompt and "`sitecustomize`" in prompt
+    assert "every `PIP_*` and `UV_*` source, auth, config, cache, target, prefix, user, and override variable" in prompt
+    assert "Disable user site, ambient package configuration, and ambient caches" in prompt
+    assert "After staging, every package operation is offline and no-index" in prompt
+    assert "managed-policy`, `user-approved`, `default-public`, or `undisclosed" in prompt
+    assert "canonical lowercase ASCII DNS hostname" in prompt
+    assert "self-attestation by an untrusted interface" in prompt
     assert all(forbidden not in prompt.lower() for forbidden in (
         "pip config", "uv config", "printenv", "authorization header:",
     ))
@@ -101,15 +114,20 @@ def test_guided_install_and_readiness_references_are_operational(repo_root):
         "configured/reload-required",
     ))
     assert all(value in install for value in (
-        "previously absent disposable virtual environment",
-        "explicit approval before creating it",
-        "only that environment's absolute Python and entrypoints",
-        "exact reviewed Actions artifact or immutable GitHub Release identity",
+        "previously absent disposable environment, staging, download, extraction, and cache roots",
+        "explicit approval before reservation",
+        "Use only the disposable environment's absolute Python and entrypoints",
+        "exact positive Actions run and run attempt",
+        "positive observed artifact ID",
         "checksums cover every final asset including the prompt and exclude only themselves",
         "Redaction after reading is not a safety boundary",
-        "source as `undisclosed` and stop before installation",
+        "becomes `undisclosed`, and stops installation",
         "cancellation, denial, identity/digest mismatch, supersession, or rollback",
-        "Never delete or repurpose a pre-existing path",
+        "Never delete or repurpose a pre-existing or mismatched path",
+        "PYTHONPATH", "sitecustomize", "offline and no-index",
+        "managed-policy`, `user-approved`, `default-public`, or `undisclosed",
+        "private unpredictable ownership marker",
+        "before and after each mutation and immediately before deletion",
     ))
     assert all(value in readiness for value in (
         '"requestScope"', '"layers"', '"environment"', '"changes"',
@@ -125,7 +143,7 @@ def test_guided_install_and_readiness_references_are_operational(repo_root):
 
 def test_skill_release_assets_match_contract_and_bootstrap_prompt(tmp_path, repo_root):
     output = tmp_path / "release"
-    base = "https://example.invalid/releases/agent-contract-v2.1.0"
+    base = "https://github.com/FSQ-lab/AutoGenesis/releases/download/agent-contract-v2.1.0"
     release_manifest = tmp_path / "release-manifest.json"
     packages = {
         "autogenesis-agent-contract": "2.1.0",
@@ -280,10 +298,11 @@ def test_candidate_channel_binds_exact_first_party_wheels_and_skill(tmp_path, re
             str(repo_root / "agent-contract/tools/build_candidate_release.py"),
             "--wheel-dir", str(wheel_dir),
             "--output-dir", str(output),
-            "--base-url", "https://example.invalid/candidate/abc",
+            "--base-url", ".",
             "--commit", commit,
             "--dependency-lock", str(dependency_lock),
             "--workflow-run-id", "123456",
+            "--workflow-run-attempt", "2",
         ],
         cwd=repo_root,
         capture_output=True,
@@ -299,7 +318,8 @@ def test_candidate_channel_binds_exact_first_party_wheels_and_skill(tmp_path, re
     assert manifest["provenance"] == {
         "repository": "FSQ-lab/AutoGenesis",
         "workflow_run_id": "123456",
-        "artifact": f"autogenesis-candidate-{commit}",
+        "workflow_run_attempt": "2",
+        "artifact": f"autogenesis-candidate-123456-2-{commit}",
     }
     assert manifest["first_party_index_fallback"] is False
     assert manifest["third_party_policy"] == "sanitized-source-with-release-hash-lock"
@@ -328,8 +348,11 @@ def test_candidate_channel_binds_exact_first_party_wheels_and_skill(tmp_path, re
 
     assert "force-reinstalled" in prompt
     _assert_hardened_install_prompt(prompt, "Candidate")
-    assert "exact Actions artifact" in prompt
+    assert "attempt-qualified artifact name" in prompt
     assert "workflow run `123456`" in prompt
+    assert "positive run attempt `2`" in prompt
+    assert "positive observed artifact ID" in prompt
+    assert "exactly one unexpired" in prompt
     assert "superseded run 42843125727" in prompt
     candidate_checksums = _checksums(output)
     assert set(candidate_checksums) == {path.name for path in output.iterdir()} - {"SHA256SUMS"}
@@ -356,10 +379,11 @@ def test_candidate_channel_rejects_incomplete_wheel_set(tmp_path, repo_root):
             str(repo_root / "agent-contract/tools/build_candidate_release.py"),
             "--wheel-dir", str(wheel_dir),
             "--output-dir", str(tmp_path / "candidate"),
-            "--base-url", "https://example.invalid/candidate/abc",
+            "--base-url", ".",
             "--commit", commit,
             "--dependency-lock", str(dependency_lock),
             "--workflow-run-id", "123456",
+            "--workflow-run-attempt", "2",
         ],
         cwd=repo_root,
         capture_output=True,
@@ -392,21 +416,51 @@ def test_candidate_channel_rejects_unhashed_dependency_lock(tmp_path, repo_root)
             str(repo_root / "agent-contract/tools/build_candidate_release.py"),
             "--wheel-dir", str(wheel_dir),
             "--output-dir", str(tmp_path / "candidate"),
-            "--base-url", "https://example.invalid/candidate/abc",
+            "--base-url", ".",
             "--commit", commit,
             "--dependency-lock", str(dependency_lock),
             "--workflow-run-id", "123456",
+            "--workflow-run-attempt", "2",
         ],
         cwd=repo_root, capture_output=True, text=True, check=False, timeout=10,
     )
     assert result.returncode != 0
     assert "dependency lock contains an unpinned or unsafe entry" in result.stderr
 
+
+@pytest.mark.parametrize("attempt", ["0", "-1", "not-a-number"])
+def test_candidate_channel_requires_positive_workflow_run_attempt(tmp_path, repo_root, attempt):
+    commit = subprocess.run(
+        ["git", "-C", str(repo_root), "rev-parse", "HEAD"],
+        check=True, capture_output=True, text=True,
+    ).stdout.strip()
+    result = subprocess.run([
+        sys.executable,
+        str(repo_root / "agent-contract/tools/build_candidate_release.py"),
+        "--wheel-dir", str(tmp_path / "unused-wheels"),
+        "--output-dir", str(tmp_path / "candidate"),
+        "--base-url", ".",
+        "--commit", commit,
+        "--dependency-lock", str(tmp_path / "unused.lock"),
+        "--workflow-run-id", "123456",
+        "--workflow-run-attempt", attempt,
+    ], cwd=repo_root, capture_output=True, text=True, check=False, timeout=10)
+    assert result.returncode != 0
+    assert "run attempt must be a positive integer" in result.stderr
+
 @pytest.mark.parametrize("unsafe", [
     "https://user:SYNTHETIC_URL_SECRET@example.invalid/release",
     "https://user:SYNTHETIC%2DENCODED%2DSECRET@example.invalid/release",
+    "https://github.com:443/FSQ-lab/AutoGenesis/releases/download/agent-contract-v2.1.0",
+    "https://github.com/FSQ-lab/AutoGenesis/releases/download/../agent-contract-v2.1.0",
+    "https://github.com/FSQ-lab\\AutoGenesis/releases/download/agent-contract-v2.1.0",
+    "https://github.com/FSQ-lab/AutoGenesis/releases/download/agent-contract-v2.1.0 ",
+    "https://github.com/FSQ-lab/AutoGenesis/releases/download/agent-contract-v2.1.0/SYNTHETIC_PATH_SECRET",
     "https://example.invalid/release?token=SYNTHETIC_QUERY_SECRET",
     "https://example.invalid/release#SYNTHETIC_FRAGMENT_SECRET",
+    "https://example.invalid/release\rSYNTHETIC_CR_SECRET",
+    "https://example.invalid/release\nSYNTHETIC_LF_SECRET",
+    "https://example.invalid/release\tSYNTHETIC_TAB_SECRET",
 ])
 @pytest.mark.parametrize("builder", ["candidate", "public"])
 def test_release_generators_reject_secret_bearing_asset_locations_without_echo(
@@ -427,6 +481,7 @@ def test_release_generators_reject_secret_bearing_asset_locations_without_echo(
             "--commit", commit,
             "--dependency-lock", str(tmp_path / "unused.lock"),
             "--workflow-run-id", "123456",
+            "--workflow-run-attempt", "2",
         ]
     else:
         command = [
@@ -435,7 +490,7 @@ def test_release_generators_reject_secret_bearing_asset_locations_without_echo(
             "--output-dir", str(output),
             "--base-url", unsafe,
             "--release-manifest", str(tmp_path / "unused-manifest.json"),
-            "--release-manifest-url", "https://example.invalid/release/release-manifest.json",
+            "--release-manifest-url", "https://github.com/FSQ-lab/AutoGenesis/releases/download/agent-contract-v2.1.0/release-manifest.json",
             "--dependency-lock", str(tmp_path / "unused.lock"),
         ]
     result = subprocess.run(
@@ -445,6 +500,57 @@ def test_release_generators_reject_secret_bearing_asset_locations_without_echo(
     assert "asset location is unsafe" in result.stderr.lower()
     assert unsafe not in result.stdout + result.stderr
     assert not output.exists()
+@pytest.mark.parametrize("unsafe_manifest", [
+    "https://user:SYNTHETIC_USERINFO_SECRET@github.com/FSQ-lab/AutoGenesis/releases/download/agent-contract-v2.1.0/release-manifest.json",
+    "https://github.com/FSQ-lab/AutoGenesis/releases/download/agent-contract-v2.1.0/SYNTHETIC_CREDENTIAL_PATH/release-manifest.json",
+    "https://github.com/FSQ-lab/AutoGenesis/releases/download/agent-contract-v2.1.0/release-manifest.json%3fSYNTHETIC_PERCENT_SECRET",
+    "https://github.com/FSQ-lab/AutoGenesis/releases/download/agent-contract-v2.1.0/release-manifest.json\rSYNTHETIC_CR_SECRET",
+    "https://github.com/FSQ-lab/AutoGenesis/releases/download/agent-contract-v2.1.0/release-manifest.json\nSYNTHETIC_LF_SECRET",
+    "https://github.com/FSQ-lab/AutoGenesis/releases/download/agent-contract-v2.1.0/release-manifest.json\tSYNTHETIC_TAB_SECRET",
+])
+def test_public_generator_rejects_manifest_url_injection_without_echo(tmp_path, repo_root, unsafe_manifest):
+    output = tmp_path / "release"
+    result = subprocess.run([
+        sys.executable,
+        str(repo_root / "agent-contract/tools/build_skill_release.py"),
+        "--output-dir", str(output),
+        "--base-url", "https://github.com/FSQ-lab/AutoGenesis/releases/download/agent-contract-v2.1.0",
+        "--release-manifest", str(tmp_path / "unused-manifest.json"),
+        "--release-manifest-url", unsafe_manifest,
+        "--dependency-lock", str(tmp_path / "unused.lock"),
+    ], cwd=repo_root, capture_output=True, text=True, check=False, timeout=10)
+    assert result.returncode != 0
+    assert "asset location is unsafe" in result.stderr.lower()
+    assert unsafe_manifest not in result.stdout + result.stderr
+    assert not output.exists()
+
+
+
+
+@pytest.mark.parametrize(("host", "source"), [
+    ("https://pypi.org", "default-public"),
+    ("pypi.org:443", "default-public"),
+    ("user@pypi.org", "user-approved"),
+    ("pypi.org/SYNTHETIC_PATH_CANARY", "managed-policy"),
+    ("pypi.org%2fSYNTHETIC_PERCENT_CANARY", "managed-policy"),
+    ("pypi.org\nSYNTHETIC_CONTROL_CANARY", "default-public"),
+    ("Pypi.org", "default-public"),
+    ("pypi.org", "SYNTHETIC_SOURCE_CLASS_CANARY"),
+])
+def test_source_metadata_injection_becomes_undisclosed_before_echo(repo_root, host, source):
+    module = runpy.run_path(str(repo_root / "agent-contract/tools/install_prompt.py"))
+    assert module["validate_source_metadata"](host, source) == ("undisclosed", "undisclosed")
+
+
+@pytest.mark.parametrize(("host", "source"), [
+    ("pypi.org", "default-public"),
+    ("packages.example", "managed-policy"),
+    ("192.0.2.1", "user-approved"),
+    ("[2001:db8::1]", "managed-policy"),
+])
+def test_source_metadata_accepts_only_canonical_host_and_finite_source_class(repo_root, host, source):
+    module = runpy.run_path(str(repo_root / "agent-contract/tools/install_prompt.py"))
+    assert module["validate_source_metadata"](host, source) == (host, source)
 
 
 

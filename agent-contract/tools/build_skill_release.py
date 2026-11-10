@@ -10,7 +10,7 @@ from pathlib import Path
 
 from _files import atomic_write
 from freeze_assets import PACKAGE, load_asset_io, release_bytes
-from install_prompt import hardened_install_contract, sanitized_asset_location
+from install_prompt import RELEASE_TAG, hardened_install_contract, public_asset_locations
 
 SKILLS = ("autogenesis",)
 EXPECTED = {
@@ -62,8 +62,7 @@ def main() -> None:
     parser.add_argument("--dependency-lock", type=Path, required=True)
     args = parser.parse_args()
     try:
-        base = sanitized_asset_location(args.base_url)
-        release_manifest_url = sanitized_asset_location(args.release_manifest_url)
+        base, release_manifest_url = public_asset_locations(args.base_url, args.release_manifest_url)
     except ValueError:
         raise SystemExit("Release asset location is unsafe.") from None
     repo = Path(__file__).resolve().parents[2]
@@ -154,7 +153,7 @@ def main() -> None:
         channel="public Release",
         external_anchor=(
             "Require the published immutable GitHub Release in `FSQ-lab/AutoGenesis`, tag "
-            f"`agent-contract-v2.1.0`, exact tag commit `{release_commit}`, and one observed positive Release ID. "
+            f"`{RELEASE_TAG}`, exact tag commit `{release_commit}`, and one observed positive Release ID. "
             "Bind the immutable Release's exact asset IDs, names, and sizes before download; reject a draft, "
             "mutable release, tag/commit mismatch, different Release ID, or copied asset directory."
         ),
@@ -177,7 +176,7 @@ def main() -> None:
     )
     prompt = f"""Install the official AutoGenesis Skill and CLI, then stop before running a business task.
 
-Immutable Release: https://github.com/FSQ-lab/AutoGenesis/releases/tag/agent-contract-v2.1.0
+Immutable Release: https://github.com/FSQ-lab/AutoGenesis/releases/tag/{RELEASE_TAG}
 Expected Release tag commit: {release_commit}
 Immutable Skill source: {base}/{skill_filename}
 Expected Skill SHA-256: {skill_digest}

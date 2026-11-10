@@ -16,7 +16,7 @@ from pathlib import Path
 
 from _files import atomic_write
 from freeze_assets import PACKAGE, load_asset_io, release_bytes
-from install_prompt import hardened_install_contract, sanitized_asset_location
+from install_prompt import REPOSITORY, candidate_asset_location, hardened_install_contract
 
 EXPECTED = {
     "autogenesis-agent-contract": "2.1.0",
@@ -35,7 +35,6 @@ _HASH = re.compile(r"--hash=sha256:[0-9a-f]{64}(?:\s|$)")
 SKILL = "skills/autogenesis/SKILL.md"
 _MAX_WHEEL_BYTES = 64 * 1024 * 1024
 _MAX_METADATA_BYTES = 256 * 1024
-REPOSITORY = "FSQ-lab/AutoGenesis"
 
 
 def _read_regular(path: Path, maximum: int) -> bytes:
@@ -147,13 +146,16 @@ def main() -> None:
     parser.add_argument("--commit", required=True)
     parser.add_argument("--dependency-lock", required=True, type=Path)
     parser.add_argument("--workflow-run-id", required=True)
+    parser.add_argument("--workflow-run-attempt", required=True)
     args = parser.parse_args()
     if re.fullmatch(r"[0-9a-f]{40}", args.commit) is None:
         raise SystemExit("Candidate commit must be an exact lowercase Git commit.")
     if not args.workflow_run_id.isdigit() or int(args.workflow_run_id) < 1:
         raise SystemExit("Candidate workflow run ID must be a positive integer.")
+    if not args.workflow_run_attempt.isdigit() or int(args.workflow_run_attempt) < 1:
+        raise SystemExit("Candidate workflow run attempt must be a positive integer.")
     try:
-        base = sanitized_asset_location(args.base_url, allow_local=True)
+        base = candidate_asset_location(args.base_url)
     except ValueError:
         raise SystemExit("Candidate asset location is unsafe.") from None
 
@@ -241,7 +243,8 @@ def main() -> None:
         "provenance": {
             "repository": REPOSITORY,
             "workflow_run_id": args.workflow_run_id,
-            "artifact": f"autogenesis-candidate-{args.commit}",
+            "workflow_run_attempt": args.workflow_run_attempt,
+            "artifact": f"autogenesis-candidate-{args.workflow_run_id}-{args.workflow_run_attempt}-{args.commit}",
         },
         "commit": args.commit,
         "contract": {
@@ -282,9 +285,12 @@ def main() -> None:
     contract = hardened_install_contract(
         channel="Candidate",
         external_anchor=(
-            f"Require the authenticated GitHub Actions artifact `{artifact_name}` from repository "
-            f"`{REPOSITORY}`, workflow run `{args.workflow_run_id}`, and exact commit `{args.commit}`; "
-            "reject a local directory, artifact from another run/commit, or the superseded run 42843125727."
+            f"In canonical repository `{REPOSITORY}`, require exact Actions run `{args.workflow_run_id}`, "
+            f"positive run attempt `{args.workflow_run_attempt}`, head commit `{args.commit}`, and attempt-qualified "
+            f"artifact name `{artifact_name}`. Before interpreting bundle instructions, resolve exactly one unexpired "
+            "immutable GitHub Actions artifact with a positive observed artifact ID matching all those fields, then "
+            "download by that artifact ID. Reject a local directory, zero/multiple/expired artifact matches, another "
+            "run/attempt/commit/name, or superseded run 42843125727."
         ),
         acquire=(
             "Use only the manifest-bound first-party wheels, locks, and Skill bytes already obtained "
@@ -311,6 +317,8 @@ Complete checksums: {base}/SHA256SUMS
 Candidate commit: {args.commit}
 GitHub Actions repository: {REPOSITORY}
 GitHub Actions workflow run: {args.workflow_run_id}
+GitHub Actions workflow run attempt: {args.workflow_run_attempt}
+GitHub Actions artifact ID: resolve one positive immutable ID externally before interpreting this bundle
 GitHub Actions artifact: {artifact_name}
 
 {contract}""".encode("utf-8")

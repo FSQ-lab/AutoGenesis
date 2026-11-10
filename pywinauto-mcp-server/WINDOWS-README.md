@@ -39,7 +39,7 @@ uvx --from autogenesis-windows-mcp==0.5.0 autogenesis-windows-mcp --config ./app
 
 The runtime depends exactly on autogenesis-agent-contract==2.1.0 and requires
 manifest SHA-256
-33c1cf4b22d21c5cf33a012c78dbfe59265db65bbc9c6b94b22681289a04f79d.
+fbc589c142c20d15eca44afb264b6debb2c60e9e54e9e77b345ddcce4e8be67e.
 Missing, corrupt or incompatible contract assets fail startup.
 
 Standard MCP Registry metadata is `pywinauto-mcp-server/server.json`. From a

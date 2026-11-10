@@ -474,11 +474,13 @@ class ReleaseWorkflowSafetyTests(unittest.TestCase):
         workflow = self.candidate_workflow
         build = workflow.index("python agent-contract/tools/build_candidate_release.py")
         run_anchor = workflow.index('--workflow-run-id "${{ github.run_id }}"', build)
-        upload = workflow.index("name: Upload exact Candidate channel", run_anchor)
+        attempt_anchor = workflow.index('--workflow-run-attempt "${{ github.run_attempt }}"', run_anchor)
+        upload = workflow.index("name: Upload exact Candidate channel", attempt_anchor)
 
         self.assertLess(build, run_anchor)
-        self.assertLess(run_anchor, upload)
-        self.assertIn("autogenesis-candidate-${{ env.CANDIDATE_COMMIT }}", workflow[upload:])
+        self.assertLess(run_anchor, attempt_anchor)
+        self.assertLess(attempt_anchor, upload)
+        self.assertIn("autogenesis-candidate-${{ github.run_id }}-${{ github.run_attempt }}-${{ env.CANDIDATE_COMMIT }}", workflow[upload:])
 
     def test_tag_is_absent_or_exact_before_draft_and_rechecked_around_publish(self):
         workflow = self.workflow

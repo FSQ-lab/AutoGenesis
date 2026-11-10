@@ -214,11 +214,11 @@ def test_agent_install_prompt_gates_host_and_converges_on_shared_installer(tmp_p
             "--output-dir",
             str(output),
             "--base-url",
-            "https://example.invalid/immutable",
+            "https://github.com/FSQ-lab/AutoGenesis/releases/download/agent-contract-v2.1.0",
             "--release-manifest",
             str(release_manifest),
             "--release-manifest-url",
-            "https://example.invalid/immutable/release-manifest.json",
+            "https://github.com/FSQ-lab/AutoGenesis/releases/download/agent-contract-v2.1.0/release-manifest.json",
             "--dependency-lock",
             str(dependency_lock),
         ],
@@ -234,14 +234,14 @@ def test_agent_install_prompt_gates_host_and_converges_on_shared_installer(tmp_p
     anchor = prompt.index("published immutable GitHub Release")
     closure = prompt.index("complete final asset set")
     approve = prompt.index("Obtain explicit user approval")
-    create = prompt.index("Only after approval, create the approved path")
+    create = prompt.index("Only after approval, atomically and exclusively reserve")
     acquire = prompt.index("Download the Release manifest")
     install = prompt.index("install that same complete lock")
     assert gate < anchor < closure < approve < create < acquire < install
     assert "Accept only native macOS or native Windows" in prompt
     assert "reject Linux and WSL" in prompt
-    assert "exact new absolute disposable virtual-environment path" in prompt
-    assert "source `undisclosed` and stop before installation" in prompt
+    assert "exact new absolute disposable virtual-environment, staging, download, extraction, and cache roots" in prompt
+    assert "treat it as `undisclosed` and stop before installation" in prompt
     assert "exact asset IDs, names, and sizes" in prompt
     assert "checksums are internal closure only" in prompt.lower()
 

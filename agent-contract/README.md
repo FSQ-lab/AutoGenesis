@@ -16,7 +16,7 @@ from mcp.server.fastmcp import FastMCP
 # These pins belong to the runtime release, independently of the installed wheel.
 required = RuntimeContractRequirement(
     contract_version="2.1.0",
-    manifest_sha256="33c1cf4b22d21c5cf33a012c78dbfe59265db65bbc9c6b94b22681289a04f79d",
+    manifest_sha256="fbc589c142c20d15eca44afb264b6debb2c60e9e54e9e77b345ddcce4e8be67e",
 )
 contract = load_contract(ContractIdentity(required.contract_version, required.manifest_sha256))
 appendix = load_project_appendix("/absolute/business-project")
@@ -104,24 +104,34 @@ never returns appendix text or a user's absolute project path. Its schema is
 ## Agent Install Prompt boundary
 
 Candidate and public generators share one fail-closed installation contract. The
-Candidate prompt is externally anchored to one authenticated Actions repository,
-run, commit, and artifact; the public prompt is anchored to one published immutable
-GitHub Release ID, tag, commit, and exact asset set. `SHA256SUMS` is generated only
-after the final prompt and covers every shipped asset except itself. A complete,
-self-consistent copied directory is not an external trust anchor.
+Candidate prompt is externally anchored to one canonical repository, positive Actions
+run and attempt, head commit, attempt-qualified name, and exactly one unexpired
+immutable artifact with a positive observed artifact ID. The public prompt is anchored
+to the exact canonical immutable GitHub Release ID, tag, commit, and asset set. The
+builders accept only local `.` for Candidate assets and the exact canonical GitHub
+Release URLs for public assets. `SHA256SUMS` is generated after the final prompt and
+covers every shipped asset except itself; self-consistent copied bytes are insufficient.
 
-Each prompt names a previously absent disposable virtual-environment path dedicated
-to that exact installation and requires explicit approval before its creation. All
-subsequent Python, package, Runtime, CLI, and verification operations use only that
-environment's absolute entrypoints. Failure, cancellation, denial, identity/digest
-mismatch, supersession, and rollback stop owned processes and delete the prompt-created
-environment and prompt-created install state while preserving unrelated state.
+Each prompt names previously absent disposable environment, staging, download,
+extraction, and cache roots and requires explicit approval before reservation. It then
+atomically reserves each root without following symlinks/reparse points, captures its
+stable identity and a private ownership marker, and rechecks both around mutations and
+before deletion. Cleanup removes only still-matching prompt-owned identities.
 
-Package-source evidence is limited to host-only and config-source-class metadata
-provided without reading full URLs, credentials, environment values, raw pip/uv
-configuration, errors, command output, or evidence payloads. Redaction after reading
-is forbidden. If a trusted secret-free disclosure is unavailable, the source is
-`undisclosed` and installation stops before mutation.
+The base Python creates the venv in isolated mode. Every child receives an explicit
+minimal environment that omits all `PYTHON*`, startup customization, and pip/uv source,
+auth, config, cache, target, prefix, user, and override variables by name without
+reading values. No ambient package config/cache is inherited; source/auth flows only
+through the approved opaque non-disclosing interface and package operations become
+offline/no-index after staging. All subsequent operations use absolute disposable-
+environment entrypoints.
+
+Before echo/use, source metadata must be a canonical lowercase ASCII DNS hostname,
+canonical IP literal, and one finite class: `managed-policy`, `user-approved`,
+`default-public`, or `undisclosed`. Interface trust is independent, not self-attested.
+Invalid metadata is never echoed and becomes `undisclosed`, stopping installation.
+Full URLs, credentials, environment/config values, errors, output, and evidence are
+never read for disclosure; redaction after reading is forbidden.
 
 ## Integrity and diagnostics
 
