@@ -34,7 +34,7 @@ def public_asset_locations(base: str, manifest: str) -> tuple[str, str]:
     expected_manifest = f"{RELEASE_BASE}/release-manifest.json"
     if base != RELEASE_BASE or manifest != expected_manifest:
         raise ValueError("asset location is unsafe")
-    for value, expected_path in ((base, f"/releases/download/{RELEASE_TAG}"), (manifest, f"/releases/download/{RELEASE_TAG}/release-manifest.json")):
+    for value, expected_path in ((base, f"/{REPOSITORY}/releases/download/{RELEASE_TAG}"), (manifest, f"/{REPOSITORY}/releases/download/{RELEASE_TAG}/release-manifest.json")):
         parsed = urlsplit(value)
         if (
             parsed.scheme != "https"
