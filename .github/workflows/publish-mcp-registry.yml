@@ -468,8 +468,8 @@ jobs:
           gh release create "$RELEASE_TAG" --draft \
             --repo "$GITHUB_REPOSITORY" \
             --target "$GITHUB_SHA" \
-            --title "AutoGenesis Agent Contract 2.1.0" \
-            --notes "Canonical AutoGenesis Agent Skills and verified Agent Install Prompt."
+            --title "AutoGenesis 1.1.1 Skills Preview" \
+            --notes "AutoGenesis 1.1.1 Skills Preview: canonical Agent Skills and verified Agent Install Prompt. Technical package identities remain Contract 2.1.0, Appium/Windows 0.5.0, and CLI 0.2.0."
           draft_id="$(
             gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" \
               --json databaseId,isDraft,tagName,targetCommitish \
