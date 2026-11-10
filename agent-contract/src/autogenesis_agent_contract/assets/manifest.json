@@ -1,13 +1,13 @@
 {
   "assets": {
     "appium-skills/manifest.json": "eee4d197f70c9100a767755c95edf41067b6e1da4d6571517c2fc509a1c38f4a",
-    "core-policy.md": "fe445982c40b0f2a5a3561ed32f6d1ba2924fe9990e511aa680e3d89a80f40cc",
+    "core-policy.md": "b7a7f2190e97d7f7d77814ca365dcd161249fa4f094c946e8b5430627becad12",
     "references/android-execution.md": "678c08a27bf823e90d022f6b75c8ba1c13935c15bf661063a44817780bec0c0c",
     "references/android-readiness.md": "96e810e92aa192a67579e717407d37c9fd888a8fb08985c1781bad98b003d709",
     "references/appium-environment.md": "44cccb34e6a51673465a193295d6b742534c1da8941d36dc510d6200ce9479d9",
     "references/apple-execution.md": "801039cdb1ab9771e17d23c87fbedbca4f2c1b691a3d87aa561f32e7c6acf91d",
-    "references/execution-common.md": "7f43d31b5ad9ca76e87e358840ff9b0f101c61080ea4443d56808dd8d1030b19",
-    "references/install.md": "0cc5ac3b294e993b560186b1669e76ee82aa8b67b0e8c9844bbf4095f6a78cdc",
+    "references/execution-common.md": "d6a9961040f9b94e9da5b64e3f92c6001133e434ba84f489606ae2e50403e199",
+    "references/install.md": "58ed53571a7b84764069fe97672c8df2f3ce4e6492c5e6261f30a6197b98b513",
     "references/ios-real-device-readiness.md": "ccbfd87222f34ea15b3f3dc33e33b7437733765dfb160086eb0ec518506985f9",
     "references/ios-simulator-readiness.md": "2749588df15eeb7824420be95c6e40a47d9d6ef4382ec155790a0cd00084ca50",
     "references/macos-readiness.md": "3f3f1b4437ae3d49832cd93a81d7f857f82fa7c5bbf98b1bb0e416bc284c042c",
@@ -18,10 +18,10 @@
     "schemas/identity.schema.json": "f95e1f2e887cc0ee3877c00a4a96c4c9a6571bfebff47e439e3e50a68186bc4d",
     "schemas/manifest.schema.json": "42f81543e658c1d15a610c643fd1e7e664935178b1bdfb0084b6652d86810a4a",
     "schemas/secret-reference.schema.json": "163041e09fefed32640af4f785b0f29a1876666c210c8099a190cd3509f1404e",
-    "skills/autogenesis/SKILL.md": "1d1bfffc3e467a4a6cafbbf860740a1ee58f33dad522336779f0da8107464771",
+    "skills/autogenesis/SKILL.md": "99e276bde9c95996d9d19c8f548eac41305cea61494a3955c4c6f44563f88f64",
     "workflows/execute_natural_language_task.md": "6f8150bdbae57000cf72089ababb37c7e01b1050e6d95d248dc0ab6f018ffc16",
     "workflows/execute_scenario.md": "e8c41dffcea6043f434e90460e0fdfa74a66465494aa52e8275e759450ef31c7",
-    "workflows/generate_scenario_test.md": "65bcd4bcb04a16a8fae6364ad04142162223ac7a64c2b47f37371f0eb981930f"
+    "workflows/generate_scenario_test.md": "87cff5bbc24cb05fa50837d38b3b13ce2dd09acd3653e728d8d9f7c0a18082a3"
   },
   "contract_version": "2.1.0",
   "schema_version": 2

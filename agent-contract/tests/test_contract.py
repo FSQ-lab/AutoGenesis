@@ -118,14 +118,17 @@ def test_absent_appendix_is_explicit_empty_block(contract):
     assert appendix["present"] is False and appendix["content"] == "" and appendix["sha256"] is None
 
 
-def test_only_generate_workflow_references_generation_tools(contract):
-    generation_tools = ("before_gen_code", "preview_code_changes", "confirm_code_changes")
+def test_only_generate_workflow_references_read_only_generation_tools(contract):
+    read_only_tools = ("before_gen_code", "preview_code_changes")
     for name in ("execute_scenario", "execute_natural_language_task"):
         argument = "task_text" if name == "execute_natural_language_task" else "scenario_text"
         prompt = contract.render(name, {argument: "Open the app"})
-        assert all(tool not in prompt for tool in generation_tools)
+        assert all(tool not in prompt for tool in (*read_only_tools, "confirm_code_changes"))
     generated = contract.render("generate_scenario_test", {"scenario_text": "Given the app is open", "feature_file_path": "a.feature"})
-    assert all(tool in block(generated, "official-workflow") for tool in generation_tools)
+    workflow = block(generated, "official-workflow")
+    assert all(tool in workflow for tool in read_only_tools)
+    assert "confirm_code_changes" not in workflow
+    assert "generated-file writes are unavailable" in workflow
 
 
 @pytest.mark.parametrize("workflow,arguments", [

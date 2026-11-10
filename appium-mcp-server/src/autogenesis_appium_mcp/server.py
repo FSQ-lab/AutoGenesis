@@ -32,7 +32,7 @@ from .utils.logger import configure_logging
 
 from .stdio import cancellable_stdio
 REQUIREMENT = RuntimeContractRequirement(
-    "2.1.0", "3768d673273fc82609a94a218a355622233e10892a9f2392688711aa4572d32c",
+    "2.1.0", "ca6f1970b994f68e78495819147dbab3daf00e3fc1e44f856be8740a00283ed4",
 )
 
 

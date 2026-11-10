@@ -43,37 +43,25 @@ export class CommandHandlers {
         return;
       }
 
-      // Extract background if exists
-      const background = this.featureParser
-        .getBackgroundExtractor()
-        .extractBackground(document);
 
-      // Check if the canonical AutoGenesis skill exists in the workspace
+      // Only an authenticated canonical Skill may define execution or recording.
       const skillName = 'autogenesis';
-      let textToSend: string;
       const skill = this.copilotService.loadSkillContent(skillName, uri.fsPath);
 
-      if (skill.status === 'invalid') {
-        vscode.window.showErrorMessage('The discovered autogenesis Skill differs from the authenticated release. Run autogenesis install for one explicit scope.');
+      if (skill.status !== 'ready') {
+        const message = skill.status === 'invalid'
+          ? 'The discovered autogenesis Skill differs from the authenticated release. Run autogenesis install for one explicit scope, reload this window, and retry.'
+          : 'The canonical autogenesis Skill is not installed. Run autogenesis install for one explicit scope, reload this window, and retry.';
+        vscode.window.showErrorMessage(message);
         return;
       }
-      if (skill.status === 'ready') {
-        // Bind the invocation to the exact Feature path and selected line.
-        textToSend = this.copilotService.generateSkillCommand(
-          skillName,
-          scenarioName,
-          uri.fsPath,
-          lineNumber,
-          skill.content
-        );
-      } else {
-        // Fallback: generate full prompt text for Copilot
-        textToSend = await this.copilotService.generateScenarioText(
-          scenario,
-          uri.fsPath,
-          background || undefined
-        );
-      }
+      const textToSend = this.copilotService.generateSkillCommand(
+        skillName,
+        scenarioName,
+        uri.fsPath,
+        lineNumber,
+        skill.content
+      );
 
       // Copy to clipboard and open Copilot chat
       await vscode.env.clipboard.writeText(textToSend);
@@ -167,10 +155,21 @@ export class CommandHandlers {
         return;
       }
 
-      // Generate text for Copilot
-      const backgroundText = await this.copilotService.generateBackgroundText(
-        background,
-        uri.fsPath
+      const skillName = 'autogenesis';
+      const skill = this.copilotService.loadSkillContent(skillName, uri.fsPath);
+      if (skill.status !== 'ready') {
+        const message = skill.status === 'invalid'
+          ? 'The discovered autogenesis Skill differs from the authenticated release. Run autogenesis install for one explicit scope, reload this window, and retry.'
+          : 'The canonical autogenesis Skill is not installed. Run autogenesis install for one explicit scope, reload this window, and retry.';
+        vscode.window.showErrorMessage(message);
+        return;
+      }
+      const backgroundText = this.copilotService.generateSkillCommand(
+        skillName,
+        backgroundName,
+        uri.fsPath,
+        lineNumber,
+        skill.content
       );
 
       // Copy to clipboard and open Copilot chat

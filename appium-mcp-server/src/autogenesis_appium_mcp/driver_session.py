@@ -35,7 +35,6 @@ class DriverSessionManager:
         self.gen_code_id = None
         self.gen_code_cache = []
         self.proposed_changes = None  # Store proposed code changes
-        self.pending_write = None
         self.recording_warnings = []
         self.header_code = ""
         self._driver = None
@@ -294,7 +293,6 @@ class DriverSessionManager:
     def clear_gen_code_cache(self):
         self.gen_code_cache.clear()
         self.gen_code_id = None
-        self.pending_write = None
         self.recording_warnings.clear()
         self.proposed_changes = None
         self.header_code = ""

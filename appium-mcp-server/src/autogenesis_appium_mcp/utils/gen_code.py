@@ -488,7 +488,6 @@ def record_calls(browser_manager):
                     warning = f"reauthor.{func.__name__}"
                     if warning not in browser_manager.recording_warnings:
                         browser_manager.recording_warnings.append(warning)
-                    browser_manager.pending_write = None
                     browser_manager.proposed_changes = None
                     return result
                 call_info = {}
@@ -521,7 +520,6 @@ def record_calls(browser_manager):
                     call_info['gen_code_id'] = browser_manager.gen_code_id
                     call_info['tool_name'] = func.__name__
                     call_info['tool_params'] = tool_params
-                    browser_manager.pending_write = None
                     browser_manager.proposed_changes = None
                     browser_manager.gen_code_cache.append(call_info)
                     logger.info("Operation diagnostic; private details omitted")
