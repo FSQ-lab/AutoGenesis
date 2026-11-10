@@ -51,10 +51,11 @@ same Skill and MCP packages.
   execute the Scenario and return a read-only generated-code preview.
 
 > [!IMPORTANT]
-> The Skills Preview cannot commit generated files. Its live Runtime schemas do
-> not expose a generated-code confirmation or write operation. Recording stops
-> after the preview, so you must not treat the preview as a committed or
-> replayable test.
+> The release-gated Skills Preview cannot commit generated files: after #72 is
+> integrated, live Runtime schemas omit generated-code confirmation and write
+> operations, and recording stops after the preview. Until that integration is
+> present in the exact artifact under review, do not claim or exercise this safe
+> Preview boundary. A preview is never a committed or replayable test.
 
 ```gherkin
 Feature: Calculator
@@ -97,81 +98,49 @@ or evidence that every Skills Preview journey is qualified.
 ## Get started
 
 > [!WARNING]
-> **Pre-release Candidate only.** The Skills Preview packages and immutable
-> GitHub Release assets are not public yet. Do not construct a version-shaped
-> Release URL or install the intended versions from a package index. Approved
-> evaluators must use the complete, commit-bound
-> `autogenesis-candidate-<40-character-commit>` artifact from the successful
-> **Quality Gates / Build exact Candidate channel** job for the exact commit
-> under evaluation.
+> **Not yet available for public installation.** Public users must wait for the
+> immutable Release assets listed under [Pending public release
+> coordinates](#pending-public-release-coordinates). Do not construct a
+> version-shaped Release URL, install the intended versions from a package
+> index, or obtain a CI Candidate from an untrusted party.
 
-### What you need
+### Before publication: maintainers and independent acceptors only
 
-- Native macOS or native Windows; Linux and WSL are unsupported.
-- Python 3.10 or newer.
-- A Coding Agent with Agent Skills discovery and standard stdio MCP support.
-- The complete Candidate bundle for one exact reviewed commit.
-- The application, device, simulator, emulator, or remote provider required by
-  the selected task.
+The commit-bound Candidate channel is not a public onboarding path. A maintainer
+or assigned independent acceptor may use it solely for release acceptance:
 
-The only qualified first-use journey in this Preview is OMP 18.18.3 on native
-macOS with Calculator. Other clients and journeys retain the status shown in
-[Support status](#support-status).
+1. Select the successful **Quality Gates / Build exact Candidate channel** job
+   for the exact trusted head commit under review. Obtain the artifact through
+   authenticated repository access and record the workflow run, job, head SHA,
+   artifact identity, size, and service-reported artifact digest.
+2. Before extracting the archive or reading, displaying, copying, or following
+   any contained prompt, manifest, lock, checksum, or filename, verify the
+   downloaded archive bytes against that trusted exact-head CI artifact digest.
+   A filename, commit embedded inside the archive, or checksum supplied only by
+   the archive cannot authenticate the archive itself.
+3. Extract into a new private directory, then validate the complete internal
+   `SHA256SUMS` set before interpreting `candidate-install-prompt.txt` or any
+   manifest/lock. Stop on any missing, extra, or mismatched asset.
+4. Perform Agent-first and CLI-first acceptance only in a dedicated disposable
+   Python virtual environment and disposable business project. Delete both to
+   roll back; never force-reinstall into an arbitrary active Python environment.
+5. If a third-party registry is required, let the package manager use its
+   existing trusted configuration opaquely. Do not read, print, copy, or expose
+   credential values or a credential-bearing URL. Evidence may name only the
+   sanitized registry host and configuration source; omit userinfo, tokens,
+   credentials, and URL query strings.
+6. Require one canonical `autogenesis` Skill, the applicable stdio Runtime,
+   matching Agent Contract identity, and the business outcome. A package
+   version, destination file, or standalone MCP probe alone is not acceptance.
 
-### Agent-first installation (primary)
-
-1. Download the Candidate artifact from the successful Quality Gates run for
-   the exact reviewed commit. Keep the extracted directory intact; its manifest,
-   locks, wheels, Skill, and checksums are one bundle.
-2. Make that directory available to the Coding Agent and give it
-   `candidate-install-prompt.txt` verbatim. Do not copy an install prompt from a
-   different commit.
-3. Let the Agent identify the native host, Python environment, package policy,
-   Skill scope, destinations, and rollback. Review its exact effect set before
-   approving downloads, process execution, or writes.
-4. After installation, reload the Agent's Skill and MCP discovery. Ask it to
-   prove that exactly one `autogenesis` Skill resolves to the Candidate bytes,
-   that the applicable stdio Runtime initializes, and that the Runtime's Agent
-   Contract identity matches the installed Contract.
-5. Continue with the original task. A package version, destination file, or
-   standalone MCP probe alone is not a ready Agent connection.
-
-The Candidate prompt installs only the host-applicable verified wheel set and
-one canonical `autogenesis` Skill. The Skill then owns capability preparation,
-MCP configuration, readiness, execution, diagnosis, and continuation of the
-user's original request.
-
-### CLI-first installation (secondary)
-
-CLI-first uses the same Candidate bytes. It is for evaluators who want to stage
-the authenticated package transaction themselves before handing control to the
-Skill. From native macOS, set the two paths and run:
-
-```bash
-CANDIDATE_DIR=/absolute/path/to/extracted-candidate
-BUSINESS_PROJECT=/absolute/path/to/business-project
-
-(cd "$CANDIDATE_DIR" && shasum -a 256 -c SHA256SUMS)
-python3 -m pip download \
-  --require-hashes \
-  --requirement "$CANDIDATE_DIR/candidate-dependencies.lock" \
-  --dest "$CANDIDATE_DIR/candidate-wheelhouse"
-python3 -m pip install \
-  --force-reinstall \
-  --no-deps \
-  --no-index \
-  --find-links "$CANDIDATE_DIR" \
-  --find-links "$CANDIDATE_DIR/candidate-wheelhouse" \
-  --require-hashes \
-  --requirement "$CANDIDATE_DIR/candidate-install.lock"
-autogenesis install --scope project --project-root "$BUSINESS_PROJECT"
-```
-
-Use the selected package index only for the strict-hash dependency download.
-The offline install must resolve the first-party wheels from the Candidate
-bundle, not from an index. Use `--scope user` instead only when user-wide Skill
-discovery is intentional. Then reload the Agent and require the same Skill,
-stdio MCP, and Contract identity proof as the Agent-first route.
+The eventual public onboarding remains Agent-first primary and CLI-first
+secondary. The Agent-first route will consume the published
+`agent-install-prompt.txt`. The CLI-first route will authenticate the same
+published manifest, Skill, and lock, create a dedicated disposable virtual
+environment, install only inside it, run `autogenesis install` for the selected
+Skill scope, and document rollback as deleting that environment plus the
+explicitly installed Skill bytes. Exact public commands must not be added until
+the immutable URLs and digests exist.
 
 ## Qualified first journey
 
@@ -254,10 +223,30 @@ artifacts today.
 | Windows Runtime | `0.5.0` |
 | AutoGenesis CLI | `0.2.0` |
 
-After publication, this README must replace the Candidate notice and workflow
-with the actual immutable Release URLs, manifest and lock digests, and the
-published installation prompt. Until that substitution is made, the Candidate
-route is the only documented installation path.
+After publication, replace the pre-release warning and acceptance-only guidance
+only after the immutable `agent-contract-v2.1.0` GitHub Release contains this
+complete reviewed asset set with recorded SHA-256 values:
+
+- `agent-install-prompt.txt`: immutable URL and SHA-256;
+- `autogenesis-SKILL.md`: immutable URL and SHA-256;
+- `release-manifest.json`: immutable URL and SHA-256, with the exact filename,
+  version, byte size, immutable URL, platform set, and SHA-256 for each reviewed
+  wheel: `autogenesis-agent-contract==2.1.0`,
+  `autogenesis-appium-mcp==0.5.0`,
+  `autogenesis-windows-mcp==0.5.0`, and `autogenesis-cli==0.2.0`;
+- `autogenesis-release.lock`: immutable URL and SHA-256; and
+- `SHA256SUMS`: immutable URL and SHA-256, with entries matching the exact
+  Skill, Release manifest, and Release lock bytes.
+
+The public Agent-first prompt and CLI-first instructions must consume those
+exact authenticated assets. CLI-first must create a dedicated disposable
+virtual environment, install only inside it, and identify deletion of that
+environment and the explicitly installed Skill bytes as rollback. Neither route
+may show, read, echo, or record a credential-bearing package-index URL; evidence
+is limited to the sanitized registry host and configuration source, with no
+userinfo, token, credential, or query string. Remove the not-public warning only
+after clean final-artifact acceptance confirms the published bytes, #72 safe
+Preview boundary, and advertised support tiers.
 
 ## Technical references
 
