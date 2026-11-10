@@ -48,12 +48,11 @@ export class CommandHandlers {
       const skillName = 'autogenesis';
       const skill = this.copilotService.loadSkillContent(skillName, uri.fsPath);
 
-      if (skill.status === 'invalid') {
-        vscode.window.showErrorMessage('The discovered autogenesis Skill differs from the authenticated release. Run autogenesis install for one explicit scope, reload this window, and retry.');
-        return;
-      }
-      if (skill.status === 'absent') {
-        vscode.window.showErrorMessage('The canonical autogenesis Skill is not installed. Run autogenesis install for one explicit scope, reload this window, and retry.');
+      if (skill.status !== 'ready') {
+        const message = skill.status === 'invalid'
+          ? 'The discovered autogenesis Skill differs from the authenticated release. Run autogenesis install for one explicit scope, reload this window, and retry.'
+          : 'The canonical autogenesis Skill is not installed. Run autogenesis install for one explicit scope, reload this window, and retry.';
+        vscode.window.showErrorMessage(message);
         return;
       }
       const textToSend = this.copilotService.generateSkillCommand(
@@ -158,12 +157,11 @@ export class CommandHandlers {
 
       const skillName = 'autogenesis';
       const skill = this.copilotService.loadSkillContent(skillName, uri.fsPath);
-      if (skill.status === 'invalid') {
-        vscode.window.showErrorMessage('The discovered autogenesis Skill differs from the authenticated release. Run autogenesis install for one explicit scope, reload this window, and retry.');
-        return;
-      }
-      if (skill.status === 'absent') {
-        vscode.window.showErrorMessage('The canonical autogenesis Skill is not installed. Run autogenesis install for one explicit scope, reload this window, and retry.');
+      if (skill.status !== 'ready') {
+        const message = skill.status === 'invalid'
+          ? 'The discovered autogenesis Skill differs from the authenticated release. Run autogenesis install for one explicit scope, reload this window, and retry.'
+          : 'The canonical autogenesis Skill is not installed. Run autogenesis install for one explicit scope, reload this window, and retry.';
+        vscode.window.showErrorMessage(message);
         return;
       }
       const backgroundText = this.copilotService.generateSkillCommand(
