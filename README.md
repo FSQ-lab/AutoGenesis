@@ -2,13 +2,13 @@
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="docs/assets/autogenesis-logo-dark.svg">
     <source media="(prefers-color-scheme: light)" srcset="docs/assets/autogenesis-logo-light.svg">
-    <img alt="AutoGenesis — Behavior to replayable tests" src="docs/assets/autogenesis-logo-light.svg" width="420">
+    <img alt="AutoGenesis" src="docs/assets/autogenesis-logo-light.svg" width="420">
   </picture>
 </p>
 
-<h3 align="center">Write the behavior. Watch AI record it. Replay without AI.</h3>
+<h3 align="center">Describe the behavior. Let your Coding Agent run it on the real app.</h3>
 
-<p align="center">Describe the behavior in BDD. Let your Coding Agent execute it on the real app, inspect the generated test, and replay the approved result in your normal test suite.</p>
+<p align="center">AutoGenesis gives an Agent one canonical Skill and standard stdio MCP Runtimes for direct natural-language testing, exact BDD execution, and read-only recording previews.</p>
 
 <p align="center">An open-source project from <a href="https://github.com/FSQ-lab">FSQ Lab</a>.</p>
 
@@ -16,25 +16,45 @@
   <a href="https://github.com/FSQ-lab/AutoGenesis/actions/workflows/quality-gates.yml"><img src="https://github.com/FSQ-lab/AutoGenesis/actions/workflows/quality-gates.yml/badge.svg" alt="Quality gates"></a>
   <a href="https://www.python.org/downloads/"><img src="https://img.shields.io/badge/python-3.10%2B-blue" alt="Python 3.10 or newer"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-yellow.svg" alt="MIT license"></a>
-  <img src="https://img.shields.io/badge/status-pre--release-orange" alt="Pre-release status">
+  <img src="https://img.shields.io/badge/status-Skills_Preview-orange" alt="Skills Preview status">
 </p>
 
 <p align="center">
-  <a href="#see-a-complete-test">See a complete test</a> ·
-  <a href="#from-behavior-to-replayable-test">How it works</a> ·
-  <a href="#proven-on-the-edge-browser-product-line">Edge results</a> ·
-  <a href="#get-started">Quick start</a> ·
-  <a href="#platform-support">Platforms</a> ·
+  <a href="#what-autogenesis-does">What it does</a> ·
+  <a href="#get-started">Get started</a> ·
+  <a href="#qualified-first-journey">First journey</a> ·
+  <a href="#support-status">Support</a> ·
   <a href="CONTRIBUTING.md">Contribute</a>
 </p>
 
-## See a complete test
+## What AutoGenesis does
 
-<!-- Complete-test video slot intentionally left empty until approved media is supplied. -->
+AutoGenesis connects a Coding Agent to native applications through one generic
+integration seam:
 
-## From behavior to replayable test
+1. the Agent discovers the canonical `autogenesis` [Agent Skill](https://agentskills.io/);
+2. the Skill prepares and verifies the selected capability;
+3. the Agent starts the applicable Runtime over standard stdio MCP; and
+4. the Runtime operates the real application and returns bounded evidence.
 
-**Describe behavior the whole team can read.** Product, development, and QA keep intent in one selected BDD Scenario.
+There are no client-specific Skill variants. A compatible Coding Agent uses the
+same Skill and MCP packages.
+
+### Three explicit workflows
+
+- **Direct request:** describe an outcome in natural language. AutoGenesis drives
+  the application and verifies the observed result.
+- **Exact BDD execution:** supply a `Background` and `Scenario`. AutoGenesis
+  preserves their source order and executes the steps without silently adding,
+  merging, or skipping them.
+- **Explicit recording:** ask to record or generate a test. AutoGenesis may
+  execute the Scenario and return a read-only generated-code preview.
+
+> [!IMPORTANT]
+> The Skills Preview cannot commit generated files. Its live Runtime schemas do
+> not expose a generated-code confirmation or write operation. Recording stops
+> after the preview, so you must not treat the preview as a committed or
+> replayable test.
 
 ```gherkin
 Feature: Calculator
@@ -45,52 +65,19 @@ Feature: Calculator
     Then the result is 56
 ```
 
-<!-- Scenario editorial image slot intentionally left empty until approved media is supplied. -->
-
-**Watch AI operate the real application.** The Coding Agent executes every selected step through the platform MCP Runtime and records the calls that actually ran.
-
-<!-- Real execution capture slot intentionally left empty until approved media is supplied. -->
-
-**Review the generated test, then replay it.** AutoGenesis presents the complete current preview before writing. The approved Behave test stays in the business project and runs again without the Coding Agent.
-
-<!-- Generated preview and replay evidence slot intentionally left empty until approved media is supplied. -->
-
 ```mermaid
 flowchart LR
-    A[Describe behavior in Gherkin] --> B[AI executes the exact scenario]
-    B --> C[MCP drives the real application]
-    C --> D[AutoGenesis verifies and records observed calls]
-    D --> E[You review the generated-code preview]
-    E --> F[Behave replays the approved test without the Coding Agent]
+    A[Natural language or exact BDD] --> B[autogenesis Skill]
+    B --> C[Appium or Windows stdio MCP Runtime]
+    C --> D[Real application]
+    D --> E[Observed result]
+    E -. explicit recording only .-> F[Read-only code preview]
 ```
-
-### During recording
-
-- The Coding Agent reads the selected `Background` and `Scenario` in source
-  order.
-- AutoGenesis operates the real desktop or mobile application through the
-  platform Runtime.
-- Every action and assertion must execute; steps are not silently skipped,
-  merged, or invented.
-- Generated code reflects the MCP calls that actually ran.
-- You see the complete current preview before anything is written.
-
-### During replay
-
-The approved step definitions live in the business project. Run them with the
-normal test runner—no Coding Agent is in the replay loop:
-
-```bash
-python -m behave --name "Add two numbers"
-```
-
-Standard actions and property assertions need no LLM at replay time. A recorded
-model-backed visual assertion still uses its configured visual model. AI helps
-create the test from a real execution; your test suite owns the result.
 
 ## Proven on the Edge browser product line
 
-The automation approach behind AutoGenesis has already operated at production scale on the Microsoft Edge browser product line.
+The automation approach behind AutoGenesis has operated at production scale on
+the Microsoft Edge browser product line.
 
 <p align="center">
   <picture>
@@ -99,198 +86,182 @@ The automation approach behind AutoGenesis has already operated at production sc
   </picture>
 </p>
 
-In the reported operating period, the Edge deployment executed **2.30 million test steps**, saved **3,193 hours per month**, covered **Windows, macOS, iOS, and Android**, and reported **99.7% pass-rate consistency**. These are observed results from that product line—not projected savings or a universal benchmark.
+In the reported operating period, the Edge deployment executed **2.30 million
+test steps**, saved **3,193 hours per month**, covered **Windows, macOS, iOS,
+and Android**, and reported **99.7% pass-rate consistency**. These are observed
+results from that product line, not projected savings, a universal benchmark,
+or evidence that every Skills Preview journey is qualified.
 
 <sub>Microsoft Edge is a trademark of the Microsoft group of companies.</sub>
 
 ## Get started
 
-> [!IMPORTANT]
-> AutoGenesis 1.1 packages and the immutable Setup Skill are published. Native
-> Windows and Coding Agent compatibility acceptance remain in progress; consult
-> the support status below before adopting AutoGenesis in a release workflow.
+> [!WARNING]
+> **Pre-release Candidate only.** The Skills Preview packages and immutable
+> GitHub Release assets are not public yet. Do not construct a version-shaped
+> Release URL or install the intended versions from a package index. Approved
+> evaluators must use the complete, commit-bound
+> `autogenesis-candidate-<40-character-commit>` artifact from the successful
+> **Quality Gates / Build exact Candidate channel** job for the exact commit
+> under evaluation.
 
 ### What you need
 
-- Native macOS or native Windows.
+- Native macOS or native Windows; Linux and WSL are unsupported.
 - Python 3.10 or newer.
-- A Coding Agent that supports Agent Skills and MCP.
+- A Coding Agent with Agent Skills discovery and standard stdio MCP support.
+- The complete Candidate bundle for one exact reviewed commit.
 - The application, device, simulator, emulator, or remote provider required by
-  the selected test.
+  the selected task.
 
-Linux and WSL are not supported. Setup stops before installation or
-configuration writes on unsupported hosts.
+The only qualified first-use journey in this Preview is OMP 18.18.3 on native
+macOS with Calculator. Other clients and journeys retain the status shown in
+[Support status](#support-status).
 
-### 1. Give AutoGenesis to your Coding Agent
+### Agent-first installation (primary)
 
-Copy the complete verified Agent Install Prompt below into the Coding Agent. It
-installs only `autogenesis-setup`, verifies the Skill identity, and stops before
-machine preparation. Do not substitute the older prompt bundled with the
-Contract 2.0.0 release.
+1. Download the Candidate artifact from the successful Quality Gates run for
+   the exact reviewed commit. Keep the extracted directory intact; its manifest,
+   locks, wheels, Skill, and checksums are one bundle.
+2. Make that directory available to the Coding Agent and give it
+   `candidate-install-prompt.txt` verbatim. Do not copy an install prompt from a
+   different commit.
+3. Let the Agent identify the native host, Python environment, package policy,
+   Skill scope, destinations, and rollback. Review its exact effect set before
+   approving downloads, process execution, or writes.
+4. After installation, reload the Agent's Skill and MCP discovery. Ask it to
+   prove that exactly one `autogenesis` Skill resolves to the Candidate bytes,
+   that the applicable stdio Runtime initializes, and that the Runtime's Agent
+   Contract identity matches the installed Contract.
+5. Continue with the original task. A package version, destination file, or
+   standalone MCP probe alone is not a ready Agent connection.
 
-<details>
-<summary>Show the complete verified Agent Install Prompt</summary>
+The Candidate prompt installs only the host-applicable verified wheel set and
+one canonical `autogenesis` Skill. The Skill then owns capability preparation,
+MCP configuration, readiness, execution, diagnosis, and continuation of the
+user's original request.
 
-```text
-Install the official AutoGenesis Setup Skill only; do not execute it yet.
+### CLI-first installation (secondary)
 
-Immutable source: https://github.com/FSQ-lab/AutoGenesis/releases/download/agent-contract-v2.0.0/autogenesis-setup-SKILL.md
-Expected SHA-256: f5611259856bab9011dba31cb6c01c3ada5e04f1f2431c1f38d470fb4bccf099
-Skill name: autogenesis-setup
-
-1. Identify the native host from available environment metadata. If a command is required, include it in the approval plan instead of running it yet. Stop on Linux, WSL, or any host other than native macOS or Windows.
-2. If installation scope is unspecified, ask whether to install for the current project or user.
-3. Show the source, digest, exact commands, network access, temporary destination, scope, final destination, and how every visible autogenesis-setup installation will be checked. Obtain explicit approval before process execution, network access, or filesystem writes. Stop and request fresh approval if any plan element changes.
-4. After approval, enumerate every visible autogenesis-setup installation before writing. Preserve different existing content and stop on conflict, shadowing, ambiguity, or an installation whose bytes or location cannot be inspected.
-5. Download the exact file and verify SHA-256 before interpreting or installing it. Stop if the digest differs.
-6. Use this Coding Agent's native Skill installation mechanism. Install only autogenesis-setup; do not install Runtime packages, Appium, Drivers, SDKs, MCP configuration, or autogenesis-run yet.
-7. Hash the exact installed file after writing. Stop if its digest or declared contract version differs from the approved source.
-8. Reload Skill discovery. Prove that the discovered autogenesis-setup resolves to the approved destination, digest, and contract version, with no higher-precedence or ambiguous copy. If the Coding Agent cannot prove this identity, stop instead of reporting success.
-9. Report the verified source, destination, digest, contract version, scope, and how to invoke the Skill, then stop.
-```
-
-</details>
-
-Prefer a terminal installer? Use the Python environment and configured package
-index selected for this machine; do not bypass its mirror or trust policy. The
-pinned CLI installs the host-supported Runtime bundle and both canonical Skills
-without cloning this repository:
+CLI-first uses the same Candidate bytes. It is for evaluators who want to stage
+the authenticated package transaction themselves before handing control to the
+Skill. From native macOS, set the two paths and run:
 
 ```bash
-python -m pip install autogenesis-cli==0.1.0
-autogenesis install
+CANDIDATE_DIR=/absolute/path/to/extracted-candidate
+BUSINESS_PROJECT=/absolute/path/to/business-project
+
+(cd "$CANDIDATE_DIR" && shasum -a 256 -c SHA256SUMS)
+python3 -m pip download \
+  --require-hashes \
+  --requirement "$CANDIDATE_DIR/candidate-dependencies.lock" \
+  --dest "$CANDIDATE_DIR/candidate-wheelhouse"
+python3 -m pip install \
+  --force-reinstall \
+  --no-deps \
+  --no-index \
+  --find-links "$CANDIDATE_DIR" \
+  --find-links "$CANDIDATE_DIR/candidate-wheelhouse" \
+  --require-hashes \
+  --requirement "$CANDIDATE_DIR/candidate-install.lock"
+autogenesis install --scope project --project-root "$BUSINESS_PROJECT"
 ```
 
-Before invoking either installed Skill, ask the Coding Agent to reload Skill
-discovery, enumerate every visible `autogenesis-setup` and `autogenesis-run`,
-and prove that each resolved Skill matches the CLI-reported destination, exact
-bytes, and Contract version. Stop on a conflicting, shadowing, ambiguous, or
-uninspectable copy; do not report installation success from the destination
-files alone.
+Use the selected package index only for the strict-hash dependency download.
+The offline install must resolve the first-party wheels from the Candidate
+bundle, not from an index. Use `--scope user` instead only when user-wide Skill
+discovery is intentional. Then reload the Agent and require the same Skill,
+stdio MCP, and Contract identity proof as the Agent-first route.
 
-### 2. Prepare one concrete capability
+## Qualified first journey
 
-Tell Setup what you actually want to test. It checks only that capability and
-shows the exact plan before installing or configuring anything:
+This is the single qualified Calculator journey for **OMP 18.18.3 on native
+macOS**. Start from the business project after completing Agent-first
+installation, then ask OMP:
 
 ```text
-Use autogenesis-setup to prepare this machine to record the Calculator scenario
-on macOS. Reuse working AutoGenesis content. Show the exact commands, sources,
-destinations, and permission changes, then wait for my approval. Do not execute
-the business scenario.
+Use autogenesis to prepare Calculator on this native macOS host, calculate
+8 × 7, and verify that the observed result is 56. Perform this as a direct test:
+do not record a Scenario or generate files. Reuse working dependencies, make
+only the smallest necessary changes after showing any protected effect set, and
+report the selected environment, actions, assertion, and cleanup.
 ```
 
-Setup returns one of three outcomes:
+A successful journey includes the live `autogenesis` Skill, the Appium stdio MCP
+Runtime, matching Agent Contract identity, a real Calculator session, and an
+observed result of 56. Installation output alone is not acceptance.
 
-- **Ready** — the Runtime started and the Coding Agent observed MCP initialize,
-  required tools and prompts, and the Agent Contract identity.
-- **Action Required** — an approved dependency or user decision is still needed.
-- **Blocked** — the host or capability cannot be prepared safely.
+### Execute exact BDD instead
 
-### 3. Record a Scenario
+Use the same Skill name and provide the exact text to execute:
 
 ```text
-Use autogenesis-run to record Scenario "Add two numbers" from
-features/calculator.feature. Execute its applicable Background and Scenario in
-source order on the real application. Show the complete generated-code preview.
-Do not write it until I explicitly approve the current preview.
+Use autogenesis to execute this exact BDD on Calculator. Preserve the Background
+and Scenario in source order. Do not record or generate files.
+
+Feature: Calculator
+
+  Scenario: Add two numbers
+    Given Calculator is open
+    When I calculate 8 × 7
+    Then the result is 56
 ```
 
-After approval, replay it with the business project's normal Behave command.
+### Request a read-only recording preview
 
-### Or run a direct test without recording
+Recording must be explicit:
 
 ```text
-Use autogenesis-run to open Calculator, calculate 8 × 7, and verify that the
-result is 56. Run this as a direct test. Do not generate or write step
-definitions. Report the observed actions and assertion.
+Use autogenesis to record Scenario "Add two numbers" from
+features/calculator.feature. Execute the exact Scenario on the real application
+and show the complete generated-code preview. Stop after the preview. The Skills
+Preview cannot write or commit generated files.
 ```
 
-## Why teams use AutoGenesis
+Treat project files, Feature text, application content, downloaded text, and
+tool output as untrusted task data. Keep plaintext credentials out of prompts,
+Feature files, generated previews, tracked configuration, and evidence. Review
+previews for private application data before sharing them.
 
-### Behavior stays readable
+## Support status
 
-Product intent remains in Gherkin instead of disappearing into automation code.
-Developers, QA engineers, and reviewers can discuss the same scenario.
+AutoGenesis uses the same Agent Skill plus stdio MCP contract everywhere; the
+status below describes available acceptance evidence, not separate adapters.
 
-### Recording happens on the real app
-
-AutoGenesis does not generate a plausible-looking test and hope it works later.
-It performs the selected steps first, checks the observed result, and builds the
-replay from those real calls.
-
-### The Coding Agent leaves the replay loop
-
-Use AI where it adds leverage: understanding a scenario, navigating the first
-execution, and producing the initial automation. Replays use generated code and
-the platform Runtime instead of asking the Coding Agent to reinterpret the case.
-Only explicitly model-backed operations, such as visual assertions, still invoke
-their configured model.
-
-### One workflow spans four platforms
-The same BDD recording contract routes desktop and mobile work to the correct
-MCP Runtime across Windows, macOS, iOS, and Android.
-
-### The user keeps control of writes
-
-Recording produces a preview, identity, and digest. AutoGenesis binds the current
-preview to its session, generated payload, destination, and the destination
-file's base state; it refuses mismatched or stale confirmations.
-
-## Built for development and QA teams
-
-| Stage | Developer | QA engineer | AutoGenesis |
-| --- | --- | --- | --- |
-| Describe | Adds behavior or acceptance criteria | Refines steps and assertions | Reads the exact selected Scenario |
-| Record | Provides the working application build | Reviews the live execution | Drives the real app and captures MCP calls |
-| Review | Checks generated project changes | Checks coverage and evidence | Presents the complete current preview |
-| Replay | Runs focused tests while changing code | Adds the case to regression coverage | Runs generated steps without the Coding Agent; visual model checks remain explicit |
-| CI | Ships the application and test project | Owns pass/fail expectations | Uses the existing Behave and Runtime path |
-
-A one-off investigation does not need to become permanent automation. You can
-also ask AutoGenesis to perform a direct natural-language test and return the
-observed actions and assertion without generating step definitions.
-
-## Platform support
-
-| Target | Host for local execution | Automation path |
+| Client or journey | Host | Skills Preview status |
 | --- | --- | --- |
-| Windows desktop | Native Windows | AutoGenesis Windows MCP |
-| macOS desktop | Native macOS | Appium with the Mac2 driver |
-| iPhone and iPad | Native macOS | Appium with the XCUITest driver |
-| Android | Native macOS or Windows | Appium with UiAutomator2 or a configured remote provider |
+| OMP 18.18.3, Calculator direct test | Native macOS | **Qualified** on the exact Candidate path above |
+| GitHub Copilot CLI with the same Skill and MCP packages | Not qualified | **Experimental / unqualified**; no passed Preview acceptance claim |
+| OpenAI Codex with the same Skill and MCP packages | Not qualified | **Experimental / unqualified**; no passed Preview acceptance claim |
+| Stock Pi | Any | **Unsupported**; stock Pi has no MCP support |
+| Agent Skills journey on Windows | Native Windows | **Unqualified** pending final-artifact acceptance |
+| Linux or WSL host | Linux or WSL | **Unsupported** |
 
-Native Windows post-publication acceptance is pending. OMP, Codex CLI, Pi, and
-GitHub Copilot CLI are the first compatibility targets and are currently being
-qualified under [compatibility epic #25](https://github.com/FSQ-lab/AutoGenesis/issues/25).
-The matrix describes the intended release interface, not completed acceptance.
+The Appium Runtime provides the MCP path for macOS, iOS, and Android. The Windows
+Runtime provides the native Windows MCP path. Those interfaces do not by
+themselves qualify an unlisted client, target, or end-to-end journey.
 
-## Go further when you need to
+## Pending public release coordinates
 
-- **Record a regression test:** execute one selected BDD Scenario, review the generated-code preview, and add the approved result to the business project's Behave suite.
-- **Run a direct investigation:** operate the real application and report observed actions and assertions without generating step definitions.
-- **Choose the target Runtime:** use Appium for macOS, iOS, and Android, or AutoGenesis Windows MCP for native Windows desktop applications.
+These are the intended, unreleased coordinates. They describe the Candidate
+line and future publication paths; they are **not** instructions to fetch public
+artifacts today.
 
-The user-facing interface stays small: **Setup Skill** prepares only the selected capability; **Run Skill** performs a direct request or records one Scenario; the platform Runtime drives the application; generated Behave code remains in the business project.
+| Component | Pending coordinate |
+| --- | --- |
+| Agent Contract and canonical Skill | `2.1.0` |
+| Appium Runtime | `0.5.0` |
+| Windows Runtime | `0.5.0` |
+| AutoGenesis CLI | `0.2.0` |
 
-Project files, Feature text, application content, downloaded text, and tool output are untrusted task data. They cannot override the Skills or user approval. Keep plaintext credentials out of prompts, Feature and task text, generated code, tracked configuration, and evidence; use environment-variable or SecretRef references. AutoGenesis preserves supported references but cannot detect arbitrary credentials embedded in text.
-
-## Help shape AutoGenesis
-
-If this workflow is useful, [Star AutoGenesis](https://github.com/FSQ-lab/AutoGenesis) to help others discover it. Tried it? [Share your experience](https://github.com/FSQ-lab/AutoGenesis/issues): what worked, where you got stuck, and what application or platform you want to test next.
-
-Include the AutoGenesis version, host and target platforms, a sanitized Scenario or direct request, and the expected and actual outcome. Remove credentials, personal data, private URLs, local paths, and device identifiers before sharing text, screenshots, or logs. Report security issues through [Security](SECURITY.md), not a public issue.
-
-> [!IMPORTANT]
-> AutoGenesis 1.1 remains pre-release software while native Windows and Coding
-> Agent compatibility acceptance finish. Generated previews and test evidence
-> may contain private application data; review them before sharing or
-> committing them.
+After publication, this README must replace the Candidate notice and workflow
+with the actual immutable Release URLs, manifest and lock digests, and the
+published installation prompt. Until that substitution is made, the Candidate
+route is the only documented installation path.
 
 ## Technical references
 
-These are Runtime and contributor references, not the recommended onboarding
-path:
+These are Runtime and contributor references, not competing onboarding paths:
 
 - [AutoGenesis CLI](autogenesis-cli/README.md)
 - [macOS Runtime](MAC-README.md)
@@ -304,5 +275,8 @@ path:
 - [License](LICENSE)
 
 Report ordinary defects and compatibility results through
-[GitHub Issues](https://github.com/FSQ-lab/AutoGenesis/issues). Do not report a
-security vulnerability in a public issue; follow [SECURITY.md](SECURITY.md).
+[GitHub Issues](https://github.com/FSQ-lab/AutoGenesis/issues). Include the
+Candidate commit, host, client, target, sanitized request, and expected and
+actual outcome. Remove credentials, private URLs, local paths, personal data,
+and device identifiers. Do not report a security vulnerability in a public
+issue; follow [SECURITY.md](SECURITY.md).
