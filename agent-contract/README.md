@@ -16,7 +16,7 @@ from mcp.server.fastmcp import FastMCP
 # These pins belong to the runtime release, independently of the installed wheel.
 required = RuntimeContractRequirement(
     contract_version="2.1.0",
-    manifest_sha256="5ebe963023c53ab7922ee36fee7f9bd44e926d2721939bebd918bef4a54615a9",
+    manifest_sha256="3787096245ded0eabffa6a2ead16256c7ca19ba016f2ef0afdd709ab0c84c8b1",
 )
 contract = load_contract(ContractIdentity(required.contract_version, required.manifest_sha256))
 appendix = load_project_appendix("/absolute/business-project")
@@ -161,10 +161,11 @@ fetch, include processing, environment expansion, templating, or execution.
 
 Callers must supply secret-free task and domain text, using environment-variable
 references. This package does not detect arbitrary credentials in text. Its
-generation module binds a complete read-only preview to the session, destination,
-base-file state, and digest. Neither `register_mcp` nor the Runtime adapters
-register a confirmation or commit tool; generated-file writes are unavailable
-through the public stdio surface.
+generation module binds a complete read-only preview to the session, a
+project-relative proposed destination, base-file state, and digest. Recording
+initialization returns only an opaque generation ID. Neither `register_mcp` nor
+the Runtime adapters register a confirmation or commit tool; generated-file
+writes are unavailable through the public stdio surface.
 
 ## Generated sources
 
@@ -246,10 +247,13 @@ claimed.
 
 ## Rollback and limits
 
-The package writes no project configuration and never edits the appendix. To
-roll back integration, revert the consumer dependency/registration and generated
-projections together, then uninstall `autogenesis-agent-contract` from that
-environment. Business instructions remain intact. There is no fallback to old
-policy text. Prompts cannot guarantee model obedience; eval evidence and runtime
-guards are required. Hashes detect package drift, not an attacker who can replace
-both installed Python code and the independent runtime requirement.
+The package writes no project configuration and never edits the appendix.
+Candidate rollback removes its packages or isolated environment, the selected
+user/project `autogenesis` Skill, MCP entries, downloaded/extracted Candidate
+channel, and the selected Agent's cached Skill and Runtime tool schemas together.
+Never restore old policy text or a cached write-capable generated-code inventory;
+reload the Agent and prove the removed or newly accepted inventory. Business
+instructions remain intact. Prompts cannot guarantee model obedience; eval
+evidence and runtime guards are required. Hashes detect package drift, not an
+attacker who can replace both installed Python code and the independent runtime
+requirement.

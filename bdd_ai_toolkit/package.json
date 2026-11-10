@@ -45,8 +45,8 @@
       "properties": {
         "bddAiToolkit.cucumber.copilotPrompt": {
           "type": "string",
-          "default": "Please use native-mcp-server to execute the following instructions:\n\n# Original BDD Test Case (strictly follow step-by-step):\n${scenario_text}\n\nRequirements:\nfeature_file = '${feature_file_path}'\n1. Before executing the first step, call `before_gen_code`, and after all steps are completed, sequentially call `preview_code_changes` and `confirm_code_change`.\n2. Execute **each step** exactly as written using native-mcp-server API calls, in order.\n3. **MANDATORY: For EVERY step, you MUST call an MCP tool. Never judge results by screenshots/snapshots alone.**\n4. **Do not modify, merge, skip, or add any step.** Do not lose bdd step keyword.\n5. Do not close browser",
-          "description": "Custom prompt to append when sending test cases to Copilot via the 'Send to Copilot' action. Use ${scenario_text} for scenario content and ${feature_file_path} for file path placeholders."
+          "default": "Apply the authenticated canonical autogenesis Skill exactly.\n\n# Explicit recording request for this exact BDD test case\n${scenario_text}\n\nFeature context: '${feature_file_path}'\n\nRequirements:\n1. Route this explicit recording request only through generate_scenario_test.\n2. Before the first supplied step, call before_gen_code.\n3. Execute and verify every supplied step exactly in order, then call preview_code_changes.\n4. Stop after the read-only preview and report that generated-file writes are unavailable.\n5. Never request write approval or copy, save, shell-write, or otherwise persist the proposed bytes.",
+          "description": "Preview-only recording request template used after authenticating the canonical autogenesis Skill. Use ${scenario_text} for scenario content and ${feature_file_path} for Feature context."
         }
       }
     },

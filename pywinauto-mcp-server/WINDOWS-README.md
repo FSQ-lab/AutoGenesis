@@ -39,7 +39,7 @@ uvx --from autogenesis-windows-mcp==0.5.0 autogenesis-windows-mcp --config ./app
 
 The runtime depends exactly on autogenesis-agent-contract==2.1.0 and requires
 manifest SHA-256
-5ebe963023c53ab7922ee36fee7f9bd44e926d2721939bebd918bef4a54615a9.
+3787096245ded0eabffa6a2ead16256c7ca19ba016f2ef0afdd709ab0c84c8b1.
 Missing, corrupt or incompatible contract assets fail startup.
 
 Standard MCP Registry metadata is `pywinauto-mcp-server/server.json`. From a
@@ -214,12 +214,13 @@ reads the wrapper value when available, then falls back to UIA ValuePattern and
 TextPattern without changing the existing tool schema or containment assertion.
 
 Generated replay continues to use Behave and the business project's
-features.environment helpers. Default proposed generation paths are relative to
-the business working directory under features/steps, never inside site-packages.
-Preview returns the complete proposed payload, scoped destination, identity, and
-digest without writing it. Recording stops after this read-only preview:
-generated-file writes are unavailable, and the stdio Runtime exposes no
-confirmation, commit, save, or alternate copy route.
+features.environment helpers. `before_gen_code` returns only an opaque generation
+ID. Default proposed generation paths are relative to the business working
+directory under features/steps, never inside site-packages. Preview returns the
+complete proposed payload, project-relative destination, identity, and digest
+without writing it. Recording stops after this read-only preview: generated-file
+writes are unavailable, and the stdio Runtime exposes no confirmation, commit,
+save, or alternate copy route.
 
 Visual verification retains the Azure OpenAI and local provider paths;
 AZURE_OPENAI_API_KEY and AZURE_OPENAI_ENDPOINT are read from the environment.
@@ -273,11 +274,14 @@ preview fails until the Coding Agent supplies an explicit SecretRef binding.
 Proposed code contains literals and references only—never plaintext credentials
 or executable `[REDACTED]` placeholders.
 
-Uninstall the runtime from the business venv to roll back:
+Rollback a Candidate by uninstalling its packages from the business environment:
 
 ```powershell
-.venv/Scripts/python -m pip uninstall autogenesis-windows-mcp
+.venv/Scripts/python -m pip uninstall autogenesis-windows-mcp autogenesis-agent-contract autogenesis-cli
 ```
 
-Remove the client's server entry separately. Business configurations and
-generated test files remain in the business project.
+Then remove that environment, the selected-scope `autogenesis` Skill, its MCP
+client entry, downloaded/extracted Candidate channel, and the Agent's cached
+Skill/tool schemas. Never restore a cached write-capable generation inventory;
+reload the Agent and prove the removed or newly accepted inventory. Business
+configuration and pre-existing generated test files remain in the project.

@@ -40,6 +40,19 @@ async def test_generation_destination_cannot_escape_business_project(config_path
     finally:
         runtime.close()
 
+@pytest.mark.anyio
+async def test_generation_start_returns_only_opaque_id(config_path, tmp_path):
+    runtime = server.Runtime("ios", config_path, business_root=tmp_path)
+    try:
+        response = result_payload(await runtime.server.call_tool("before_gen_code", {
+            "step_file": str(tmp_path / "features/steps/generated.py"),
+        }))
+        assert set(response["data"]) == {"gen_code_id"}
+        assert response["data"]["gen_code_id"]
+        assert str(tmp_path) not in json.dumps(response)
+    finally:
+        runtime.close()
+
 
 @pytest.mark.anyio
 async def test_confirmation_tool_is_unreachable_and_cannot_write(config_path, tmp_path):
@@ -142,6 +155,7 @@ async def test_secret_ref_executes_records_and_previews_without_write(config_pat
         preview = result_payload(await runtime.server.call_tool("preview_code_changes", {}))
         assert "env:AUTOGENESIS_TEST_PASSWORD" in preview["data"]["diff_preview"]
         assert PRIVATE not in json.dumps(preview)
+        assert preview["data"]["destination"] == "steps/replay.py"
         proposed = "".join(runtime.driver.proposed_changes)
         assert "env:AUTOGENESIS_TEST_PASSWORD" in proposed
         assert "[REDACTED]" not in proposed

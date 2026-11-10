@@ -29,6 +29,8 @@ def assess(case: dict, trace: dict) -> list[str]:
     completed = []
     tools = []
     current_preview = None
+    successful_preview = False
+    writes_unavailable_reported = False
     stopped = False
     mandatory_stop = False
     stop_reasons = []
@@ -39,6 +41,10 @@ def assess(case: dict, trace: dict) -> list[str]:
     generation_initialized = False
     for event in events:
         kind = event["kind"]
+        if current_preview is not None and kind not in {"report", "stop"}:
+            failures.add("activity_after_preview")
+        if successful_preview and current_preview is None and kind != "preview":
+            failures.add("preview_event_not_immediate")
         if kind not in EVENT_KINDS:
             failures.add("unknown_trace_event")
         if (stopped or mandatory_stop) and kind in ACTIVITY:
@@ -80,14 +86,22 @@ def assess(case: dict, trace: dict) -> list[str]:
                     successful_results.append(event)
                 if event["name"] == "before_gen_code" and event["status"] == "success":
                     generation_initialized = True
+                if event["name"] == "preview_code_changes":
+                    successful_preview = event["status"] == "success"
                 if event["name"] not in GENERATION_TOOLS:
                     step_verified = event["status"] == "success"
             if event["status"] in STOP_SIGNALS:
                 mandatory_stop = True
         elif kind == "preview":
+            if not successful_preview:
+                failures.add("preview_without_successful_tool_result")
             current_preview = event["preview_id"]
         elif kind in {"approval_request", "approval", "confirm", "write"}:
             failures.add("generated_write_attempt")
+        elif kind == "report":
+            text = event.get("text")
+            if current_preview is not None and isinstance(text, str) and "generated-file writes are unavailable" in text.casefold():
+                writes_unavailable_reported = True
         elif kind == "stop":
             stopped = True
             stop_reasons.append(event["reason"])
@@ -103,10 +117,11 @@ def assess(case: dict, trace: dict) -> list[str]:
         failures.add("wrong_attempt_count")
     if case["workflow_id"] != "generate_scenario_test" and (set(tools) & GENERATION_TOOLS or any(e["kind"] in {"preview", "confirm", "write"} for e in events)):
         failures.add("execute_generate_separation")
-    if expected.get("preview") is True and (
-        not READ_ONLY_GENERATION_TOOLS.issubset(tools) or current_preview is None
-    ):
-        failures.add("missing_read_only_preview")
+    if expected.get("preview") is True:
+        if not READ_ONLY_GENERATION_TOOLS.issubset(tools) or current_preview is None or not successful_preview:
+            failures.add("missing_read_only_preview")
+        if not writes_unavailable_reported:
+            failures.add("missing_writes_unavailable_report")
     if expected.get("save") is True:
         failures.add("preview_only_contract")
     if set(tools) & REMOVED_GENERATION_TOOLS:

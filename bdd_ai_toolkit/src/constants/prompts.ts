@@ -9,18 +9,19 @@
  * Default COPILOT_PROMPT value used across the extension
  * This prompt is used when sending test cases to Copilot for execution
  */
-export const DEFAULT_COPILOT_PROMPT = `Please use native-mcp-server to execute the following instructions:
+export const DEFAULT_COPILOT_PROMPT = `Apply the authenticated canonical autogenesis Skill exactly.
 
-# Original BDD Test Case (strictly follow step-by-step):
+# Explicit recording request for this exact BDD test case
 \${scenario_text}
 
+Feature context: '\${feature_file_path}'
+
 Requirements:
-feature_file = '\${feature_file_path}'
-1. Before executing the first step, call \`before_gen_code\`, and after all steps are completed, sequentially call \`preview_code_changes\` and \`confirm_code_change\`.
-2. Execute **each step** exactly as written using native-mcp-server API calls, in order.
-3. **MANDATORY: For EVERY step, you MUST call an MCP tool. Never judge results by screenshots/snapshots alone.**
-4. **Do not modify, merge, skip, or add any step.** Do not lose bdd step keyword.
-5. Do not close browser`;
+1. Route this explicit recording request only through generate_scenario_test.
+2. Before the first supplied step, call before_gen_code.
+3. Execute and verify every supplied step exactly in order, then call preview_code_changes.
+4. Stop after the read-only preview and report that generated-file writes are unavailable.
+5. Never request write approval or copy, save, shell-write, or otherwise persist the proposed bytes.`;
 
 /**
  * Default NATRUAL_LANGUAGE_TASK_PROMPT value used across the extension
@@ -39,7 +40,7 @@ Please use \`native-mcp-server\` MCP tools to **test** the following scenario:
 4. Execute steps **in sequence** - consider previous results before next action
 
 **⚠️ FORBIDDEN ACTIONS:**
-- Do NOT call \`before_gen_code\`, \`preview_code_changes\`, or \`confirm_code_change\`
+- Do NOT call before_gen_code or preview_code_changes; direct execution never generates or writes files
 - Do NOT describe what you would do - actually DO it using MCP tools
 - Do NOT skip MCP tool calls
 

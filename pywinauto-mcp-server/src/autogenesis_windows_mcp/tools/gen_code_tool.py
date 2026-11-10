@@ -44,10 +44,9 @@ def register_gen_code_tools(mcp, app_manager, business_root=None):
                 If not specified, do not provide a random value.
                 
         Returns:
-            str: JSON response containing:
-                - status: "success" or "error"
-                - data: Dictionary with gen_code_id, steps_dir, and step_file_target
-                - error: Error message if operation failed
+            str: JSON response containing success status and an opaque gen_code_id.
+            Proposed destinations are returned only by preview_code_changes as
+            project-relative paths.
          
         """
         try:
@@ -70,11 +69,7 @@ def register_gen_code_tools(mcp, app_manager, business_root=None):
             app_manager.steps_dir = str(Path(app_manager.step_file_target).parent)
 
             resp["status"] = "success"
-            resp["data"] = {
-                "gen_code_id": app_manager.gen_code_id,
-                "steps_dir": app_manager.steps_dir,
-                "step_file_target": app_manager.step_file_target,
-            }
+            resp["data"] = {"gen_code_id": app_manager.gen_code_id}
         except Exception as e:
             resp["error"] = safe_error()
             logger.error('Error during code generation: [redacted]')

@@ -44,10 +44,9 @@ def register_gen_code_tools(mcp, browser_manager, business_root=None):
                 If not specified, do not provide a random value.
                 
         Returns:
-            str: JSON response containing:
-                - status: "success" or "error"
-                - data: Dictionary with gen_code_id, steps_dir, and step_file_target
-                - error: Error message if operation failed
+            str: JSON response containing success status and an opaque gen_code_id.
+            Proposed destinations are returned only by preview_code_changes as
+            project-relative paths.
          
         """
         try:
@@ -70,12 +69,7 @@ def register_gen_code_tools(mcp, browser_manager, business_root=None):
             browser_manager.steps_dir = str(Path(browser_manager.step_file_target).parent)
 
             resp["status"] = "success"
-            resp["data"] = {
-                "gen_code_id": browser_manager.gen_code_id,
-                "steps_dir": browser_manager.steps_dir,
-                "step_file_target": browser_manager.step_file_target,
-                # "gen_code_cache": browser_manager.gen_code_cache,
-            }
+            resp["data"] = {"gen_code_id": browser_manager.gen_code_id}
         except Exception as e:
             resp["error"] = f"Error during code generation: {repr(e)}"
             logger.error("Operation diagnostic; private details omitted")

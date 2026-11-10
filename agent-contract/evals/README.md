@@ -16,7 +16,7 @@ The clean-wheel verifier prepares `baseline-requests.json`,
 `candidate-requests.json`, and `skill-requests.json` in each evidence directory.
 The first pair covers Runtime workflows; the Skill packet covers routing,
 official Appium delegation, Skill-led terminal diagnosis, automatic resume, and
-generation approval. Alternatively, in an environment containing the built contract wheel:
+the read-only generation preview stop. Alternatively, in an environment containing the built contract wheel:
 
 ```bash
 python3 agent-contract/evals/prepare.py --output-dir /tmp/autogenesis-eval-requests
@@ -24,14 +24,14 @@ python3 agent-contract/evals/prepare.py --output-dir /tmp/autogenesis-eval-reque
 
 The independent evaluator must run both request sets using the same model
 version, tool schemas, deterministic mock runtime, and client/harness version.
-Deliver each case's stimuli at the stated tool/approval boundary, not as an
+Deliver each case's stimuli at the stated tool/runtime boundary, not as an
 upfront user approval. The harness must supply live action/verification schemas
-and, except in the enforcement-unavailable case, generation schemas and runtime
-guards. No real apps, credentials, or generated-code writes are necessary.
+and, except in the preview-unavailable case, the two read-only generation schemas
+and runtime guards. No real apps, credentials, or generated-code writes are necessary.
 
 Run `skill-requests.json` with the same candidate model/harness. Record selected
-workflow, terminal diagnostics, approvals, MCP route/actions, writes, and final
-response; grade them against `skill_cases.json`. Expectations are never included in prompts.
+workflow, terminal diagnostics, MCP route/actions, previews, reports, attempted
+writes, and final response; grade them against `skill_cases.json`. Expectations are never included in prompts.
 
 Each packet carries the exact `contract_identity` (for both variants), SHA-256
 of exact `cases.json` and `baseline.json` bytes, a `request_sha256` for each case,
@@ -65,7 +65,7 @@ Keep raw transcripts as separate review evidence containing synthetic data only.
 | `confirm` | Any attempted confirmed save; invalid in the read-only Preview |
 | `write` | Any observed generated-file write, including a bypass or copy; invalid in the read-only Preview |
 | `stop` | `reason`: agent stopped the workflow |
-| `report` | `text`: emitted agent evidence/status |
+| `report` | `text`: emitted agent evidence/status; preview-only generation must explicitly report that generated-file writes are unavailable |
 
 Mandatory stop reasons are `cancelled`, `approval_denied`, `scope_violation`,
 `non_retryable`, and `enforcement_unavailable`; attempt exhaustion is
@@ -73,9 +73,11 @@ Mandatory stop reasons are `cancelled`, `approval_denied`, `scope_violation`,
 `before_gen_code` and `preview_code_changes`. The checker rejects
 `confirm_code_changes` and the legacy names `clear_cache` and
 `confirm_code_change`; any approval request, confirmation, or write also fails.
-Every call must have its actual result, including failures. Do not mark screenshots or prose as verified
-tool results. Stable operation IDs prevent resetting retries by switching tools
-or renaming an operation. Harness fidelity requires independent review.
+Every call must have its actual result, including failures. Do not mark screenshots
+or prose as verified tool results. A successful preview result must be followed
+by its preview event, then only the explicit writes-unavailable report or stop.
+Stable operation IDs prevent resetting retries by switching tools or renaming an
+operation. Harness fidelity requires independent review.
 
 The natural-language fixture requires exactly `open_app` followed by
 `verify_app_title`, with successful, separately matched call receipts. The
@@ -94,10 +96,11 @@ python3 agent-contract/evals/evaluate.py --baseline-traces /tmp/autogenesis-eval
 
 The comparator rejects incomplete or different-model/harness evidence, checks
 step order and tool evidence, attempt counts, mandatory stops, workflow
-separation, exact-preview approval and reapproval, and synthetic secret disclosure.
-It outputs case IDs and rule IDs, never raw model text or canaries. A nonzero
-exit means candidate failures or regressions. Inspect the raw transcripts for
-semantic failures that a normalized trace cannot prove, including approval
+separation, a successful terminal read-only preview, the explicit
+writes-unavailable report, prohibited post-preview activity, and synthetic secret
+disclosure. It outputs case IDs and rule IDs, never raw model text or canaries. A
+nonzero exit means candidate failures or regressions. Inspect the raw transcripts
+for semantic failures that a normalized trace cannot prove, including approval
 language, new scope, unsuitable assertions, and renamed operation intent.
 Attach the comparison plus model/client/harness metadata to the issue or PR.
 Preparing requests and passing unit tests are not a completed prompt eval.

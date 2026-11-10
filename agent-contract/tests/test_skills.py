@@ -157,6 +157,36 @@ def test_skill_release_assets_match_contract_and_bootstrap_prompt(tmp_path, repo
     ).read_text(encoding="utf-8")
     assert "skill.status === 'invalid'" in command_handlers
     assert "differs from the authenticated release" in command_handlers
+    assert "record-read-only-preview" in extension_service
+    assert "stop after preview_code_changes" in extension_service
+    assert "generated-file writes are unavailable" in extension_service
+    assert "generateScenarioText" not in extension_service
+    assert "generateBackgroundText" not in extension_service
+    assert "skill.status === 'absent'" in command_handlers
+    assert "canonical autogenesis Skill is not installed" in command_handlers
+    assert "autogenesis install for one explicit scope" in command_handlers
+    assert "generateScenarioText" not in command_handlers
+    assert "generateBackgroundText" not in command_handlers
+
+    package = json.loads((repo_root / "bdd_ai_toolkit/package.json").read_bytes())
+    default_prompt = package["contributes"]["configuration"]["properties"][
+        "bddAiToolkit.cucumber.copilotPrompt"
+    ]["default"]
+    prompt_source = (repo_root / "bdd_ai_toolkit/src/constants/prompts.ts").read_text(encoding="utf-8")
+    get_started = (repo_root / "docs/src/pages/GetStarted.tsx").read_text(encoding="utf-8")
+    for shipped in (default_prompt, prompt_source, get_started):
+        assert "before_gen_code" in shipped
+        assert "preview_code_changes" in shipped
+        assert "generated-file writes are unavailable" in shipped
+        assert all(name not in shipped for name in (
+            "confirm_code_changes", "confirm_code_change", "clear_cache",
+        ))
+
+    for relative in ("appium-mcp-server/server.json", "pywinauto-mcp-server/server.json"):
+        descriptor = json.loads((repo_root / relative).read_bytes())
+        project_root = next(argument for argument in descriptor["packages"][0]["packageArguments"] if argument["name"] == "--project-root")
+        assert "preview destinations" in project_root["description"]
+        assert "no generated-file write occurs" in project_root["description"]
 
 def _candidate_wheel(root, package, version):
     filename = f"{package.replace('-', '_')}-{version}-py3-none-any.whl"
@@ -233,6 +263,9 @@ def test_candidate_channel_binds_exact_first_party_wheels_and_skill(tmp_path, re
     assert "complete offline-install lock" in prompt
 
     assert "force-reinstalled" in prompt
+    assert "remove the Candidate packages/environment" in prompt
+    assert "cached Skill/Runtime schemas" in prompt
+    assert "never restore a cached write-capable generated-code inventory" in prompt
 
 def test_candidate_channel_rejects_incomplete_wheel_set(tmp_path, repo_root):
     wheel_dir = tmp_path / "wheels"
