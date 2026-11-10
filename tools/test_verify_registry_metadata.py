@@ -378,14 +378,97 @@ class RegistryReleaseVerifierTests(unittest.TestCase):
 
 
 class ReleaseWorkflowSafetyTests(unittest.TestCase):
-    def test_skill_release_is_completed_before_one_way_publication(self):
-        workflow = (Path(__file__).resolve().parents[1] / ".github/workflows/publish-mcp-registry.yml").read_text()
+    @classmethod
+    def setUpClass(cls):
+        cls.workflow = (
+            Path(__file__).resolve().parents[1] / ".github/workflows/publish-mcp-registry.yml"
+        ).read_text()
+
+    def test_tag_is_absent_or_exact_before_draft_and_rechecked_around_publish(self):
+        workflow = self.workflow
+        preflight = workflow.index('if resolved_tag="$(resolve_tag_commit)"')
+        wrong_tag = workflow.index('if [[ "$resolved_tag" != "$GITHUB_SHA" ]]', preflight)
+        establish = workflow.index('gh api --method POST "repos/${GITHUB_REPOSITORY}/git/refs"', wrong_tag)
+        create = workflow.index('gh release create "$RELEASE_TAG" --draft')
+        prepublish_tag = workflow.index("require_exact_tag", workflow.index("verify_release_assets", create))
+        publish = workflow.index('gh api --method PATCH "repos/${GITHUB_REPOSITORY}/releases/${draft_id}"')
+        postpublish_tag = workflow.index("require_exact_tag", publish)
+
+        self.assertLess(preflight, wrong_tag)
+        self.assertLess(wrong_tag, establish)
+        self.assertLess(establish, create)
+        self.assertLess(create, prepublish_tag)
+        self.assertLess(prepublish_tag, publish)
+        self.assertLess(publish, postpublish_tag)
+        self.assertIn('tag_object="$(gh api "repos/${GITHUB_REPOSITORY}/git/tags/${object_sha}")"', workflow)
+        self.assertIn('if [[ "$resolved_tag" != "$GITHUB_SHA" ]]', workflow)
+
+    def test_same_commit_tag_only_state_can_continue_to_draft(self):
+        workflow = self.workflow
+        tag_gate = workflow.index('if resolved_tag="$(resolve_tag_commit)"')
+        exact_comparison = workflow.index('if [[ "$resolved_tag" != "$GITHUB_SHA" ]]', tag_gate)
+        gate_end = workflow.index("          fi\n\n          if gh release view", exact_comparison)
+        create = workflow.index('gh release create "$RELEASE_TAG" --draft', gate_end)
+
+        self.assertLess(tag_gate, exact_comparison)
+        self.assertLess(exact_comparison, gate_end)
+        self.assertLess(gate_end, create)
+
+    def test_wrong_commit_tag_only_state_exits_before_any_draft(self):
+        workflow = self.workflow
+        wrong_commit = workflow.index("Pre-existing release tag resolves to another commit")
+        reject = workflow.index("exit 1", wrong_commit)
+        create = workflow.index('gh release create "$RELEASE_TAG" --draft')
+
+        self.assertLess(wrong_commit, reject)
+        self.assertLess(reject, create)
+
+    def test_absent_or_uncaptured_draft_cleanup_proves_absence_before_owned_tag_delete(self):
+        workflow = self.workflow
+        recover = workflow.index("recover_uncaptured_draft() {")
+        prove_absent = workflow.index('if [[ "$(jq -r \'length\' <<< "$matches")" == "0" ]]', recover)
+        cleanup = workflow.index("cleanup_draft() {", prove_absent)
+        delete_owned_tag = workflow.index("delete_created_tag || true", cleanup)
+
+        self.assertLess(recover, prove_absent)
+        self.assertLess(prove_absent, cleanup)
+        self.assertLess(cleanup, delete_owned_tag)
+        self.assertIn('if recover_uncaptured_draft; then', workflow[cleanup:delete_owned_tag])
+
+    def test_draft_cleanup_is_database_id_bound_and_only_removes_owned_exact_tag(self):
+        workflow = self.workflow
+        cleanup = workflow[workflow.index("cleanup_draft() {"):workflow.index("verify_release_assets() {")]
+
+        self.assertIn('delete_exact_draft "$draft_id"', cleanup)
+        self.assertIn('require_release_identity "$release_id" true', workflow)
+        self.assertIn('gh api --method DELETE "repos/${GITHUB_REPOSITORY}/releases/${release_id}"', workflow)
+        self.assertIn('created_tag" == "true" && "$release_safe_for_tag_cleanup" == "true', cleanup)
+        self.assertIn('test "$direct_type" = "commit"', workflow)
+        self.assertIn('test "$direct_sha" = "$GITHUB_SHA"', workflow)
+        self.assertNotIn("gh release delete", workflow)
+        self.assertNotIn("--cleanup-tag", workflow)
+
+    def test_mutable_public_release_burns_identity_and_is_not_cleaned_for_rerun(self):
+        workflow = self.workflow
+        publish = workflow.index('gh api --method PATCH "repos/${GITHUB_REPOSITORY}/releases/${draft_id}"')
+        mark_public = workflow.index("published=true", publish)
+        immutable = workflow.index('if [[ "$published_immutable" != "true" ]]', mark_public)
+        burned = workflow.index("its tag and evidence are preserved and identity reuse is blocked", immutable)
+
+        self.assertLess(publish, mark_public)
+        self.assertLess(mark_public, immutable)
+        self.assertLess(immutable, burned)
+        self.assertNotIn("--method DELETE", workflow[mark_public:burned])
+        self.assertIn("The public release identity is burned by a mutable release; refusing reuse", workflow)
+
+    def test_skill_release_is_reviewed_uploaded_verified_then_published_once(self):
+        workflow = self.workflow
         review = workflow.index("--verify-skill-review-manifest")
         create = workflow.index('gh release create "$RELEASE_TAG" --draft')
         upload = workflow.index('gh release upload "$RELEASE_TAG" skill-release/*')
-        verify = workflow.index('verify_release_assets "$RELEASE_TAG"', upload)
-        publish = workflow.index('gh release edit "$RELEASE_TAG" --draft=false')
-        immutable = workflow.index('published_immutable="$(gh api')
+        verify = workflow.index('verify_release_assets "$draft_id" true', upload)
+        publish = workflow.index('gh api --method PATCH "repos/${GITHUB_REPOSITORY}/releases/${draft_id}"')
+        immutable = workflow.index('published_immutable="$(', publish)
 
         self.assertLess(review, create)
         self.assertLess(create, upload)
@@ -393,6 +476,22 @@ class ReleaseWorkflowSafetyTests(unittest.TestCase):
         self.assertLess(verify, publish)
         self.assertLess(publish, immutable)
         self.assertNotIn('gh release create "$RELEASE_TAG" skill-release/*', workflow)
+
+    def test_release_and_publisher_downloads_have_byte_limits(self):
+        workflow = self.workflow
+        asset_bounds = workflow.index("readonly MAX_RELEASE_ASSET_BYTES=8388608")
+        size_preflight = workflow.index("and .size <= $max_size", asset_bounds)
+        metadata_compare = workflow.index('review/skill-review-manifest.json', size_preflight)
+        asset_download = workflow.index("releases/assets/${asset_id}", metadata_compare)
+
+        self.assertLess(asset_bounds, size_preflight)
+        self.assertLess(size_preflight, metadata_compare)
+        self.assertLess(metadata_compare, asset_download)
+        self.assertIn('ulimit -f "$blocks"', workflow)
+        self.assertIn('--max-filesize "$MAX_PUBLISHER_ARCHIVE_BYTES"', workflow)
+        self.assertIn('--max-filesize "$MAX_SIGSTORE_BUNDLE_BYTES"', workflow)
+        self.assertIn("readonly MAX_PUBLISHER_BINARY_BYTES=134217728", workflow)
+        self.assertIn('ulimit -f "$(( (MAX_PUBLISHER_BINARY_BYTES + 1023) / 1024 + 1 ))"', workflow)
 
 
 if __name__ == "__main__":

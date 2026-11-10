@@ -255,86 +255,254 @@ jobs:
         run: |
           set -euo pipefail
           shopt -s nullglob dotglob
+          readonly MAX_RELEASE_ASSETS=16
+          readonly MAX_RELEASE_ASSET_BYTES=8388608
+          readonly MAX_RELEASE_TOTAL_BYTES=33554432
+          created_tag=false
+          draft_id=""
+          published=false
+          release_safe_for_tag_cleanup=true
 
-          verify_release_assets() {
-            local tag="$1"
-            local temporary
-            temporary="$(mktemp -d)"
-            for asset in skill-release/*; do
-              test -f "$asset"
-              basename "$asset"
-            done | LC_ALL=C sort > "$temporary/expected-assets"
-            test -s "$temporary/expected-assets"
-            gh release view "$tag" --repo "$GITHUB_REPOSITORY" --json assets \
-              --jq '.assets[].name' | LC_ALL=C sort > "$temporary/public-assets"
-            cmp "$temporary/expected-assets" "$temporary/public-assets"
-            mkdir "$temporary/downloaded"
-            gh release download "$tag" --repo "$GITHUB_REPOSITORY" --dir "$temporary/downloaded"
-            for asset in skill-release/*; do
-              cmp "$asset" "$temporary/downloaded/$(basename "$asset")"
+          resolve_tag_commit() {
+            local matches object_type object_sha depth tag_object
+            matches="$(
+              gh api "repos/${GITHUB_REPOSITORY}/git/matching-refs/tags/${RELEASE_TAG}" \
+                --jq "[.[] | select(.ref == \"refs/tags/${RELEASE_TAG}\")]"
+            )"
+            test "$(jq -er 'length | select(. <= 1)' <<< "$matches")" -le 1
+            if [[ "$(jq -r 'length' <<< "$matches")" == "0" ]]; then
+              return 1
+            fi
+            object_type="$(jq -er '.[0].object.type' <<< "$matches")"
+            object_sha="$(jq -er '.[0].object.sha | select(test("^[0-9a-f]{40}$"))' <<< "$matches")"
+            for depth in {1..5}; do
+              if [[ "$object_type" == "commit" ]]; then
+                printf '%s\n' "$object_sha"
+                return 0
+              fi
+              test "$object_type" = "tag"
+              tag_object="$(gh api "repos/${GITHUB_REPOSITORY}/git/tags/${object_sha}")"
+              object_type="$(jq -er '.object.type' <<< "$tag_object")"
+              object_sha="$(jq -er '.object.sha | select(test("^[0-9a-f]{40}$"))' <<< "$tag_object")"
             done
-            rm -rf "$temporary"
+            echo "Release tag annotation depth exceeds the safety bound." >&2
+            return 2
           }
 
-          existing_count="$(
-            gh api "repos/${GITHUB_REPOSITORY}/releases?per_page=100" \
-              --jq "[.[] | select(.tag_name == \"${RELEASE_TAG}\")] | length"
-          )"
-          if [[ "$existing_count" == "1" ]]; then
-            gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" \
-              --json isDraft,targetCommitish > existing-release.json
-            is_draft="$(jq -er 'if .isDraft == true then "true" elif .isDraft == false then "false" else error("invalid draft state") end' existing-release.json)"
-            target="$(jq -er '.targetCommitish' existing-release.json)"
-            if [[ "$is_draft" == "false" ]]; then
-              immutable="$(gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${RELEASE_TAG}" --jq '.immutable')"
-              tag_commit="$(gh api "repos/${GITHUB_REPOSITORY}/commits/${RELEASE_TAG}" --jq '.sha')"
-              test "$immutable" = "true"
-              test "$tag_commit" = "$GITHUB_SHA"
-              verify_release_assets "$RELEASE_TAG"
-              exit 0
+          require_exact_tag() {
+            local resolved
+            resolved="$(resolve_tag_commit)"
+            if [[ "$resolved" != "$GITHUB_SHA" ]]; then
+              echo "Release tag does not resolve to the reviewed commit." >&2
+              return 1
             fi
-            test "$is_draft" = "true"
-            test "$target" = "$GITHUB_SHA"
-            gh release delete "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --cleanup-tag --yes
-          elif [[ "$existing_count" != "0" ]]; then
-            echo "Release tag resolves to multiple releases; refusing publication." >&2
-            exit 1
-          fi
+          }
 
-          created_draft=false
-          published=false
+          require_release_identity() {
+            local release_id="$1"
+            local expected_draft="$2"
+            local document
+            document="$(gh api "repos/${GITHUB_REPOSITORY}/releases/${release_id}")"
+            jq -e \
+              --argjson id "$release_id" \
+              --arg tag "$RELEASE_TAG" \
+              --arg target "$GITHUB_SHA" \
+              --argjson draft "$expected_draft" \
+              '.id == $id and .tag_name == $tag and .target_commitish == $target and .draft == $draft' \
+              <<< "$document" >/dev/null
+            printf '%s\n' "$document"
+          }
+
+          delete_exact_draft() {
+            local release_id="$1"
+            require_release_identity "$release_id" true >/dev/null
+            gh api --method DELETE "repos/${GITHUB_REPOSITORY}/releases/${release_id}"
+          }
+
+          delete_created_tag() {
+            local direct_type direct_sha matches
+            matches="$(
+              gh api "repos/${GITHUB_REPOSITORY}/git/matching-refs/tags/${RELEASE_TAG}" \
+                --jq "[.[] | select(.ref == \"refs/tags/${RELEASE_TAG}\")]"
+            )"
+            test "$(jq -er 'length | select(. == 1)' <<< "$matches")" = "1"
+            direct_type="$(jq -er '.[0].object.type' <<< "$matches")"
+            direct_sha="$(jq -er '.[0].object.sha' <<< "$matches")"
+            test "$direct_type" = "commit"
+            test "$direct_sha" = "$GITHUB_SHA"
+            gh api --method DELETE "repos/${GITHUB_REPOSITORY}/git/refs/tags/${RELEASE_TAG}"
+          }
+
+          recover_uncaptured_draft() {
+            local releases matches recovered_id
+            releases="$(gh api "repos/${GITHUB_REPOSITORY}/releases?per_page=100")" || return 1
+            matches="$(
+              jq --arg tag "$RELEASE_TAG" '[.[] | select(.tag_name == $tag)]' <<< "$releases"
+            )"
+            test "$(jq -er 'length | select(. <= 1)' <<< "$matches")" -le 1
+            if [[ "$(jq -r 'length' <<< "$matches")" == "0" ]]; then
+              return 0
+            fi
+            recovered_id="$(
+              jq -er \
+                --arg tag "$RELEASE_TAG" \
+                --arg target "$GITHUB_SHA" \
+                '.[0]
+                 | select(.draft == true and .tag_name == $tag and .target_commitish == $target)
+                 | .id
+                 | select(type == "number")' \
+                <<< "$matches"
+            )"
+            delete_exact_draft "$recovered_id"
+          }
+
+
           cleanup_draft() {
-            if [[ "$created_draft" == "true" && "$published" == "false" ]]; then
-              gh release delete "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --cleanup-tag --yes || true
+            if [[ "$published" == "true" ]]; then
+              return
+            fi
+            if [[ -z "$draft_id" && "$release_safe_for_tag_cleanup" == "false" ]]; then
+              if recover_uncaptured_draft; then
+                release_safe_for_tag_cleanup=true
+              fi
+            fi
+            if [[ -n "$draft_id" ]]; then
+              if delete_exact_draft "$draft_id"; then
+                release_safe_for_tag_cleanup=true
+              else
+                release_safe_for_tag_cleanup=false
+              fi
+            fi
+            if [[ "$created_tag" == "true" && "$release_safe_for_tag_cleanup" == "true" ]]; then
+              delete_created_tag || true
             fi
           }
           trap cleanup_draft EXIT
 
+          verify_release_assets() {
+            local release_id="$1"
+            local expected_draft="$2"
+            local temporary release_json asset_id asset_name asset_size blocks
+            temporary="$(mktemp -d)"
+            release_json="$(require_release_identity "$release_id" "$expected_draft")"
+            jq -e \
+              --argjson max_count "$MAX_RELEASE_ASSETS" \
+              --argjson max_size "$MAX_RELEASE_ASSET_BYTES" \
+              --argjson max_total "$MAX_RELEASE_TOTAL_BYTES" \
+              '.assets as $assets
+               | ($assets | length) > 0
+               and ($assets | length) <= $max_count
+               and ([$assets[].name] | length == (unique | length))
+               and (all($assets[];
+                 (.id | type) == "number"
+                 and .id > 0
+                 and .id == (.id | floor)
+                 and (.name | type) == "string"
+                 and .state == "uploaded"
+                 and (.size | type) == "number"
+                 and .size == (.size | floor)
+                 and .size > 0
+                 and .size <= $max_size))
+               and ([$assets[].size] | add) <= $max_total' \
+              <<< "$release_json" >/dev/null
+            jq -S '[.assets[] | {filename: .name, size}] | sort_by(.filename)' \
+              <<< "$release_json" > "$temporary/release-assets.json"
+            jq -S '[.assets[] | {filename, size}] | sort_by(.filename)' \
+              review/skill-review-manifest.json > "$temporary/reviewed-assets.json"
+            cmp "$temporary/reviewed-assets.json" "$temporary/release-assets.json"
+            mkdir "$temporary/downloaded"
+            while IFS=$'\t' read -r asset_id asset_name asset_size; do
+              [[ "$asset_id" =~ ^[0-9]+$ ]]
+              [[ "$asset_size" =~ ^[0-9]+$ ]]
+              blocks="$(( (asset_size + 1023) / 1024 + 1 ))"
+              (
+                ulimit -f "$blocks"
+                gh api \
+                  -H 'Accept: application/octet-stream' \
+                  "repos/${GITHUB_REPOSITORY}/releases/assets/${asset_id}" \
+                  > "$temporary/downloaded/${asset_name}"
+              )
+              test "$(stat -c '%s' "$temporary/downloaded/${asset_name}")" = "$asset_size"
+              cmp "skill-release/${asset_name}" "$temporary/downloaded/${asset_name}"
+            done < <(jq -r '.assets[] | [.id, .name, .size] | @tsv' <<< "$release_json")
+            rm -rf "$temporary"
+          }
+
+          if resolved_tag="$(resolve_tag_commit)"; then
+            if [[ "$resolved_tag" != "$GITHUB_SHA" ]]; then
+              echo "Pre-existing release tag resolves to another commit." >&2
+              exit 1
+            fi
+          else
+            status="$?"
+            test "$status" = "1"
+            gh api --method POST "repos/${GITHUB_REPOSITORY}/git/refs" \
+              -f ref="refs/tags/${RELEASE_TAG}" \
+              -f sha="$GITHUB_SHA" >/dev/null
+            created_tag=true
+            require_exact_tag
+          fi
+
+          if gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" \
+            --json databaseId,isDraft,isImmutable,tagName,targetCommitish > existing-release.json 2>/dev/null; then
+            existing_id="$(jq -er '.databaseId | select(type == "number")' existing-release.json)"
+            existing_draft="$(jq -er 'if .isDraft == true then "true" elif .isDraft == false then "false" else error("invalid draft state") end' existing-release.json)"
+            test "$(jq -er '.tagName' existing-release.json)" = "$RELEASE_TAG"
+            test "$(jq -er '.targetCommitish' existing-release.json)" = "$GITHUB_SHA"
+            if [[ "$existing_draft" == "false" ]]; then
+              published=true
+              immutable="$(jq -er 'if .isImmutable == true then "true" elif .isImmutable == false then "false" else error("invalid immutable state") end' existing-release.json)"
+              if [[ "$immutable" != "true" ]]; then
+                echo "The public release identity is burned by a mutable release; refusing reuse." >&2
+                exit 1
+              fi
+              require_exact_tag
+              verify_release_assets "$existing_id" false
+              trap - EXIT
+              exit 0
+            fi
+            delete_exact_draft "$existing_id"
+          fi
+
+          release_safe_for_tag_cleanup=false
           gh release create "$RELEASE_TAG" --draft \
             --repo "$GITHUB_REPOSITORY" \
             --target "$GITHUB_SHA" \
             --title "AutoGenesis Agent Contract 2.1.0" \
             --notes "Canonical AutoGenesis Agent Skills and verified Agent Install Prompt."
-          created_draft=true
-          draft_target="$(
+          draft_id="$(
             gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" \
-              --json isDraft,targetCommitish --jq 'select(.isDraft == true) | .targetCommitish'
+              --json databaseId,isDraft,tagName,targetCommitish \
+              --jq "select(.isDraft == true and .tagName == \"${RELEASE_TAG}\" and .targetCommitish == \"${GITHUB_SHA}\") | .databaseId"
           )"
-          test "$draft_target" = "$GITHUB_SHA"
+          [[ "$draft_id" =~ ^[0-9]+$ ]]
+          require_release_identity "$draft_id" true >/dev/null
           gh release upload "$RELEASE_TAG" skill-release/* --repo "$GITHUB_REPOSITORY"
-          verify_release_assets "$RELEASE_TAG"
+          verify_release_assets "$draft_id" true
+          require_release_identity "$draft_id" true >/dev/null
+          require_exact_tag
 
-          gh release edit "$RELEASE_TAG" --draft=false --repo "$GITHUB_REPOSITORY"
+          published_json="$(
+            gh api --method PATCH "repos/${GITHUB_REPOSITORY}/releases/${draft_id}" \
+              -F draft=false
+          )"
           published=true
-          published_immutable="$(gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${RELEASE_TAG}" --jq '.immutable')"
+          jq -e \
+            --argjson id "$draft_id" \
+            --arg tag "$RELEASE_TAG" \
+            --arg target "$GITHUB_SHA" \
+            '.id == $id and .tag_name == $tag and .target_commitish == $target and .draft == false' \
+            <<< "$published_json" >/dev/null
+          require_exact_tag
+          published_immutable="$(
+            require_release_identity "$draft_id" false \
+              | jq -er 'if .immutable == true then "true" elif .immutable == false then "false" else error("invalid immutable state") end'
+          )"
           if [[ "$published_immutable" != "true" ]]; then
-            gh release delete "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --cleanup-tag --yes || true
-            echo "Published Skill release was not immutable; release success is blocked." >&2
+            echo "Published Skill release is mutable; its tag and evidence are preserved and identity reuse is blocked." >&2
             exit 1
           fi
-          tag_commit="$(gh api "repos/${GITHUB_REPOSITORY}/commits/${RELEASE_TAG}" --jq '.sha')"
-          test "$tag_commit" = "$GITHUB_SHA"
-          verify_release_assets "$RELEASE_TAG"
+          verify_release_assets "$draft_id" false
           trap - EXIT
 
   publish-registry:
@@ -380,19 +548,31 @@ jobs:
           set -euo pipefail
           os="$(uname -s | tr '[:upper:]' '[:lower:]')"
           arch="$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/')"
+          readonly MAX_PUBLISHER_ARCHIVE_BYTES=33554432
+          readonly MAX_SIGSTORE_BUNDLE_BYTES=4194304
+          readonly MAX_PUBLISHER_BINARY_BYTES=134217728
           archive="mcp-publisher_${os}_${arch}.tar.gz"
+          bundle="${archive}.sigstore.json"
           base_url="https://github.com/modelcontextprotocol/registry/releases/download/${MCP_PUBLISHER_VERSION}"
           curl --fail --location --silent --show-error --connect-timeout 15 --max-time 120 \
+            --max-filesize "$MAX_PUBLISHER_ARCHIVE_BYTES" \
             --output "$archive" "$base_url/$archive"
+          test "$(stat -c '%s' "$archive")" -le "$MAX_PUBLISHER_ARCHIVE_BYTES"
           curl --fail --location --silent --show-error --connect-timeout 15 --max-time 120 \
-            --output "$archive.sigstore.json" "$base_url/$archive.sigstore.json"
+            --max-filesize "$MAX_SIGSTORE_BUNDLE_BYTES" \
+            --output "$bundle" "$base_url/$bundle"
+          test "$(stat -c '%s' "$bundle")" -le "$MAX_SIGSTORE_BUNDLE_BYTES"
           cosign verify-blob \
-            --bundle "$archive.sigstore.json" \
+            --bundle "$bundle" \
             --certificate-identity "https://github.com/modelcontextprotocol/registry/.github/workflows/release.yml@refs/tags/${MCP_PUBLISHER_VERSION}" \
             --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \
             "$archive"
-          tar xzf "$archive" mcp-publisher
-          rm -f "$archive" "$archive.sigstore.json"
+          (
+            ulimit -f "$(( (MAX_PUBLISHER_BINARY_BYTES + 1023) / 1024 + 1 ))"
+            tar xzf "$archive" mcp-publisher
+          )
+          test "$(stat -c '%s' mcp-publisher)" -le "$MAX_PUBLISHER_BINARY_BYTES"
+          rm -f "$archive" "$bundle"
       - name: Authenticate organization namespace
         if: steps.registry-preflight.outputs.appium == 'absent' || steps.registry-preflight.outputs.windows == 'absent'
         run: ./mcp-publisher login github-oidc
