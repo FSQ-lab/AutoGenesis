@@ -40,16 +40,6 @@
         }
       ]
     },
-    "configuration": {
-      "title": "BDD AI Toolkit",
-      "properties": {
-        "bddAiToolkit.cucumber.copilotPrompt": {
-          "type": "string",
-          "default": "Apply the authenticated canonical autogenesis Skill exactly.\n\n# Explicit recording request for this exact BDD test case\n${scenario_text}\n\nFeature context: '${feature_file_path}'\n\nRequirements:\n1. Route this explicit recording request only through generate_scenario_test.\n2. Before the first supplied step, call before_gen_code.\n3. Execute and verify every supplied step exactly in order, then call preview_code_changes.\n4. Stop after the read-only preview and report that generated-file writes are unavailable.\n5. Never request write approval or copy, save, shell-write, or otherwise persist the proposed bytes.",
-          "description": "Preview-only recording request template used after authenticating the canonical autogenesis Skill. Use ${scenario_text} for scenario content and ${feature_file_path} for Feature context."
-        }
-      }
-    },
     "languageModelTools": [
       {
         "name": "sendNaturalLanguageTask",

@@ -169,15 +169,28 @@ def test_skill_release_assets_match_contract_and_bootstrap_prompt(tmp_path, repo
     assert "generateBackgroundText" not in command_handlers
 
     package = json.loads((repo_root / "bdd_ai_toolkit/package.json").read_bytes())
-    default_prompt = package["contributes"]["configuration"]["properties"][
-        "bddAiToolkit.cucumber.copilotPrompt"
-    ]["default"]
+    configuration = package["contributes"].get("configuration", {}).get("properties", {})
+    assert "bddAiToolkit.cucumber.copilotPrompt" not in configuration
+    assert not (repo_root / "bdd_ai_toolkit/src/bdd-feature-support/utils/ConfigManager.ts").exists()
+
     prompt_source = (repo_root / "bdd_ai_toolkit/src/constants/prompts.ts").read_text(encoding="utf-8")
+    assert "DEFAULT_COPILOT_PROMPT" not in prompt_source
+    assert "direct execution never generates or writes files" in prompt_source
     get_started = (repo_root / "docs/src/pages/GetStarted.tsx").read_text(encoding="utf-8")
-    for shipped in (default_prompt, prompt_source, get_started):
-        assert "before_gen_code" in shipped
-        assert "preview_code_changes" in shipped
-        assert "generated-file writes are unavailable" in shipped
+    assert "before_gen_code" in get_started
+    assert "preview_code_changes" in get_started
+    assert "generated-file writes are unavailable" in get_started
+    extension_readme = (repo_root / "bdd_ai_toolkit/README.md").read_text(encoding="utf-8")
+    assert "bddAiToolkit.cucumber.copilotPrompt" not in extension_readme
+    assert ".agents/skills/autogenesis/SKILL.md" in extension_readme
+    assert "never sends a fallback" in extension_readme
+    assert "recording preview does not create files" in extension_readme
+    assert "Recording preview never writes generated files" in extension_readme
+    assert "step definitions already exist" in extension_readme
+    assert "no manual coding required" not in extension_readme
+    assert "let AI generate automation code" not in extension_readme
+    assert "Execute recorded scenarios" not in extension_readme
+    for shipped in (prompt_source, get_started, extension_readme):
         assert all(name not in shipped for name in (
             "confirm_code_changes", "confirm_code_change", "clear_cache",
         ))

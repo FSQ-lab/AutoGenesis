@@ -2,30 +2,7 @@
 // Licensed under the MIT license.
 
 /**
- * Default prompts and templates used throughout the BDD AI Toolkit
- */
-
-/**
- * Default COPILOT_PROMPT value used across the extension
- * This prompt is used when sending test cases to Copilot for execution
- */
-export const DEFAULT_COPILOT_PROMPT = `Apply the authenticated canonical autogenesis Skill exactly.
-
-# Explicit recording request for this exact BDD test case
-\${scenario_text}
-
-Feature context: '\${feature_file_path}'
-
-Requirements:
-1. Route this explicit recording request only through generate_scenario_test.
-2. Before the first supplied step, call before_gen_code.
-3. Execute and verify every supplied step exactly in order, then call preview_code_changes.
-4. Stop after the read-only preview and report that generated-file writes are unavailable.
-5. Never request write approval or copy, save, shell-write, or otherwise persist the proposed bytes.`;
-
-/**
- * Default NATRUAL_LANGUAGE_TASK_PROMPT value used across the extension
- * This prompt is used when sending test cases to Copilot for execution
+ * Default natural-language task prompt used for direct execution.
  */
 export const DEFAULT_NATURAL_LANGUAGE_TASK_PROMPT = `**🤖 EXECUTE WITH MCP TOOLS ONLY**
 
