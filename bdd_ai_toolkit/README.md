@@ -4,15 +4,15 @@
 [![VS Code](https://img.shields.io/badge/VS%20Code-1.95.0+-007ACC.svg)](https://code.visualstudio.com/)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
-AI-powered VS Code extension for BDD test automation. **Record** test scenarios with AI assistance and **Replay** them instantly - no manual coding required!
+AI-powered VS Code extension for BDD test automation. Preview proposed step-definition code through the authenticated AutoGenesis Skill, and run tests whose step definitions already exist. Recording preview never writes generated files.
 
 ## ✨ Features
 
-- 🎥 **AI-Powered Recording** - Write Gherkin scenarios, let AI generate automation code
-- ▶️ **One-Click Replay** - Execute recorded scenarios directly from feature files
+- **AI-Powered Recording Preview** - Execute exact Gherkin steps and inspect proposed automation code without writing it
+- **One-Click Existing-Test Replay** - Run scenarios whose step definitions already exist
 - 🔧 **Multi-Platform Support** - Windows (browser), Appium (macOS & Mobile)
 - 🤖 **MCP Integration** - Seamless GitHub Copilot connection via Model Context Protocol
-- 🎯 **Interactive CodeLens** - Record and replay buttons above each scenario
+- **Interactive CodeLens** - Preview a Scenario or Background recording, or run an existing test
 - 📝 **Natural Language Tasks** - Execute automation from plain English descriptions
 
 > 👨‍💻 **For Developers**: See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup and contribution guidelines.
@@ -76,22 +76,26 @@ Open VS Code Extensions (`Ctrl+Shift+X` / `Cmd+Shift+X`) → Search "BDD AI Tool
    - Check MCP connections panel
    - Confirm "BDD AI Toolkit MCP" is connected
 
-### Step 3: Record & Replay
+### Step 3: Preview Recording & Replay Existing Tests
 
-Now you're ready to use AI-powered test automation!
+**Recording preview** (no generated-file write):
+1. Install the canonical Skill with `autogenesis install` for one explicit user
+   or project scope. The extension authenticates the exact discovered
+   `.agents/skills/autogenesis/SKILL.md` bytes at that scope.
+2. Create or open a `.feature` file and write the Scenario in Gherkin.
+3. Click **"Send to Copilot"** above the Scenario or Background.
+4. The authenticated Skill executes the supplied steps, calls
+   `before_gen_code` then `preview_code_changes`, returns the read-only proposed
+   code, and stops with generated-file writes unavailable.
 
-**Recording** (AI generates code):
-1. Create/open a `.feature` file
-2. Write your scenario in Gherkin
-3. Click **"Send to Copilot"** above the scenario
-4. AI generates automation code automatically
+If the canonical Skill is absent or differs from the reviewed release, the
+extension stops with the canonical install action. It never sends a fallback
+full prompt, requests write approval, or copies/saves the proposed bytes.
 
-> If `.github/skills/autogenesis/SKILL.md` exists, the extension sends `/autogenesis <Scenario Name>` to Copilot instead of the fallback prompt.
-
-**Replaying** (Execute tests):
-1. Open a `.feature` file with recorded scenarios
-2. Click **"Run"** above any scenario
-3. Watch the automation execute!
+**Replaying existing tests**:
+1. Open a `.feature` file whose step definitions already exist.
+2. Click **"Run"** above a Scenario.
+3. The existing Behave test executes; recording preview does not create files.
 
 ---
 
@@ -110,21 +114,6 @@ Execute ad-hoc automation without writing scenarios:
 
 AI converts your description to automation and executes immediately.
 
-### Custom Copilot Prompt
-
-Customize how AI generates code:
-
-```json
-{
-  "bddAiToolkit.cucumber.copilotPrompt": "Generate step definitions for:\n\n${scenario_text}\n\nFile: ${feature_file_path}\n\nUse Behave framework and follow PEP 8 style."
-}
-```
-
-**Available placeholders**:
-- `${scenario_text}` - Full scenario content
-- `${feature_file_path}` - Path to feature file
-
-> **Note**: This prompt is used as fallback when the `autogenesis` Skill is not present in the workspace.
 
 ---
 

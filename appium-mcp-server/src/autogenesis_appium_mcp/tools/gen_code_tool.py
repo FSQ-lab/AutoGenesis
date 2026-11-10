@@ -6,7 +6,6 @@ from autogenesis_agent_contract import (
     SecretBindings,
     SecretReferenceError,
     apply_bindings,
-    commit_generation_preview,
     prepare_generation_preview,
     validate_generation_destination,
     serialize,
@@ -45,10 +44,9 @@ def register_gen_code_tools(mcp, browser_manager, business_root=None):
                 If not specified, do not provide a random value.
                 
         Returns:
-            str: JSON response containing:
-                - status: "success" or "error"
-                - data: Dictionary with gen_code_id, steps_dir, and step_file_target
-                - error: Error message if operation failed
+            str: JSON response containing success status and an opaque gen_code_id.
+            Proposed destinations are returned only by preview_code_changes as
+            project-relative paths.
          
         """
         try:
@@ -71,12 +69,7 @@ def register_gen_code_tools(mcp, browser_manager, business_root=None):
             browser_manager.steps_dir = str(Path(browser_manager.step_file_target).parent)
 
             resp["status"] = "success"
-            resp["data"] = {
-                "gen_code_id": browser_manager.gen_code_id,
-                "steps_dir": browser_manager.steps_dir,
-                "step_file_target": browser_manager.step_file_target,
-                # "gen_code_cache": browser_manager.gen_code_cache,
-            }
+            resp["data"] = {"gen_code_id": browser_manager.gen_code_id}
         except Exception as e:
             resp["error"] = f"Error during code generation: {repr(e)}"
             logger.error("Operation diagnostic; private details omitted")
@@ -87,7 +80,7 @@ def register_gen_code_tools(mcp, browser_manager, business_root=None):
     @mcp.tool()
     @log_tool_call
     async def preview_code_changes(secret_bindings: SecretBindings | None = None) -> str:
-        """Preview generated test code changes and confirm before applying"""
+        """Return a read-only preview of generated test code changes."""
         resp = init_tool_response()
         
         if browser_manager.recording_warnings:
@@ -98,7 +91,6 @@ def register_gen_code_tools(mcp, browser_manager, business_root=None):
             return json.dumps(format_tool_response(resp))
         
         bound_cache = serialize(apply_bindings(browser_manager.gen_code_cache, secret_bindings))
-        browser_manager.pending_write = None
         result = gen_code_preview(browser_manager, bound_cache)
         append_payload = result.get("append_payload", "")
         if not append_payload:
@@ -111,37 +103,10 @@ def register_gen_code_tools(mcp, browser_manager, business_root=None):
             browser_manager.gen_code_id,
             append_payload,
         )
-        browser_manager.pending_write = preview
         resp["status"] = "success"
         resp["data"] = {"diff_preview": result.get("diff_preview"), **preview.to_dict()}
 
         return json.dumps(format_tool_response(resp))
 
-    @mcp.tool()
-    @log_tool_call
-    async def confirm_code_changes(
-        preview_id: str = "",
-        digest: str = "",
-        approved: bool = False,
-    ) -> str:
-        """Atomically commit exactly the complete, current, approved preview."""
-        resp = init_tool_response()
-        preview = getattr(browser_manager, "pending_write", None)
-        count = len(browser_manager.proposed_changes or [])
-        destination = commit_generation_preview(
-            preview,
-            preview_id=preview_id,
-            digest=digest,
-            approved=approved,
-        )
-        browser_manager.new_steps_count = count
-        browser_manager.clear_gen_code_cache()
-        resp["status"] = "success"
-        resp["data"] = {
-            "message": "Approved generated code committed atomically",
-            "destination": destination,
-            "new_steps_count": count,
-        }
-        return json.dumps(format_tool_response(resp))
 
 

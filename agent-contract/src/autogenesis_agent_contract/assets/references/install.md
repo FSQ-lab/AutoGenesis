@@ -26,6 +26,12 @@ Disclose packages/source identities, Python environment, package policy, Skill s
 
 Treat the installer result as evidence only for layers it reports. Do not rerun an identical install for reassurance; reuse `unchanged`. On a stable error inspect only its failing layer instead of discovering flags through repeated mutations. Configure or repair the selected Agent through its native MCP mechanism with absolute Runtime command and argv, never a shell-interpolated launch string. Retain all existing configuration.
 
+Candidate rollback removes the Candidate packages or isolated environment, the
+selected-scope Skill, its MCP entries, downloaded/extracted Candidate channel,
+and the selected Agent's cached Skill and Runtime tool schemas together. Never
+restore a previously cached Skill or write-capable generated-code inventory.
+Reload the Agent and prove the removed or newly accepted inventory before use.
+
 ## Prove Machine Ready
 
 Reload through the current Agent when available, then prove through that Agent: the canonical Skill resolves to the approved scope and exact bytes with no shadow/legacy copy; the Runtime completes MCP initialize; required prompts/tools/resources are discoverable; and `autogenesis://agent-contract/identity` matches the installed Contract requirement.

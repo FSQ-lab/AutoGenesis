@@ -157,7 +157,7 @@ cd AutoGenesis`}</CodeBlock>
         </p>
       </Step>
 
-      <Step number={2} title="Generate Test Code with AI">
+      <Step number={2} title="Preview Generated Test Code with AI">
         <p className="text-slate-700 mb-4">
           Switch to Agent mode in Copilot Chat and send a prompt with your test scenario:
         </p>
@@ -170,16 +170,18 @@ Then the Downloads pane should appear
 When I navigate to "edge://downloads"
 Then "sample-1.pdf" should appear in download list
 
-Please use win-auto-mcp to execute the following instructions:
+Apply the authenticated canonical autogenesis Skill to this explicit recording request.
 Requirements:
-1. Before executing the first step, call before_gen_code, and after all steps are completed, sequentially call preview_code_changes and confirm_code_change.
-2. Execute each step exactly as written, in order.
-3. Do not modify, merge, skip, or add any step.
-4. Use only win-auto-mcp API calls.`}
+1. Before executing the first supplied step, call before_gen_code.
+2. Execute and verify each supplied step exactly as written, in order.
+3. After every step succeeds, call preview_code_changes.
+4. Stop after the read-only preview and report that generated-file writes are unavailable.
+5. Do not copy, save, shell-write, or otherwise persist the proposed bytes.
+6. Use the Windows Runtime selected by the canonical Skill.`}
           </pre>
         </div>
         <p className="text-slate-600 mt-4 text-sm">
-          AI will call MCP tools to automatically generate step definition code.
+          AI will execute the steps and return a read-only code preview; it will not write a generated test file.
         </p>
       </Step>
 
@@ -363,7 +365,7 @@ python simple_server.py --platform mac`}
         </p>
       </Step>
 
-      <Step number={2} title="Generate Test Code with AI">
+      <Step number={2} title="Preview Generated Test Code with AI">
         <p className="text-slate-700 mb-4">
           Switch to Agent mode in Copilot Chat and send a prompt with your test scenario:
         </p>
@@ -377,16 +379,18 @@ And I click button "3"
 And I click button "="
 Then The result should be "8"
 
-Please use appium-mcp-server to execute the following instructions:
+Apply the authenticated canonical autogenesis Skill to this explicit recording request.
 Requirements:
-1. Before executing the first step, call clear_cache, and after all steps are completed, sequentially call preview_code_changes and confirm_code_change.
-2. Execute each step exactly as written, in order.
-3. Do not modify, merge, skip, or add any step.
-4. Use only appium-mcp-server API calls.`}
+1. Before executing the first supplied step, call before_gen_code.
+2. Execute and verify each supplied step exactly as written, in order.
+3. After every step succeeds, call preview_code_changes.
+4. Stop after the read-only preview and report that generated-file writes are unavailable.
+5. Do not copy, save, shell-write, or otherwise persist the proposed bytes.
+6. Use the Appium Runtime selected by the canonical Skill.`}
           </pre>
         </div>
         <p className="text-slate-600 mt-4 text-sm">
-          AI will call MCP tools to automatically generate step definition code.
+          AI will execute the steps and return a read-only code preview; it will not write a generated test file.
         </p>
       </Step>
 
@@ -595,7 +599,7 @@ python simple_server.py --platform android`}
         </p>
       </Step>
 
-      <Step number={2} title="Generate Test Code with AI">
+      <Step number={2} title="Preview Generated Test Code with AI">
         <p className="text-slate-700 mb-4">
           Switch to Agent mode in Copilot Chat and send a prompt with your test scenario:
         </p>
@@ -609,16 +613,18 @@ And I press enter to navigate to the page
 And I wait for the page to load completely
 Then I should see the tab with the title "msn.com"
 
-Please use appium-mcp-server to execute the following instructions:
+Apply the authenticated canonical autogenesis Skill to this explicit recording request.
 Requirements:
-1. Before executing the first step, call clear_cache, and after all steps are completed, sequentially call preview_code_changes and confirm_code_change.
-2. Execute each step exactly as written, in order.
-3. Do not modify, merge, skip, or add any step.
-4. Use only appium-mcp-server API calls.`}
+1. Before executing the first supplied step, call before_gen_code.
+2. Execute and verify each supplied step exactly as written, in order.
+3. After every step succeeds, call preview_code_changes.
+4. Stop after the read-only preview and report that generated-file writes are unavailable.
+5. Do not copy, save, shell-write, or otherwise persist the proposed bytes.
+6. Use the Appium Runtime selected by the canonical Skill.`}
           </pre>
         </div>
         <p className="text-slate-600 mt-4 text-sm">
-          AI will call MCP tools to automatically generate step definition code.
+          AI will execute the steps and return a read-only code preview; it will not write a generated test file.
         </p>
       </Step>
 

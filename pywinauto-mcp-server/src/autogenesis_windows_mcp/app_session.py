@@ -129,7 +129,6 @@ class AppSessionManager:
         self.gen_code_id = None
         self.gen_code_cache = []
         self.proposed_changes = None  # Store proposed code changes
-        self.pending_write = None
         self.recording_warnings = []
         self.header_code = ""
         self.steps_dir = None  # Directory for step files
@@ -613,7 +612,6 @@ class AppSessionManager:
         self.gen_code_id = None
         self.gen_code_cache.clear()
         self.proposed_changes = None
-        self.pending_write = None
         self.recording_warnings.clear()
         self.header_code = ""
         self.steps_dir = None
@@ -667,7 +665,6 @@ class AppSessionManager:
         self.gen_code_cache.clear()
         self.gen_code_id = None
         self.proposed_changes = None
-        self.pending_write = None
         self.recording_warnings.clear()
         self.header_code = ""
         self.steps_dir = None
