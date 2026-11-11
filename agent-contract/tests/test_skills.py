@@ -58,7 +58,7 @@ def _assert_hardened_install_prompt(prompt, channel):
     assert "isolated mode (`-I`, `-E`, `-s`, plus `-S`" in prompt
     assert "all `PYTHON*` variables (including `PYTHONPATH`)" in prompt and "`sitecustomize`" in prompt
     assert "Remove every ambient `PIP_*` and `UV_*` variable by name without reading its value" in prompt
-    assert "`PIP_CONFIG_FILE` to `/dev/null` on macOS and `NUL` on Windows" in prompt
+    assert "`PIP_CONFIG_FILE` to `/dev/null` on macOS and the exact lowercase pip sentinel `nul` on Windows" in prompt
     assert "`pip --isolated`" in prompt and "sole package manager" in prompt
     assert "never invoke uv or another package manager" in prompt and "`uv --no-config`" not in prompt
     assert "--no-index --no-cache-dir --find-links <transaction-stage> --require-hashes --no-deps" in prompt
@@ -80,7 +80,7 @@ def test_poisoned_venv_site_pip_config_cannot_escape_reserved_offline_install(tm
         install="Install authenticated wheels.",
         cleanup="prompt-created staging state",
     )
-    assert "`PIP_CONFIG_FILE` to `/dev/null` on macOS and `NUL` on Windows" in prompt
+    assert "`PIP_CONFIG_FILE` to `/dev/null` on macOS and the exact lowercase pip sentinel `nul` on Windows" in prompt
     assert "`pip --isolated`" in prompt and "sole package manager" in prompt
     assert "never invoke uv or another package manager" in prompt and "`uv --no-config`" not in prompt
 
@@ -215,7 +215,7 @@ def test_poisoned_venv_site_pip_config_cannot_escape_reserved_offline_install(tm
         assert control_import.returncode != 0
 
         pip_environment = dict(child_environment)
-        pip_environment["PIP_CONFIG_FILE"] = "NUL" if os.name == "nt" else "/dev/null"
+        pip_environment["PIP_CONFIG_FILE"] = "nul" if os.name == "nt" else "/dev/null"
         assert {name for name in pip_environment if name.startswith("PIP_")} == {"PIP_CONFIG_FILE"}
         assert not any(name.startswith("UV_") for name in pip_environment)
         installed = subprocess.run(
@@ -342,7 +342,7 @@ def test_guided_install_and_readiness_references_are_operational(repo_root):
         "forbids entering or deleting that state",
         "Never delete or repurpose a pre-existing or mismatched object",
         "PYTHONPATH", "sitecustomize", "offline and no-index", "PIP_CONFIG_FILE",
-        "`/dev/null` on macOS", "`NUL` on Windows", "--isolated",
+        "`/dev/null` on macOS", "lowercase `nul` on Windows", "--isolated",
         "managed-policy`, `user-approved`, `default-public`, or `undisclosed",
         "private unpredictable ownership marker",
     ))

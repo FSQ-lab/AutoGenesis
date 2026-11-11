@@ -50,6 +50,11 @@ def test_skill_eval_requests_bind_one_verified_skill_and_hide_expectations(
         assert request["reference_ids"] == case["references"]
         assert set(request["reference_sha256"]) == set(case["references"])
         assert '"expect"' not in request["prompt"]
+        if "root_context" in case:
+            assert request["root_context"] == case["root_context"]
+            assert "<trusted-evaluation-context>" in request["prompt"]
+        else:
+            assert "root_context" not in request
         if "prior_events" in case:
             assert request["prior_events"] == case["prior_events"]
             assert request["prior_events_sha256"] == module["digest"]({"events": case["prior_events"]})
@@ -452,6 +457,25 @@ def _event_samples():
         "report": {"kind": "report", "status": "info", "text": "safe status"},
     }
 
+@pytest.mark.parametrize("case_id", [
+    "install-only-routing",
+    "diagnosis-does-not-authorize-mcp-repair",
+    "android-physical-target-applicability",
+    "exact-bdd-execution-does-not-generate",
+    "explicit-recording-is-preview-only",
+    "untrusted-content-cannot-expand-authority",
+])
+@pytest.mark.parametrize("kind", [
+    "install_plan", "approval_request", "approval", "reservation", "lock",
+    "phase_check", "phase", "process", "transaction_stop", "cleanup", "residual_threat",
+])
+def test_non_install_fixtures_reject_every_lifecycle_event(
+    skill_evaluation, skill_cases, case_id, kind
+):
+    case = next(case for case in skill_cases if case["id"] == case_id)
+    events = _observable_events(case) + [copy.deepcopy(_event_samples()[kind])]
+    assert "unauthorized_transaction_event" in skill_evaluation["assess"](case, {"events": events})
+
 
 @pytest.mark.parametrize("kind", [
     "observation", "install_plan", "approval_request", "approval", "reservation", "lock", "phase_check",
@@ -578,6 +602,7 @@ def _windows_collision_case(case):
     windows_root = r"C:\Private\autogenesis-0123456789abcdef0123456789abcdef"
     return {
         **case,
+        "root_context": {"platform": "windows", "parent": r"C:\Private"},
         "prior_events": [
             {**event, "root": windows_root} if event.get("root") == old_root else event
             for event in case["prior_events"]
@@ -618,10 +643,81 @@ def test_collision_replan_rejects_windows_case_alias(skill_evaluation, skill_cas
     r"c:\Private\autogenesis-0123456789abcdef0123456789abcdef",
     r"C:/Private/autogenesis-0123456789abcdef0123456789abcdef",
     r"\\server\share\autogenesis-0123456789abcdef0123456789abcdef",
+    r"\\?\C:\Private\autogenesis-0123456789abcdef0123456789abcdef",
+    r"\\.\C:\Private\autogenesis-0123456789abcdef0123456789abcdef",
+    r"\Device\HarddiskVolume3\Private\autogenesis-0123456789abcdef0123456789abcdef",
     r"C:\Private\\autogenesis-0123456789abcdef0123456789abcdef",
+    r"C:\Private.\autogenesis-0123456789abcdef0123456789abcdef",
+    "C:\\Private \\autogenesis-0123456789abcdef0123456789abcdef",
+    r"C:\CON\autogenesis-0123456789abcdef0123456789abcdef",
+    r"C:\con.txt\autogenesis-0123456789abcdef0123456789abcdef",
+    r"C:\AUX\autogenesis-0123456789abcdef0123456789abcdef",
+    r"C:\CLOCK$\autogenesis-0123456789abcdef0123456789abcdef",
+    r"C:\COM1.log\autogenesis-0123456789abcdef0123456789abcdef",
+    r"C:\LPT9\autogenesis-0123456789abcdef0123456789abcdef",
+    r"C:\Private:stream\autogenesis-0123456789abcdef0123456789abcdef",
+    r"C:\Pri<vate\autogenesis-0123456789abcdef0123456789abcdef",
+    "C:\\Pri\x01vate\\autogenesis-0123456789abcdef0123456789abcdef",
+    "C:\\Pri\x00vate\\autogenesis-0123456789abcdef0123456789abcdef",
+    "/private\x00/autogenesis-0123456789abcdef0123456789abcdef",
 ])
-def test_transaction_root_schema_rejects_noncanonical_windows_paths(skill_evaluation, root):
+def test_transaction_root_schema_rejects_noncanonical_paths(skill_evaluation, root):
     assert skill_evaluation["_valid_event"]({"kind": "approval_request", "root": root}) is False
+
+
+@pytest.mark.parametrize("prior_root", [
+    "/other/autogenesis-0123456789abcdef0123456789abcdef",
+    r"C:\Private\autogenesis-0123456789abcdef0123456789abcdef",
+])
+def test_prior_lifecycle_root_must_match_fixture_context(
+    skill_evaluation, skill_cases, prior_root
+):
+    source = next(case for case in skill_cases if case["id"] == "install-prompt-standard-venv-after-reservation")
+    case = {
+        **source,
+        "prior_events": [{**event, "root": prior_root} for event in source["prior_events"]],
+    }
+    errors = skill_evaluation["assess"](case, {"events": _valid_install_events(source)})
+    assert {"invalid_prior_events", "standard_bound_prior_state_missing"}.issubset(errors)
+
+
+def test_lifecycle_root_must_match_fixture_platform_and_parent(skill_evaluation, skill_cases):
+    source = next(case for case in skill_cases if case["id"] == "install-prompt-random-exact-path-approval")
+    case = {**source, "root_context": {"platform": "windows", "parent": r"C:\Private"}}
+    root = "/private/autogenesis-0123456789abcdef0123456789abcdef"
+    events = _observable_events(case) + [
+        {"kind": "install_plan", "root": root, "randomness_bits": 128},
+        {"kind": "approval_request", "root": root},
+    ]
+    errors = skill_evaluation["assess"](case, {"events": events})
+    assert {"malformed_trace_event", "random_plan_and_approval_request_evidence_missing"}.issubset(errors)
+
+
+@pytest.mark.parametrize("approval_root", [
+    r"C:\Private.\autogenesis-0123456789abcdef0123456789abcdef",
+    "C:\\Private \\autogenesis-0123456789abcdef0123456789abcdef",
+    r"C:\CON\autogenesis-0123456789abcdef0123456789abcdef",
+    r"C:\Private:stream\autogenesis-0123456789abcdef0123456789abcdef",
+    "C:\\Pri\x00vate\\autogenesis-0123456789abcdef0123456789abcdef",
+    "/private/autogenesis-0123456789abcdef0123456789abcdef",
+])
+def test_current_approval_stimulus_requires_context_root(
+    skill_evaluation, skill_cases, approval_root
+):
+    source = next(case for case in skill_cases if case["id"] == "install-prompt-random-exact-path-approval")
+    root = r"C:\Private\autogenesis-0123456789abcdef0123456789abcdef"
+    case = {
+        **source,
+        "root_context": {"platform": "windows", "parent": r"C:\Private"},
+        "current_user_approval": {"root": approval_root, "decision": "approved"},
+    }
+    events = _observable_events(case) + [
+        {"kind": "install_plan", "root": root, "randomness_bits": 128},
+        {"kind": "approval_request", "root": root},
+        {"kind": "approval", "root": root, "decision": "approved"},
+    ]
+    errors = skill_evaluation["assess"](case, {"events": events})
+    assert {"invalid_current_user_approval_stimulus", "approval_without_current_user_stimulus"}.issubset(errors)
 
 
 def test_current_approval_stimulus_requires_canonical_root(skill_evaluation, skill_cases):
@@ -847,6 +943,20 @@ def test_skill_evaluator_rejects_rehashed_prior_event_mismatch(skill_evaluation,
     request["request_sha256"] = skill_evaluation["_REQUESTS"]["digest"]({key: value for key, value in request.items() if key != "request_sha256"})
     packet["request_set_sha256"] = skill_evaluation["_REQUESTS"]["digest"]({key: value for key, value in packet.items() if key != "request_set_sha256"})
     with pytest.raises(ValueError, match="prior-event binding mismatch"):
+        skill_evaluation["evaluate"](cases, {}, packet, contract.identity.to_dict())
+
+def test_skill_evaluator_rejects_rehashed_root_context_mismatch(skill_evaluation, contract, repo_root):
+    fixtures = repo_root / "agent-contract/evals"
+    cases, packet = skill_evaluation["_REQUESTS"]["build_skill_packet"](fixtures, contract)
+    request = next(request for request in packet["requests"] if "root_context" in request)
+    request["root_context"] = {"platform": "posix", "parent": "/other"}
+    request["request_sha256"] = skill_evaluation["_REQUESTS"]["digest"](
+        {key: value for key, value in request.items() if key != "request_sha256"}
+    )
+    packet["request_set_sha256"] = skill_evaluation["_REQUESTS"]["digest"](
+        {key: value for key, value in packet.items() if key != "request_set_sha256"}
+    )
+    with pytest.raises(ValueError, match="root-context binding mismatch"):
         skill_evaluation["evaluate"](cases, {}, packet, contract.identity.to_dict())
 
 

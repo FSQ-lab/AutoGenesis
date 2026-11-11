@@ -68,6 +68,8 @@ def build_skill_packet(fixtures: Path, contract) -> tuple[list[dict], dict]:
             for name, text in reference_text.items()
         )
         trusted_context = {}
+        if "root_context" in case:
+            trusted_context["root_context"] = case["root_context"]
         if "prior_events" in case:
             trusted_context["prior_events"] = case["prior_events"]
             trusted_context["prior_events_sha256"] = digest({"events": case["prior_events"]})

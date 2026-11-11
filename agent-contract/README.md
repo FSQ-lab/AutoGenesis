@@ -16,7 +16,7 @@ from mcp.server.fastmcp import FastMCP
 # These pins belong to the runtime release, independently of the installed wheel.
 required = RuntimeContractRequirement(
     contract_version="2.1.0",
-    manifest_sha256="f74579b91a7949a8beefc33a90dd1a2594367a9062c1149f47e512effdc38b3d",
+    manifest_sha256="c3c87437b140520e9e3d502e0ac52a1f11c532df8ac8f64847f775fec1fb533f",
 )
 contract = load_contract(ContractIdentity(required.contract_version, required.manifest_sha256))
 appendix = load_project_appendix("/absolute/business-project")
@@ -142,7 +142,7 @@ minimal environment that omits all `PYTHON*` and startup customization. Ambient
 `PIP_*` and `UV_*` names are removed without reading their values as defensive
 scrubbing. Pip is the sole package manager for Candidate and public Release prompt
 installations; uv and other package managers are never invoked. Pip receives only
-`PIP_CONFIG_FILE=/dev/null` on macOS or `PIP_CONFIG_FILE=NUL` on Windows and always
+`PIP_CONFIG_FILE=/dev/null` on macOS or the exact pip sentinel `PIP_CONFIG_FILE=nul` on Windows and always
 runs with `--isolated`; failure to establish the platform null configuration stops
 installation. Acquisition binds destination, staging, cache, authenticated
 requirements/hashes, and the approved opaque source/auth interface to transaction
