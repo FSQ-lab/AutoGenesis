@@ -4,6 +4,7 @@ import os
 import re
 import runpy
 import shutil
+import secrets
 import subprocess
 import sys
 from importlib import resources
@@ -17,29 +18,40 @@ NAME = "autogenesis"
 
 def _assert_hardened_install_prompt(prompt, channel):
     assert f"exact {channel} identity" in prompt
-    assert "exact new absolute disposable virtual-environment, staging, download, extraction, and cache roots" in prompt
-    assert "Require every root to be absent" in prompt
-    assert "pre-existing state" in prompt
+    assert "local private per-user parent" in prompt
+    assert "current-user ownership" in prompt
+    assert "deny every other OS identity write, create, delete, or delete-child control" in prompt
+    assert "shared, untrusted, unsafe, or network-backed parents" in prompt
+    assert "reject every symlink or reparse component without following it" in prompt
+    assert "at least 128 bits of entropy for this exact installation" in prompt
+    assert "immutable plan naming that exact path" in prompt
     assert "explicit user approval" in prompt
-    assert "before reserving a root" in prompt
+    assert "before creating the leaf" in prompt
+    assert "pre-existing state" in prompt
     assert "environment's absolute Python or entrypoints only" in prompt
+    assert "atomically create the exact approved leaf with fail-if-exists and no-follow semantics" in prompt
+    assert "newly generated random path, a fresh immutable plan, and fresh approval" in prompt
+    assert "exclusive transaction lock for the complete create, install, verify, rollback, and cleanup lifecycle" in prompt
+    assert "reject a second installer while it is held" in prompt
+    assert "stable parent and leaf identities" in prompt and "private unpredictable ownership marker" in prompt
+    assert "Before and after every reservation, venv, staging, download, extraction, install" in prompt
+    assert "lock, parent identity/ownership/permissions, exact leaf identity, and marker still match" in prompt
+    assert "standard pathname-based stdlib `venv`, `pip`, and installed AutoGenesis or Runtime CLI" in prompt
+    assert "trusts processes already running as the same OS user identity" in prompt
+    assert "does not claim to prevent a malicious same-user process" in prompt
+    assert "do not propose a privileged or sandboxed native Bootstrap" in prompt
     assert "failure, cancellation, denial, digest or identity mismatch, supersession, or rollback" in prompt
-    assert "delete only roots whose handle-bound native identities" in prompt
-    assert "Preserve every pre-existing environment" in prompt
+    assert "marker mismatch" in prompt and "forbids entering or deleting that state" in prompt
+    assert "Preserve every pre-existing or mismatched environment" in prompt
     assert "treat it as `undisclosed` and stop before installation" in prompt
     assert "Redaction after reading" in prompt and "are forbidden" in prompt
-    assert "open and keep no-follow directory handles for every approved parent" in prompt
-    assert "for the entire transaction" in prompt
-    assert "stable filesystem identity" in prompt and "private unpredictable ownership marker" in prompt
-    assert "pathname identity check before or after an operation is not sufficient" in prompt
-    assert "swap between check and mutation or deletion must be rejected before damage" in prompt
-    assert "every create, write, traversal, venv, staging, download, extraction, cache, Skill, MCP" in prompt
-    assert "handle-relative no-follow native primitives" in prompt
     assert "platform-native atomic no-replace semantics" in prompt
-    assert "must never re-resolve an absolute pathname" in prompt
-    assert "stop before mutation and report the operation unsupported" in prompt
-    assert "never fall back to pathname checks" in prompt
-    assert "swap between check and deletion must stop without deleting either object" in prompt
+    assert "no-follow semantics where supported" in prompt
+    assert all(removed not in prompt for removed in (
+        "handle-relative no-follow native primitives",
+        "entire operation is constrained through those handles",
+        "never fall back to pathname checks",
+    ))
     assert "isolated mode (`-I`, `-E`, `-s`, plus `-S`" in prompt
     assert "all `PYTHON*` variables (including `PYTHONPATH`)" in prompt and "`sitecustomize`" in prompt
     assert "every `PIP_*` and `UV_*` source, auth, config, cache, target, prefix, user, and override variable" in prompt
@@ -51,6 +63,61 @@ def _assert_hardened_install_prompt(prompt, channel):
     assert all(forbidden not in prompt.lower() for forbidden in (
         "pip config", "uv config", "printenv", "authorization header:",
     ))
+
+
+def test_reserved_transaction_allows_standard_pathname_venv(tmp_path, repo_root):
+    module = runpy.run_path(str(repo_root / "agent-contract/tools/install_prompt.py"))
+    prompt = module["hardened_install_contract"](
+        channel="Candidate",
+        external_anchor="Verify the exact external anchor.",
+        acquire="Acquire authenticated local assets.",
+        install="Install authenticated wheels.",
+        cleanup="prompt-created staging state",
+    )
+    assert "standard pathname-based stdlib `venv`, `pip`" in prompt
+
+    private_parent = tmp_path / "private-user-installations"
+    private_parent.mkdir(mode=0o700)
+    random_leaf = f"autogenesis-{secrets.token_bytes(16).hex()}"
+    assert len(bytes.fromhex(random_leaf.removeprefix("autogenesis-"))) * 8 == 128
+    transaction = private_parent / random_leaf
+    transaction.mkdir(mode=0o700)
+
+    exclusive = os.O_RDWR | os.O_CREAT | os.O_EXCL | getattr(os, "O_CLOEXEC", 0)
+    lock_descriptor = os.open(transaction / ".transaction.lock", exclusive, 0o600)
+    try:
+        with pytest.raises(FileExistsError):
+            os.open(transaction / ".transaction.lock", exclusive, 0o600)
+        marker_descriptor = os.open(transaction / ".ownership-marker", exclusive, 0o600)
+        os.close(marker_descriptor)
+
+        child_environment = {
+            name: os.environ[name]
+            for name in ("HOME", "USERPROFILE", "SYSTEMROOT", "WINDIR", "TEMP", "TMP", "TMPDIR")
+            if name in os.environ
+        }
+        created = subprocess.run(
+            [sys.executable, "-I", "-E", "-s", "-m", "venv", str(transaction)],
+            env=child_environment,
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=60,
+        )
+        assert created.returncode == 0, created.stderr
+        environment_python = transaction / ("Scripts/python.exe" if os.name == "nt" else "bin/python")
+        package_manager = subprocess.run(
+            [str(environment_python), "-I", "-E", "-s", "-m", "pip", "--version"],
+            env=child_environment,
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=30,
+        )
+        assert package_manager.returncode == 0, package_manager.stderr
+        assert (transaction / ".ownership-marker").is_file()
+    finally:
+        os.close(lock_descriptor)
 
 
 def _checksums(output):
@@ -121,8 +188,17 @@ def test_guided_install_and_readiness_references_are_operational(repo_root):
         "configured/reload-required",
     ))
     assert all(value in install for value in (
-        "previously absent disposable environment, staging, download, extraction, and cache roots",
+        "verified local private per-user parent",
+        "at least 128 bits of cryptographic randomness",
+        "includes that exact path in the immutable plan",
         "explicit approval before reservation",
+        "fail-if-exists and no-follow semantics",
+        "exclusive transaction lock",
+        "reject a concurrent installer",
+        "Standard pathname-based stdlib `venv`, `pip`",
+        "same OS user identity",
+        "does not claim to prevent malicious same-user replacement",
+        "privileged or sandboxed native Bootstrap",
         "Use only the disposable environment's absolute Python and entrypoints",
         "exact positive Actions run and run attempt",
         "positive observed artifact ID",
@@ -130,18 +206,12 @@ def test_guided_install_and_readiness_references_are_operational(repo_root):
         "Redaction after reading is not a safety boundary",
         "becomes `undisclosed`, and stops installation",
         "cancellation, denial, identity/digest mismatch, supersession, or rollback",
+        "marker mismatch",
+        "forbids entering or deleting that state",
         "Never delete or repurpose a pre-existing or mismatched object",
         "PYTHONPATH", "sitecustomize", "offline and no-index",
         "managed-policy`, `user-approved`, `default-public`, or `undisclosed",
         "private unpredictable ownership marker",
-        "keep no-follow directory handles for every approved parent",
-        "pathname identity check before or after an operation is insufficient",
-        "swap between check and mutation or deletion before damage",
-        "handle-relative no-follow native primitives",
-        "platform-native atomic no-replace semantics",
-        "never re-resolves an absolute pathname",
-        "never fall back to pathname checks",
-        "swap between check and deletion stops without deleting either object",
     ))
     assert all(value in readiness for value in (
         '"requestScope"', '"layers"', '"environment"', '"changes"',

@@ -234,13 +234,16 @@ def test_agent_install_prompt_gates_host_and_converges_on_shared_installer(tmp_p
     anchor = prompt.index("published immutable GitHub Release")
     closure = prompt.index("complete final asset set")
     approve = prompt.index("Obtain explicit user approval")
-    create = prompt.index("Only after approval, atomically and exclusively reserve")
+    create = prompt.index("Only after approval, re-open and verify the private parent")
     acquire = prompt.index("Download the Release manifest")
     install = prompt.index("install that same complete lock")
     assert gate < anchor < closure < approve < create < acquire < install
     assert "Accept only native macOS or native Windows" in prompt
     assert "reject Linux and WSL" in prompt
-    assert "exact new absolute disposable virtual-environment, staging, download, extraction, and cache roots" in prompt
+    assert "at least 128 bits of entropy for this exact installation" in prompt
+    assert "standard pathname-based stdlib `venv`, `pip`" in prompt
+    assert "same OS user identity" in prompt
+    assert "exclusive transaction lock" in prompt
     assert "treat it as `undisclosed` and stop before installation" in prompt
     assert "exact asset IDs, names, and sizes" in prompt
     assert "checksums are internal closure only" in prompt.lower()

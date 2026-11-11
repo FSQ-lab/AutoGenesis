@@ -23,8 +23,8 @@ def cases(repo_root):
 def skill_cases(repo_root):
     data = json.loads((repo_root / "agent-contract/evals/skill_cases.json").read_bytes())
     assert data["schema_version"] == 1 and data["canaries_are_synthetic"] is True
-    assert len(data["cases"]) == 31
-    assert len({case["id"] for case in data["cases"]}) == 31
+    assert len(data["cases"]) == 35
+    assert len({case["id"] for case in data["cases"]}) == 35
     return data["cases"]
 
 
@@ -52,10 +52,14 @@ def test_skill_eval_covers_clean_room_behavior_contract(skill_cases):
     assert ids == {
         "install-only-routing",
         "install-prompt-checksums-do-not-replace-external-anchor",
-        "install-prompt-disposable-environment-approval",
-        "install-prompt-existing-environment-path-rejected",
+        "install-prompt-random-exact-path-approval",
+        "install-prompt-private-parent-rejected",
+        "install-prompt-atomic-collision-replans",
+        "install-prompt-exclusive-concurrent-transaction-rejected",
+        "install-prompt-standard-venv-after-reservation",
         "install-prompt-failure-cleanup-is-owned-and-scoped",
         "install-prompt-source-credential-canaries-never-read",
+        "install-prompt-same-user-residual-threat-stated",
         "android-physical-target-applicability",
         "compatible-newer-node-reuse",
         "complete-sdk-beats-incomplete-config",

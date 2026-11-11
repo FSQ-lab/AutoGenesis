@@ -16,7 +16,7 @@ from mcp.server.fastmcp import FastMCP
 # These pins belong to the runtime release, independently of the installed wheel.
 required = RuntimeContractRequirement(
     contract_version="2.1.0",
-    manifest_sha256="0b3f0e71800ed02c57c10146f6893dac7b864b8a54348c9c3516ab15bd65e145",
+    manifest_sha256="dd0a3cc3ea1b0f54c9f809688bb40f3c93f435ce4cfafa99afaf6f4810456db7",
 )
 contract = load_contract(ContractIdentity(required.contract_version, required.manifest_sha256))
 appendix = load_project_appendix("/absolute/business-project")
@@ -112,14 +112,30 @@ builders accept only local `.` for Candidate assets and the exact canonical GitH
 Release URLs for public assets. `SHA256SUMS` is generated after the final prompt and
 covers every shipped asset except itself; self-consistent copied bytes are insufficient.
 
-Each prompt names previously absent disposable environment, staging, download,
-extraction, and cache roots and requires explicit approval before reservation. It keeps
-no-follow handles to every approved parent/root for the entire transaction. Every
-mutation and cleanup is handle-relative and no-follow; final placement is native atomic
-no-replace, and deletion is handle-/identity-bound without pathname re-resolution. A
-pre/post pathname check cannot authorize a mutation or deletion. If macOS/Windows
-tooling or a child cannot preserve the invariant, installation stops before mutation
-as unsupported rather than falling back to pathname checks.
+Each prompt selects one local private per-user parent with stable native identity,
+current-user ownership, and permissions/ACLs that deny every other OS identity
+write/create/delete/delete-child control. Shared, untrusted, unsafe, network-backed,
+symlink, and reparse parents are rejected. A cryptographically random leaf with at
+least 128 bits of entropy is generated for the exact installation, and its exact
+absolute transaction path plus environment/staging/download/extraction/cache children
+appear in the immutable plan before explicit approval.
+
+After approval, the exact leaf is atomically created with fail-if-exists and no-follow
+reservation semantics. Collision or changed parent/leaf state stops and requires a new
+random path, plan, and approval. One exclusive transaction lock is held for the complete
+create/install/verify/rollback/cleanup lifecycle. Stable parent/leaf identities and a
+private unpredictable ownership marker are recorded. The lock, private parent ownership
+and permissions, leaf identity, and marker are rechecked before and after each phase.
+Final placement remains native atomic no-replace.
+
+After successful reservation, standard pathname-based stdlib `venv`, `pip`, and
+installed CLI operations are permitted within the exact transaction root. The boundary
+explicitly trusts processes already running as the same OS user identity and does not
+claim to prevent malicious same-user replacement of pathname-addressed state; no native
+privileged/sandboxed Bootstrap is introduced. Reservation and cleanup use no-follow
+opens where supported. Cleanup deletes only still-matching prompt-owned state; a missing
+lock, changed parent permission or identity, substituted leaf, marker mismatch, symlink,
+reparse point, or ambiguity forbids deletion and preserves the state.
 
 The base Python creates the venv in isolated mode. Every child receives an explicit
 minimal environment that omits all `PYTHON*`, startup customization, and pip/uv source,
@@ -127,7 +143,7 @@ auth, config, cache, target, prefix, user, and override variables by name withou
 reading values. No ambient package config/cache is inherited; source/auth flows only
 through the approved opaque non-disclosing interface and package operations become
 offline/no-index after staging. All subsequent operations use absolute disposable-
-environment entrypoints.
+environment entrypoints while the phase-boundary checks continue to pass.
 
 Before echo/use, source metadata must be a canonical lowercase ASCII DNS hostname,
 canonical IP literal, and one finite class: `managed-policy`, `user-approved`,
