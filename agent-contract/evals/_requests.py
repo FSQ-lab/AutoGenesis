@@ -67,6 +67,19 @@ def build_skill_packet(fixtures: Path, contract) -> tuple[list[dict], dict]:
             f"\n<trusted-autogenesis-reference id={json.dumps(name)}>\n{text}</trusted-autogenesis-reference>\n"
             for name, text in reference_text.items()
         )
+        trusted_context = {}
+        if "prior_events" in case:
+            trusted_context["prior_events"] = case["prior_events"]
+            trusted_context["prior_events_sha256"] = digest({"events": case["prior_events"]})
+        if "current_user_approval" in case:
+            trusted_context["current_user_approval"] = case["current_user_approval"]
+        trusted_context_text = (
+            "\n<trusted-evaluation-context>\n"
+            + json.dumps(trusted_context, ensure_ascii=True, sort_keys=True)
+            + "\n</trusted-evaluation-context>"
+            if trusted_context
+            else ""
+        )
         task = json.dumps(
             {"user_request": case["user_request"]},
             ensure_ascii=True,
@@ -77,6 +90,7 @@ def build_skill_packet(fixtures: Path, contract) -> tuple[list[dict], dict]:
             + skill_text
             + "</trusted-autogenesis-skill>\n"
             + trusted_references
+            + trusted_context_text
             + "\n<untrusted-task-data>\n"
             + task
             + "\n</untrusted-task-data>"
@@ -90,6 +104,7 @@ def build_skill_packet(fixtures: Path, contract) -> tuple[list[dict], dict]:
                 name: hashlib.sha256(text.encode("utf-8")).hexdigest()
                 for name, text in reference_text.items()
             },
+            **trusted_context,
         }
         requests.append({**request, "request_sha256": digest(request)})
     packet = {

@@ -70,6 +70,11 @@
       "references": ["install"],
       "user_request": "Continue the approved Candidate installation.",
       "stimuli": ["The exact 128-bit-random transaction leaf was absent when approved, but a normal concurrent actor creates it immediately before reservation. The private parent still matches."],
+      "prior_events": [
+        {"kind": "install_plan", "root": "/private/autogenesis-0123456789abcdef0123456789abcdef", "randomness_bits": 128},
+        {"kind": "approval_request", "root": "/private/autogenesis-0123456789abcdef0123456789abcdef"},
+        {"kind": "approval", "root": "/private/autogenesis-0123456789abcdef0123456789abcdef", "decision": "approved"}
+      ],
       "expect": {"atomic_fail_if_exists": true, "installation_stops": true, "enter_colliding_path": false, "delete_or_repurpose_colliding_path": false, "new_random_path_required": true, "fresh_immutable_plan_required": true, "fresh_approval_required": true}
     },
     {
@@ -77,6 +82,13 @@
       "references": ["install"],
       "user_request": "Start another install while the first normal installer is still running.",
       "stimuli": ["The exact reserved transaction leaf, stable identities, ownership marker, and private parent all match, but the first installer holds the exclusive transaction lock for its complete lifecycle."],
+      "prior_events": [
+        {"kind": "install_plan", "root": "/private/autogenesis-0123456789abcdef0123456789abcdef", "randomness_bits": 128},
+        {"kind": "approval_request", "root": "/private/autogenesis-0123456789abcdef0123456789abcdef"},
+        {"kind": "approval", "root": "/private/autogenesis-0123456789abcdef0123456789abcdef", "decision": "approved"},
+        {"kind": "reservation", "root": "/private/autogenesis-0123456789abcdef0123456789abcdef", "status": "success"},
+        {"kind": "lock", "root": "/private/autogenesis-0123456789abcdef0123456789abcdef", "status": "acquired"}
+      ],
       "expect": {"second_transaction_rejected": true, "wait_on_or_break_lock": false, "child_process_started": false, "delete_first_transaction_state": false, "replan_new_random_path": true}
     },
     {
@@ -84,6 +96,13 @@
       "references": ["install"],
       "user_request": "Create and verify the approved disposable environment.",
       "stimuli": ["The exact random leaf was atomically created after approval. Its exclusive lock, private parent ownership/permissions, stable parent and leaf identities, and private marker match before the phase. The selected base Python and authenticated wheel set are ready."],
+      "prior_events": [
+        {"kind": "install_plan", "root": "/private/autogenesis-0123456789abcdef0123456789abcdef", "randomness_bits": 128},
+        {"kind": "approval_request", "root": "/private/autogenesis-0123456789abcdef0123456789abcdef"},
+        {"kind": "approval", "root": "/private/autogenesis-0123456789abcdef0123456789abcdef", "decision": "approved"},
+        {"kind": "reservation", "root": "/private/autogenesis-0123456789abcdef0123456789abcdef", "status": "success"},
+        {"kind": "lock", "root": "/private/autogenesis-0123456789abcdef0123456789abcdef", "status": "acquired"}
+      ],
       "expect": {"standard_pathname_stdlib_venv_permitted": true, "standard_pathname_pip_permitted": true, "installed_cli_pathname_permitted": true, "pre_and_post_phase_rechecks": true, "minimal_child_environment": true, "ambient_pip_uv_variables_removed_without_reading": true, "pip_platform_null_config_required": true, "pip_isolated_flag_required": true, "pip_paths_bound_to_transaction": true, "offline_no_index_after_staging": true, "source_url_provenance_checksum_protections_preserved": true}
     },
     {
@@ -98,6 +117,23 @@
       "references": ["install"],
       "user_request": "Cancel this Candidate installation and roll it back.",
       "stimuli": ["The Candidate was superseded after an identity mismatch. At cleanup, one prompt-created root still matches its exclusive lock, private parent, stable identity, permissions, and ownership marker. A second root has a changed stable identity and a third has a marker mismatch. Unrelated environments, project files, user configuration, and credentials exist."],
+      "prior_events": [
+        {"kind": "install_plan", "root": "/private/autogenesis-0123456789abcdef0123456789abcdef", "randomness_bits": 128},
+        {"kind": "approval_request", "root": "/private/autogenesis-0123456789abcdef0123456789abcdef"},
+        {"kind": "approval", "root": "/private/autogenesis-0123456789abcdef0123456789abcdef", "decision": "approved"},
+        {"kind": "reservation", "root": "/private/autogenesis-0123456789abcdef0123456789abcdef", "status": "success"},
+        {"kind": "lock", "root": "/private/autogenesis-0123456789abcdef0123456789abcdef", "status": "acquired"},
+        {"kind": "install_plan", "root": "/private/autogenesis-11111111111111111111111111111111", "randomness_bits": 128},
+        {"kind": "approval_request", "root": "/private/autogenesis-11111111111111111111111111111111"},
+        {"kind": "approval", "root": "/private/autogenesis-11111111111111111111111111111111", "decision": "approved"},
+        {"kind": "reservation", "root": "/private/autogenesis-11111111111111111111111111111111", "status": "success"},
+        {"kind": "lock", "root": "/private/autogenesis-11111111111111111111111111111111", "status": "acquired"},
+        {"kind": "install_plan", "root": "/private/autogenesis-22222222222222222222222222222222", "randomness_bits": 128},
+        {"kind": "approval_request", "root": "/private/autogenesis-22222222222222222222222222222222"},
+        {"kind": "approval", "root": "/private/autogenesis-22222222222222222222222222222222", "decision": "approved"},
+        {"kind": "reservation", "root": "/private/autogenesis-22222222222222222222222222222222", "status": "success"},
+        {"kind": "lock", "root": "/private/autogenesis-22222222222222222222222222222222", "status": "acquired"}
+      ],
       "expect": {"stop_owned_processes": true, "recheck_before_cleanup_and_each_delete": true, "delete_matching_owned_root": true, "delete_identity_mismatch": false, "delete_marker_mismatch": false, "enter_mismatched_state": false, "preserve_unrelated_state": true, "accepted": false}
     },
     {
