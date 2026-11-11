@@ -139,17 +139,17 @@ reparse point, or ambiguity forbids deletion and preserves the state.
 
 The base Python creates the venv in isolated mode. Every child receives an explicit
 minimal environment that omits all `PYTHON*` and startup customization. Ambient
-`PIP_*` and `UV_*` names are removed without reading their values. Pip then receives
-only `PIP_CONFIG_FILE=/dev/null` on macOS or `PIP_CONFIG_FILE=NUL` on Windows and
-always runs with `--isolated`; failure to establish the platform null configuration
-stops installation. Acquisition binds destination, staging, cache, authenticated
+`PIP_*` and `UV_*` names are removed without reading their values as defensive
+scrubbing. Pip is the sole package manager for Candidate and public Release prompt
+installations; uv and other package managers are never invoked. Pip receives only
+`PIP_CONFIG_FILE=/dev/null` on macOS or `PIP_CONFIG_FILE=NUL` on Windows and always
+runs with `--isolated`; failure to establish the platform null configuration stops
+installation. Acquisition binds destination, staging, cache, authenticated
 requirements/hashes, and the approved opaque source/auth interface to transaction
 roots. Offline pip installation additionally fixes `--no-index`, `--no-cache-dir`,
-`--find-links`, `--require-hashes`, and `--no-deps` and targets only the reserved venv.
-If uv is used, it always receives `--no-config` and explicit transaction cache,
-staging, destination, Python, and source bindings; after staging it is likewise
-offline/no-index. No ambient user/global configuration, source, cache, target, prefix,
-or credentials are inherited. All subsequent operations use absolute disposable-
+`--find-links`, `--require-hashes`, and `--no-deps` and targets only the reserved
+venv. No ambient user/global configuration, source, cache, target, prefix, or
+credentials are inherited. All subsequent operations use absolute disposable-
 environment entrypoints while the phase-boundary checks continue to pass.
 
 Before echo/use, source metadata must be a canonical lowercase ASCII DNS hostname,

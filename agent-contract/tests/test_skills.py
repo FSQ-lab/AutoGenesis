@@ -59,7 +59,8 @@ def _assert_hardened_install_prompt(prompt, channel):
     assert "all `PYTHON*` variables (including `PYTHONPATH`)" in prompt and "`sitecustomize`" in prompt
     assert "Remove every ambient `PIP_*` and `UV_*` variable by name without reading its value" in prompt
     assert "`PIP_CONFIG_FILE` to `/dev/null` on macOS and `NUL` on Windows" in prompt
-    assert "`pip --isolated`" in prompt and "`uv --no-config`" in prompt
+    assert "`pip --isolated`" in prompt and "sole package manager" in prompt
+    assert "never invoke uv or another package manager" in prompt and "`uv --no-config`" not in prompt
     assert "--no-index --no-cache-dir --find-links <transaction-stage> --require-hashes --no-deps" in prompt
     assert "After staging, every package operation is offline and no-index" in prompt
     assert "managed-policy`, `user-approved`, `default-public`, or `undisclosed" in prompt
@@ -70,7 +71,7 @@ def _assert_hardened_install_prompt(prompt, channel):
     ))
 
 
-def test_poisoned_user_pip_config_cannot_escape_reserved_offline_install(tmp_path, repo_root):
+def test_poisoned_venv_site_pip_config_cannot_escape_reserved_offline_install(tmp_path, repo_root):
     module = runpy.run_path(str(repo_root / "agent-contract/tools/install_prompt.py"))
     prompt = module["hardened_install_contract"](
         channel="Candidate",
@@ -80,7 +81,8 @@ def test_poisoned_user_pip_config_cannot_escape_reserved_offline_install(tmp_pat
         cleanup="prompt-created staging state",
     )
     assert "`PIP_CONFIG_FILE` to `/dev/null` on macOS and `NUL` on Windows" in prompt
-    assert "`pip --isolated`" in prompt and "`uv --no-config`" in prompt
+    assert "`pip --isolated`" in prompt and "sole package manager" in prompt
+    assert "never invoke uv or another package manager" in prompt and "`uv --no-config`" not in prompt
 
     private_parent = tmp_path / "private-user-installations"
     private_parent.mkdir(mode=0o700)
@@ -90,15 +92,19 @@ def test_poisoned_user_pip_config_cannot_escape_reserved_offline_install(tmp_pat
     transaction.mkdir(mode=0o700)
     stage = transaction / "stage"
     stage.mkdir()
+    control_environment = transaction / "control-venv"
     environment = transaction / "venv"
 
     outside = tmp_path / "outside-transaction"
+    control_target = outside / "control-target"
     outside_target = outside / "target"
     outside_cache = outside / "cache"
     outside_prefix = outside / "prefix"
     poison_home = outside / "home"
-    outside_target.mkdir(parents=True)
+    control_target.mkdir(parents=True)
+    outside_target.mkdir()
     outside_cache.mkdir()
+    poison_home.mkdir()
 
     requests = []
 
@@ -115,19 +121,6 @@ def test_poisoned_user_pip_config_cannot_escape_reserved_offline_install(tmp_pat
     source_thread = threading.Thread(target=source.serve_forever, daemon=True)
     source_thread.start()
     poison_url = f"http://127.0.0.1:{source.server_port}/simple"
-    if os.name == "nt":
-        config = poison_home / "pip" / "pip.ini"
-    else:
-        config = poison_home / ".config" / "pip" / "pip.conf"
-    config.parent.mkdir(parents=True)
-    config.write_text(
-        "[global]\n"
-        f"target = {outside_target}\n"
-        f"prefix = {outside_prefix}\n"
-        f"index-url = {poison_url}\n"
-        f"cache-dir = {outside_cache}\n",
-        encoding="utf-8",
-    )
 
     wheel = stage / "poisonproof-1.0-py3-none-any.whl"
     dist_info = "poisonproof-1.0.dist-info"
@@ -164,27 +157,69 @@ def test_poisoned_user_pip_config_cannot_escape_reserved_offline_install(tmp_pat
         child_environment["HOME"] = str(poison_home)
         child_environment["USERPROFILE"] = str(poison_home)
         child_environment["APPDATA"] = str(poison_home)
-        created = subprocess.run(
-            [sys.executable, "-I", "-E", "-s", "-m", "venv", str(environment)],
+        assert not any(name.startswith(("PIP_", "UV_", "PYTHON")) for name in child_environment)
+        for destination in (control_environment, environment):
+            created = subprocess.run(
+                [sys.executable, "-I", "-E", "-s", "-m", "venv", str(destination)],
+                env=child_environment,
+                capture_output=True,
+                text=True,
+                check=False,
+                timeout=60,
+            )
+            assert created.returncode == 0, created.stderr
+
+        executable = "Scripts/python.exe" if os.name == "nt" else "bin/python"
+        config_name = "pip.ini" if os.name == "nt" else "pip.conf"
+        control_python = control_environment / executable
+        environment_python = environment / executable
+        (control_environment / config_name).write_text(
+            f"[global]\ntarget = {control_target}\n",
+            encoding="utf-8",
+        )
+        (environment / config_name).write_text(
+            "[global]\n"
+            f"target = {outside_target}\n"
+            f"prefix = {outside_prefix}\n"
+            f"index-url = {poison_url}\n"
+            f"cache-dir = {outside_cache}\n",
+            encoding="utf-8",
+        )
+
+        def install_command(python):
+            return [
+                str(python), "-I", "-E", "-s", "-m", "pip",
+                "--isolated", "--disable-pip-version-check", "install", "--no-input",
+                "--no-index", "--no-cache-dir", "--find-links", str(stage),
+                "--require-hashes", "--no-deps", "-r", str(requirements),
+            ]
+
+        control = subprocess.run(
+            install_command(control_python),
             env=child_environment,
             capture_output=True,
             text=True,
             check=False,
             timeout=60,
         )
-        assert created.returncode == 0, created.stderr
-        environment_python = environment / ("Scripts/python.exe" if os.name == "nt" else "bin/python")
+        assert control.returncode == 0, control.stderr
+        assert (control_target / "poisonproof" / "__init__.py").is_file()
+        control_import = subprocess.run(
+            [str(control_python), "-I", "-E", "-s", "-c", "import poisonproof"],
+            env=child_environment,
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=30,
+        )
+        assert control_import.returncode != 0
 
         pip_environment = dict(child_environment)
         pip_environment["PIP_CONFIG_FILE"] = "NUL" if os.name == "nt" else "/dev/null"
-        assert set(name for name in pip_environment if name.startswith("PIP_")) == {"PIP_CONFIG_FILE"}
+        assert {name for name in pip_environment if name.startswith("PIP_")} == {"PIP_CONFIG_FILE"}
+        assert not any(name.startswith("UV_") for name in pip_environment)
         installed = subprocess.run(
-            [
-                str(environment_python), "-I", "-E", "-s", "-m", "pip",
-                "--isolated", "--disable-pip-version-check", "install", "--no-input",
-                "--no-index", "--no-cache-dir", "--find-links", str(stage),
-                "--require-hashes", "--no-deps", "-r", str(requirements),
-            ],
+            install_command(environment_python),
             env=pip_environment,
             capture_output=True,
             text=True,
