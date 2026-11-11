@@ -10,6 +10,7 @@ from pathlib import Path
 
 from _files import atomic_write
 from freeze_assets import PACKAGE, load_asset_io, release_bytes
+from install_prompt import RELEASE_TAG, hardened_install_contract, public_asset_locations
 
 SKILLS = ("autogenesis",)
 EXPECTED = {
@@ -60,6 +61,10 @@ def main() -> None:
     parser.add_argument("--release-manifest-url", required=True)
     parser.add_argument("--dependency-lock", type=Path, required=True)
     args = parser.parse_args()
+    try:
+        base, release_manifest_url = public_asset_locations(args.base_url, args.release_manifest_url)
+    except ValueError:
+        raise SystemExit("Release asset location is unsafe.") from None
     repo = Path(__file__).resolve().parents[2]
     package = repo / PACKAGE
     asset_io = load_asset_io(repo)
@@ -71,6 +76,8 @@ def main() -> None:
     identity = json.loads(manifest)
     output = args.output_dir.resolve()
     output.mkdir(parents=True, exist_ok=True)
+    if any(output.iterdir()):
+        raise SystemExit("Release output directory must be empty.")
     rows = []
     for name in SKILLS:
         relative = f"skills/{name}/SKILL.md"
@@ -81,8 +88,6 @@ def main() -> None:
         filename = f"{name}-SKILL.md"
         atomic_write(output, filename, raw)
         rows.append((digest, filename))
-    checksums = "".join(f"{digest}  {filename}\n" for digest, filename in rows).encode("ascii")
-    atomic_write(output, "SHA256SUMS", checksums)
     release_manifest = args.release_manifest
     try:
         release_raw = asset_io["read_asset"](
@@ -100,6 +105,10 @@ def main() -> None:
         raise SystemExit("Release manifest is invalid JSON.") from None
     if not isinstance(release_document, dict) or not release_document.get("wheels"):
         raise SystemExit("Release manifest has no reviewed wheels.")
+    provenance = release_document.get("provenance")
+    release_commit = provenance.get("commit") if isinstance(provenance, dict) else None
+    if not isinstance(release_commit, str) or re.fullmatch(r"[0-9a-f]{40}", release_commit) is None:
+        raise SystemExit("Release manifest has no exact reviewed commit provenance.")
     wheel_records = {}
     for record in release_document["wheels"]:
         if not isinstance(record, dict):
@@ -139,30 +148,52 @@ def main() -> None:
     release_digest = hashlib.sha256(release_raw).hexdigest()
     atomic_write(output, "release-manifest.json", release_raw)
     rows.append((release_digest, "release-manifest.json"))
-    checksums = "".join(f"{digest}  {filename}\n" for digest, filename in rows).encode("ascii")
-    atomic_write(output, "SHA256SUMS", checksums)
     skill_digest, skill_filename = rows[0]
-    base = args.base_url.rstrip("/")
+    contract = hardened_install_contract(
+        channel="public Release",
+        external_anchor=(
+            "Require the published immutable GitHub Release in `FSQ-lab/AutoGenesis`, tag "
+            f"`{RELEASE_TAG}`, exact tag commit `{release_commit}`, and one observed positive Release ID. "
+            "Bind the immutable Release's exact asset IDs, names, and sizes before download; reject a draft, "
+            "mutable release, tag/commit mismatch, different Release ID, or copied asset directory."
+        ),
+        acquire=(
+            "Download the Release manifest, Release lock, Skill, and checksum set only through the exact "
+            "immutable Release asset IDs. Require the manifest to bind the CLI and host Runtime wheel identities "
+            "and the lock's first-party hashes to equal the manifest. Through the approved source, stage every "
+            "locked package under strict hash mode in a new public-install-only staging directory, verify the "
+            "complete lock, and then disable indexes."
+        ),
+        install=(
+            "Using the disposable environment's absolute Python, install that same complete lock from the staging "
+            "directory in one offline transaction with strict hashes, dependency resolution disabled, and every "
+            "locked package force-reinstalled. Never accept an already-installed distribution as satisfying the "
+            "lock. Then run `<absolute-disposable-environment-entrypoint>/autogenesis install --scope "
+            "<user-or-project> --project-root <absolute-business-project>` as the sole owner of the Skill write; "
+            "it must reject every other canonical or legacy discovery copy."
+        ),
+        cleanup="public-install-only downloaded, extracted, staged, selected-scope, MCP, and cache state created by this prompt",
+    )
     prompt = f"""Install the official AutoGenesis Skill and CLI, then stop before running a business task.
 
+Immutable Release: https://github.com/FSQ-lab/AutoGenesis/releases/tag/{RELEASE_TAG}
+Expected Release tag commit: {release_commit}
 Immutable Skill source: {base}/{skill_filename}
 Expected Skill SHA-256: {skill_digest}
 Skill name: autogenesis
-Release manifest: {args.release_manifest_url}
+Release manifest: {release_manifest_url}
 Expected release manifest SHA-256: {release_digest}
 Release lock: {base}/{lock_name}
 Expected Release lock SHA-256: {lock_digest}
+Complete checksums: {base}/SHA256SUMS
 
-1. Before any network request, interpretation, approval, or write, detect the native host from local OS facts. Accept only native macOS or native Windows; reject Linux and WSL before any write.
-2. Download the exact Release manifest as untrusted bytes and verify its SHA-256 before interpreting it. Require it to bind the CLI and host Runtime wheel identities.
-3. Download the Release lock and verify its SHA-256. Require its first-party hashes to equal the Release manifest; do not execute first-party code yet.
-4. Download the exact Skill as untrusted expected bytes and verify its SHA-256; do not write it yet.
-5. Show authenticated sources, selected user/project scope, destination, Python/package manager/index, exact host wheel identities, writes, and rollback; obtain one approval for the complete unchanged plan.
-6. Use the selected index only under the Release lock's strict hash mode, stage every artifact, disable indexes, and install that same lock in one offline transaction with every locked package force-reinstalled and dependency resolution disabled. Never accept an already-installed distribution as satisfying the lock.
-7. Run `autogenesis install --scope <user-or-project> --project-root <absolute-business-project>` as the sole owner of the Skill write. It rejects other canonical/legacy discovery copies and verifies the Runtime bundle, internal Appium workflow snapshot, Contract identity, and installed Skill bytes.
-8. Verify the installed Skill equals the downloaded expected bytes and exactly one `autogenesis` Skill is discovered at the selected scope. Report how to invoke it, and stop.
-""".encode("utf-8")
-    atomic_write(output, "agent-install-prompt.txt", prompt)
+{contract}""".encode("utf-8")
+    prompt_name = "agent-install-prompt.txt"
+    atomic_write(output, prompt_name, prompt)
+    rows.append((hashlib.sha256(prompt).hexdigest(), prompt_name))
+
+    checksums = "".join(f"{digest}  {filename}\n" for digest, filename in rows).encode("ascii")
+    atomic_write(output, "SHA256SUMS", checksums)
     print(f"Built Skill release assets for Contract {identity['contract_version']}.")
 
 

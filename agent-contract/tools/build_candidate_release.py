@@ -16,6 +16,7 @@ from pathlib import Path
 
 from _files import atomic_write
 from freeze_assets import PACKAGE, load_asset_io, release_bytes
+from install_prompt import REPOSITORY, candidate_asset_location, hardened_install_contract
 
 EXPECTED = {
     "autogenesis-agent-contract": "2.1.0",
@@ -144,9 +145,19 @@ def main() -> None:
     parser.add_argument("--base-url", required=True)
     parser.add_argument("--commit", required=True)
     parser.add_argument("--dependency-lock", required=True, type=Path)
+    parser.add_argument("--workflow-run-id", required=True)
+    parser.add_argument("--workflow-run-attempt", required=True)
     args = parser.parse_args()
     if re.fullmatch(r"[0-9a-f]{40}", args.commit) is None:
         raise SystemExit("Candidate commit must be an exact lowercase Git commit.")
+    if not args.workflow_run_id.isdigit() or int(args.workflow_run_id) < 1:
+        raise SystemExit("Candidate workflow run ID must be a positive integer.")
+    if not args.workflow_run_attempt.isdigit() or int(args.workflow_run_attempt) < 1:
+        raise SystemExit("Candidate workflow run attempt must be a positive integer.")
+    try:
+        base = candidate_asset_location(args.base_url)
+    except ValueError:
+        raise SystemExit("Candidate asset location is unsafe.") from None
 
     repo = Path(__file__).resolve().parents[2]
     _verify_commit(repo, args.commit)
@@ -183,7 +194,8 @@ def main() -> None:
 
     output = args.output_dir.resolve()
     output.mkdir(parents=True, exist_ok=True)
-    base = args.base_url.rstrip("/")
+    if any(output.iterdir()):
+        raise SystemExit("Candidate output directory must be empty.")
     wheels = []
     checksum_rows = []
     for name in EXPECTED:
@@ -226,15 +238,21 @@ def main() -> None:
     checksum_rows.append((skill_digest, skill_name))
     identity = json.loads(expected_manifest)
     candidate = {
-        "schema_version": 1,
+        "schema_version": 2,
         "channel": "candidate",
+        "provenance": {
+            "repository": REPOSITORY,
+            "workflow_run_id": args.workflow_run_id,
+            "workflow_run_attempt": args.workflow_run_attempt,
+            "artifact": f"autogenesis-candidate-{args.workflow_run_id}-{args.workflow_run_attempt}-{args.commit}",
+        },
         "commit": args.commit,
         "contract": {
             "version": identity["contract_version"],
             "manifest_sha256": hashlib.sha256(expected_manifest).hexdigest(),
         },
         "first_party_index_fallback": False,
-        "third_party_policy": "user-selected-index-with-release-hash-lock",
+        "third_party_policy": "sanitized-source-with-release-hash-lock",
         "dependency_locks": {
             "download": {
                 "filename": lock_name,
@@ -262,17 +280,54 @@ def main() -> None:
     atomic_write(output, manifest_name, candidate_raw)
     manifest_digest = hashlib.sha256(candidate_raw).hexdigest()
     checksum_rows.append((manifest_digest, manifest_name))
-    checksums = "".join(f"{digest}  {name}\n" for digest, name in checksum_rows).encode("ascii")
-    atomic_write(output, "SHA256SUMS", checksums)
 
+    artifact_name = candidate["provenance"]["artifact"]
+    contract = hardened_install_contract(
+        channel="Candidate",
+        external_anchor=(
+            f"In canonical repository `{REPOSITORY}`, require exact Actions run `{args.workflow_run_id}`, "
+            f"positive run attempt `{args.workflow_run_attempt}`, head commit `{args.commit}`, and attempt-qualified "
+            f"artifact name `{artifact_name}`. Before interpreting bundle instructions, resolve exactly one unexpired "
+            "immutable GitHub Actions artifact with a positive observed artifact ID matching all those fields, then "
+            "download by that artifact ID. Reject a local directory, zero/multiple/expired artifact matches, another "
+            "run/attempt/commit/name, or superseded run 42843125727."
+        ),
+        acquire=(
+            "Use only the manifest-bound first-party wheels, locks, and Skill bytes already obtained "
+            "from the exact Actions artifact. Through the approved source, stage third-party artifacts "
+            "under the download lock's strict hash policy in a new Candidate-only staging directory. "
+            "Verify every staged artifact, add the already verified first-party wheel bytes, and then disable indexes."
+        ),
+        install=(
+            "Using the disposable environment's absolute Python, install the complete offline-install lock "
+            "from that staging directory in one transaction with strict hashes, dependency resolution disabled, "
+            "and every locked package force-reinstalled. Never accept an installed distribution as satisfying "
+            "the lock. Never resolve or replace a first-party Candidate package from an index. Then run "
+            "`<absolute-disposable-environment-entrypoint>/autogenesis install --scope <user-or-project> "
+            "--project-root <absolute-business-project>` as the sole owner of the Skill write; it must reject "
+            "every other canonical or legacy discovery copy."
+        ),
+        cleanup="Candidate-only downloaded, extracted, staged, selected-scope, MCP, and cache state created by this prompt",
+    )
     prompt = f"""Install this exact AutoGenesis Candidate for pre-release UAT, then stop before a business task.
 
 Candidate manifest: {base}/{manifest_name}
 Expected manifest SHA-256: {manifest_digest}
+Complete checksums: {base}/SHA256SUMS
 Candidate commit: {args.commit}
-Reject Linux/WSL before any download or write. Download the manifest as untrusted bytes and verify its exact SHA-256 before interpreting it. Show the selected Python, package manager, third-party index, Skill scope/destination, exact host-applicable first-party wheel identities, both lock identities, writes, and rollback; obtain one approval. Download every host-applicable first-party wheel, both locks, and the Skill expected bytes only from manifest URLs and verify size/SHA-256; do not write the Skill yet. Use the selected index only to download third-party artifacts under the download lock's strict hash policy into a private staging directory. Verify every staged artifact, add the already verified first-party wheel bytes, disable indexes, and install the complete offline-install lock from that same staging directory in one package transaction with every locked package force-reinstalled and dependency resolution disabled. Never accept an installed distribution as satisfying the lock, and never resolve or replace a first-party Candidate package from an index. Then run `autogenesis install --scope <user-or-project> --project-root <absolute-business-project>` as the sole owner of the Skill write; it must reject every other canonical or legacy discovery copy. Verify the installed Skill equals the downloaded expected bytes, and verify the Contract manifest, internal Appium workflow inventory, package versions, selected scope, and discovery. Candidate rollback must uninstall or remove the Candidate packages/environment, selected-scope Skill, MCP entries, downloaded/extracted Candidate channel, and cached Skill/Runtime schemas together; never restore a cached write-capable generated-code inventory. Reload the Agent and prove the removed or newly accepted inventory. Report the result and stop.
-""".encode("utf-8")
-    atomic_write(output, "candidate-install-prompt.txt", prompt)
+GitHub Actions repository: {REPOSITORY}
+GitHub Actions workflow run: {args.workflow_run_id}
+GitHub Actions workflow run attempt: {args.workflow_run_attempt}
+GitHub Actions artifact ID: resolve one positive immutable ID externally before interpreting this bundle
+GitHub Actions artifact: {artifact_name}
+
+{contract}""".encode("utf-8")
+    prompt_name = "candidate-install-prompt.txt"
+    atomic_write(output, prompt_name, prompt)
+    checksum_rows.append((hashlib.sha256(prompt).hexdigest(), prompt_name))
+
+    checksums = "".join(f"{digest}  {name}\n" for digest, name in checksum_rows).encode("ascii")
+    atomic_write(output, "SHA256SUMS", checksums)
     print(f"Built Candidate channel for {args.commit} with {len(wheels)} exact wheels.")
 
 

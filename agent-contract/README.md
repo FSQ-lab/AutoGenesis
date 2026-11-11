@@ -16,7 +16,7 @@ from mcp.server.fastmcp import FastMCP
 # These pins belong to the runtime release, independently of the installed wheel.
 required = RuntimeContractRequirement(
     contract_version="2.1.0",
-    manifest_sha256="ca6f1970b994f68e78495819147dbab3daf00e3fc1e44f856be8740a00283ed4",
+    manifest_sha256="c3c87437b140520e9e3d502e0ac52a1f11c532df8ac8f64847f775fec1fb533f",
 )
 contract = load_contract(ContractIdentity(required.contract_version, required.manifest_sha256))
 appendix = load_project_appendix("/absolute/business-project")
@@ -100,6 +100,64 @@ cannot be saved through the Contract's stdio surface or an alternate copy route.
 presence, the constant relative appendix path, and its separate SHA-256. It
 never returns appendix text or a user's absolute project path. Its schema is
 `assets/schemas/identity.schema.json`.
+
+## Agent Install Prompt boundary
+
+Candidate and public generators share one fail-closed installation contract. The
+Candidate prompt is externally anchored to one canonical repository, positive Actions
+run and attempt, head commit, attempt-qualified name, and exactly one unexpired
+immutable artifact with a positive observed artifact ID. The public prompt is anchored
+to the exact canonical immutable GitHub Release ID, tag, commit, and asset set. The
+builders accept only local `.` for Candidate assets and the exact canonical GitHub
+Release URLs for public assets. `SHA256SUMS` is generated after the final prompt and
+covers every shipped asset except itself; self-consistent copied bytes are insufficient.
+
+Each prompt selects one local private per-user parent with stable native identity,
+current-user ownership, and permissions/ACLs that deny every other OS identity
+write/create/delete/delete-child control. Shared, untrusted, unsafe, network-backed,
+symlink, and reparse parents are rejected. A cryptographically random leaf with at
+least 128 bits of entropy is generated for the exact installation, and its exact
+absolute transaction path plus environment/staging/download/extraction/cache children
+appear in the immutable plan before explicit approval.
+
+After approval, the exact leaf is atomically created with fail-if-exists and no-follow
+reservation semantics. Collision or changed parent/leaf state stops and requires a new
+random path, plan, and approval. One exclusive transaction lock is held for the complete
+create/install/verify/rollback/cleanup lifecycle. Stable parent/leaf identities and a
+private unpredictable ownership marker are recorded. The lock, private parent ownership
+and permissions, leaf identity, and marker are rechecked before and after each phase.
+Final placement remains native atomic no-replace.
+
+After successful reservation, standard pathname-based stdlib `venv`, `pip`, and
+installed CLI operations are permitted within the exact transaction root. The boundary
+explicitly trusts processes already running as the same OS user identity and does not
+claim to prevent malicious same-user replacement of pathname-addressed state; no native
+privileged/sandboxed Bootstrap is introduced. Reservation and cleanup use no-follow
+opens where supported. Cleanup deletes only still-matching prompt-owned state; a missing
+lock, changed parent permission or identity, substituted leaf, marker mismatch, symlink,
+reparse point, or ambiguity forbids deletion and preserves the state.
+
+The base Python creates the venv in isolated mode. Every child receives an explicit
+minimal environment that omits all `PYTHON*` and startup customization. Ambient
+`PIP_*` and `UV_*` names are removed without reading their values as defensive
+scrubbing. Pip is the sole package manager for Candidate and public Release prompt
+installations; uv and other package managers are never invoked. Pip receives only
+`PIP_CONFIG_FILE=/dev/null` on macOS or the exact pip sentinel `PIP_CONFIG_FILE=nul` on Windows and always
+runs with `--isolated`; failure to establish the platform null configuration stops
+installation. Acquisition binds destination, staging, cache, authenticated
+requirements/hashes, and the approved opaque source/auth interface to transaction
+roots. Offline pip installation additionally fixes `--no-index`, `--no-cache-dir`,
+`--find-links`, `--require-hashes`, and `--no-deps` and targets only the reserved
+venv. No ambient user/global configuration, source, cache, target, prefix, or
+credentials are inherited. All subsequent operations use absolute disposable-
+environment entrypoints while the phase-boundary checks continue to pass.
+
+Before echo/use, source metadata must be a canonical lowercase ASCII DNS hostname,
+canonical IP literal, and one finite class: `managed-policy`, `user-approved`,
+`default-public`, or `undisclosed`. Interface trust is independent, not self-attested.
+Invalid metadata is never echoed and becomes `undisclosed`, stopping installation.
+Full URLs, credentials, environment/config values, errors, output, and evidence are
+never read for disclosure; redaction after reading is forbidden.
 
 ## Integrity and diagnostics
 
