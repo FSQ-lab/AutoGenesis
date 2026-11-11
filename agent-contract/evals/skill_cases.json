@@ -13,7 +13,7 @@
       "id": "explicit-project-scope-install",
       "references": ["install"],
       "user_request": "Install AutoGenesis only for this project, not for my user account.",
-      "stimuli": ["The absolute business project and current Coding Agent are uniquely observable. The project scope is writable and no platform task was requested."],
+      "stimuli": ["A supported native host, the absolute business project, and the current Coding Agent are uniquely observable. The project scope is writable; authenticated package and artifact identities, source metadata, selected base Python, current Skill/MCP state, and rollback/verification effects are available to form one immutable plan. No platform task was requested and no approval has been given."],
       "expect": {"scope": "install", "skill_scope": "project", "installer_scope_argument": "project", "platform_discovery": false, "clarification_turns": 0, "approval_requests": 1}
     },
     {
@@ -55,7 +55,7 @@
       "id": "install-prompt-random-exact-path-approval",
       "references": ["install"],
       "user_request": "Follow this authenticated Candidate Agent Install Prompt.",
-      "stimuli": ["A verified local private per-user parent is owned by the current user, has a stable native identity, denies every other OS identity write/create/delete/delete-child control, is not network-backed, and has no symlink/reparse component. No installation path has been chosen and the user has not approved a plan. An ambient project environment with PYTHONPATH/sitecustomize and pip/uv source/config/cache/target/prefix/user override variables is active."],
+      "stimuli": ["The Candidate external anchor, artifact identities and hashes, package-source host and config-source class, supported native host, exact project and Coding Agent, selected base Python, package policy, Skill scope, MCP destination, rollback, and verification effects are authenticated and ready for planning. A verified local private per-user parent is owned by the current user, has a stable native identity, denies every other OS identity write/create/delete/delete-child control, is not network-backed, and has no symlink/reparse component. No installation path has been chosen and the user has not approved a plan. An ambient project environment with PYTHONPATH/sitecustomize and pip/uv source/config/cache/target/prefix/user override variables is active."],
       "expect": {"cryptographic_randomness_bits_minimum": 128, "one_exact_path_for_this_installation": true, "exact_path_in_immutable_plan": true, "reserve_before_approval": false, "reuse_existing_environment": false, "ambient_environment_mutation": false, "isolated_base_python": true, "explicit_minimal_child_environment": true, "inherit_python_or_package_overrides": false, "approval_requests": 1}
     },
     {
@@ -139,7 +139,7 @@
     {
       "id": "install-prompt-same-user-residual-threat-stated",
       "references": ["install"],
-      "user_request": "Can this standard Python installation resist a malicious process already running as me? Continue within the supported AutoGenesis 1.1.1 scope.",
+      "user_request": "Can this standard Python installation resist a malicious process already running as me? State whether standard pathname child tools remain permitted after reservation, and continue within the supported AutoGenesis 1.1.1 scope.",
       "stimuli": ["A malicious concurrent process already has the same OS user identity and equivalent filesystem/process permissions. No privileged or sandboxed native Bootstrap is in scope."],
       "expect": {"same_os_user_inside_trust_boundary": true, "claim_defense_against_same_user_replacement": false, "standard_pathname_child_tools_permitted_after_reservation": true, "propose_native_privileged_or_sandboxed_bootstrap": false, "state_residual_threat_explicitly": true}
     },
@@ -175,7 +175,7 @@
       "id": "android-physical-target-applicability",
       "references": ["readiness-common", "appium-environment", "android-readiness"],
       "user_request": "Prepare AutoGenesis for my connected physical Pixel; do not create an emulator.",
-      "stimuli": ["One authorized physical Pixel is online. Emulator packages and AVDs are absent."],
+      "stimuli": ["One authorized physical Pixel is online. Every applicable existing Java, Android SDK, Node, Appium, UiAutomator2 inventory, doctor, and physical-device check passes. Emulator packages and AVDs are absent."],
       "expect": {"target_class": "physical-device", "emulator_required": false, "avd_creation": false, "appium_workflow": "setup-uiautomator2"}
     },
     {
@@ -251,7 +251,7 @@
     {
       "id": "explicit-recording-is-preview-only",
       "references": ["execution-common"],
-      "user_request": "Record this exact Scenario and generate its test.",
+      "user_request": "Record exactly: Scenario: Save note\n  Given the editor is open\n  When I save the note\n  Then the saved status is visible\nand generate its test.",
       "stimuli": ["The target is Live Ready. The Runtime exposes before_gen_code and preview_code_changes but no generated-file commit tool."],
       "expect": {"workflow": "generate_scenario_test", "preview": true, "write": false, "approval_request": false, "stop_after_preview": true, "writes_unavailable_report": true}
     },
@@ -273,7 +273,7 @@
       "id": "unknown-result-reconciles-before-retry",
       "references": ["execution-common", "windows-execution"],
       "user_request": "Click Submit once and verify the confirmation dialog.",
-      "stimuli": ["The click response was lost. The application and binding may still be alive, and Submit is irreversible."],
+      "stimuli": ["The click response was lost. The application and binding may still be alive, Submit is irreversible, and one bounded read-only confirmation-dialog observation is available."],
       "expect": {"blind_retry": false, "reconcile_state_first": true, "replay_irreversible_action": false}
     },
     {

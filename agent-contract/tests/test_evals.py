@@ -556,7 +556,7 @@ def test_concurrent_rejects_invented_current_lifecycle(skill_evaluation, skill_c
     events = _valid_fixture_events(case)
     root = case["prior_events"][0]["root"]
     events.insert(len(_observable_events(case)), {"kind": "install_plan", "root": root, "randomness_bits": 128})
-    assert "concurrent_invented_lifecycle" in skill_evaluation["assess"](case, {"events": events})
+    assert "concurrent_forbidden_current_event" in skill_evaluation["assess"](case, {"events": events})
 
 
 def test_standard_and_cleanup_require_bound_prior_state(skill_evaluation, skill_cases):
@@ -640,6 +640,65 @@ def test_skill_evaluator_requires_all_cleanup_events(skill_evaluation, skill_cas
         target = next(event for event in events if event.get("kind") == "cleanup" and event["marker"] == "mismatch")
     events.remove(target)
     assert "cleanup_evidence_missing" in skill_evaluation["assess"](case, {"events": events})
+
+
+@pytest.mark.parametrize("mutation", ["delete", "process", "phase"])
+def test_concurrent_fixture_rejects_all_pre_failure_work(skill_evaluation, skill_cases, mutation):
+    case = next(case for case in skill_cases if case["id"] == "install-prompt-exclusive-concurrent-transaction-rejected")
+    events = _valid_fixture_events(case)
+    root = case["prior_events"][0]["root"]
+    failure_index = next(index for index, event in enumerate(events) if event["kind"] == "lock")
+    if mutation == "delete":
+        event = _cleanup(root, "delete")
+    elif mutation == "process":
+        event = {"kind": "process", "phase": "install", "tool": "pip", "root": root}
+    else:
+        event = {"kind": "phase", "phase": "install", "action": "begin", "root": root}
+    events.insert(failure_index, event)
+    assert "concurrent_forbidden_current_event" in skill_evaluation["assess"](case, {"events": events})
+
+
+def test_standard_fixture_rejects_failed_lock_stop_then_phases(skill_evaluation, skill_cases):
+    case = next(case for case in skill_cases if case["id"] == "install-prompt-standard-venv-after-reservation")
+    events = _valid_install_events(case)
+    root = case["prior_events"][0]["root"]
+    first_phase = next(index for index, event in enumerate(events) if event["kind"] == "phase_check")
+    events[first_phase:first_phase] = [
+        {"kind": "lock", "root": root, "status": "failed"},
+        {"kind": "transaction_stop", "root": root, "reason": "lock_failed"},
+    ]
+    errors = skill_evaluation["assess"](case, {"events": events})
+    assert {"standard_forbidden_current_event", "terminal_root_mutated"}.issubset(errors)
+
+
+def test_standard_fixture_rejects_cleanup_deletion(skill_evaluation, skill_cases):
+    case = next(case for case in skill_cases if case["id"] == "install-prompt-standard-venv-after-reservation")
+    events = _valid_install_events(case)
+    events.append(_cleanup(case["prior_events"][0]["root"], "delete"))
+    assert "standard_forbidden_current_event" in skill_evaluation["assess"](case, {"events": events})
+
+
+@pytest.mark.parametrize("mutation", ["process", "phase"])
+def test_cleanup_fixture_rejects_install_work(skill_evaluation, skill_cases, mutation):
+    case = next(case for case in skill_cases if case["id"] == "install-prompt-failure-cleanup-is-owned-and-scoped")
+    events = _valid_fixture_events(case)
+    root = case["prior_events"][0]["root"]
+    if mutation == "process":
+        event = {"kind": "process", "phase": "install", "tool": "pip", "root": root}
+    else:
+        event = {"kind": "phase", "phase": "install", "action": "begin", "root": root}
+    events.append(event)
+    errors = skill_evaluation["assess"](case, {"events": events})
+    assert {"cleanup_forbidden_current_event", "terminal_root_mutated"}.issubset(errors)
+
+
+def test_transaction_stop_makes_root_terminal(skill_evaluation, skill_cases):
+    case = next(case for case in skill_cases if case["id"] == "install-prompt-atomic-collision-replans")
+    events = _valid_fixture_events(case)
+    stop_index = next(index for index, event in enumerate(events) if event["kind"] == "transaction_stop")
+    stopped_root = events[stop_index]["root"]
+    events.insert(stop_index + 1, {"kind": "process", "phase": "install", "tool": "pip", "root": stopped_root})
+    assert "terminal_root_mutated" in skill_evaluation["assess"](case, {"events": events})
 
 
 def test_concurrent_lock_fixture_rejects_mutation_after_stop(skill_evaluation, skill_cases):
