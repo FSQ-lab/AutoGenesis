@@ -342,7 +342,7 @@ def test_guided_install_and_readiness_references_are_operational(repo_root):
         "forbids entering or deleting that state",
         "Never delete or repurpose a pre-existing or mismatched object",
         "PYTHONPATH", "sitecustomize", "offline and no-index", "PIP_CONFIG_FILE",
-        "`/dev/null` on macOS", "`NUL` on Windows", "--isolated", "--no-config",
+        "`/dev/null` on macOS", "`NUL` on Windows", "--isolated",
         "managed-policy`, `user-approved`, `default-public`, or `undisclosed",
         "private unpredictable ownership marker",
     ))

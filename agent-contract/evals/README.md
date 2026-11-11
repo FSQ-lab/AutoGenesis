@@ -99,6 +99,15 @@ structured user `approval`, successful reservation, and acquired lock before
 phase work or destructive cleanup. Current approval events without that stimulus
 are rejected.
 
+Every lifecycle root and structured current-approval root uses one canonical
+local transaction spelling. POSIX roots use absolute `/` paths with no
+backslashes, repeated or trailing separators, or `.`/`..` segments. Windows
+roots use an uppercase local drive, backslashes, and no UNC, device, network,
+forward-slash, repeated-separator, trailing-separator, or dot-segment form.
+Both forms require a non-root parent and a final leaf exactly
+`autogenesis-` followed by 32 lowercase hexadecimal characters. Windows root
+and parent comparisons are case-insensitive.
+
 The standard-install fixture requires all six phases exactly once and in the
 documented order. Every phase is bracketed as `phase_check(before)`,
 `phase(begin)`, actual work when applicable, `phase(end)`,
@@ -109,10 +118,12 @@ installation path through uv is supported.
 
 The random-path trace ends after one plan and exact-root approval request. The
 collision trace reserves its bound previously approved root, records collision
-and exact-root stop, then emits a distinct plan and approval request without
-inventing a fresh approval. A root becomes terminal after its matching
-`transaction_stop` or a cleanup deletion; no later transaction mutation may
-target that root.
+and exact-root stop, then emits a distinct canonical plan and approval request.
+The replacement must be a direct sibling under the exact same verified private
+parent; descendants, another parent, the colliding root, and spelling aliases
+are rejected without inventing a fresh approval. A root becomes terminal after
+its matching `transaction_stop` or a cleanup deletion; no later transaction
+mutation may target that root.
 
 Prior state grants only the current operations named by each fixture. The
 concurrent fixture permits exactly one failed lock on its single bound active

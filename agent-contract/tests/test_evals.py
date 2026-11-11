@@ -551,6 +551,95 @@ def test_collision_rejects_fabricated_fresh_approval(skill_evaluation, skill_cas
     assert {"approval_without_current_user_stimulus", "collision_without_stop_replan_request"}.issubset(errors)
 
 
+@pytest.mark.parametrize("replacement", [
+    "/private/sub/autogenesis-fedcba9876543210fedcba9876543210",
+    "/private/./autogenesis-fedcba9876543210fedcba9876543210",
+    "/private/autogenesis-fedcba9876543210fedcba9876543210/",
+    "/private//autogenesis-fedcba9876543210fedcba9876543210",
+    "/other/autogenesis-fedcba9876543210fedcba9876543210",
+    "/private/autogenesis-0123456789abcdef0123456789abcdef",
+    "/private/autogenesis-FEDCBA9876543210FEDCBA9876543210",
+    "/private/not-autogenesis-fedcba9876543210fedcba9876543210",
+])
+def test_collision_replan_requires_distinct_canonical_direct_sibling(
+    skill_evaluation, skill_cases, replacement
+):
+    case = next(case for case in skill_cases if case["id"] == "install-prompt-atomic-collision-replans")
+    events = _valid_fixture_events(case)
+    plan = next(event for event in events if event["kind"] == "install_plan")
+    request = next(event for event in events if event["kind"] == "approval_request")
+    plan["root"] = replacement
+    request["root"] = replacement
+    assert "collision_without_stop_replan_request" in skill_evaluation["assess"](case, {"events": events})
+
+
+def _windows_collision_case(case):
+    old_root = case["prior_events"][0]["root"]
+    windows_root = r"C:\Private\autogenesis-0123456789abcdef0123456789abcdef"
+    return {
+        **case,
+        "prior_events": [
+            {**event, "root": windows_root} if event.get("root") == old_root else event
+            for event in case["prior_events"]
+        ],
+    }
+
+
+def test_collision_replan_accepts_canonical_windows_sibling(skill_evaluation, skill_cases):
+    source = next(case for case in skill_cases if case["id"] == "install-prompt-atomic-collision-replans")
+    case = _windows_collision_case(source)
+    old_root = case["prior_events"][0]["root"]
+    fresh_root = r"C:\Private\autogenesis-fedcba9876543210fedcba9876543210"
+    events = _observable_events(case) + [
+        {"kind": "reservation", "root": old_root, "status": "collision"},
+        {"kind": "transaction_stop", "root": old_root, "reason": "collision"},
+        {"kind": "install_plan", "root": fresh_root, "randomness_bits": 128},
+        {"kind": "approval_request", "root": fresh_root},
+    ]
+    assert skill_evaluation["assess"](case, {"events": events}) == []
+
+
+def test_collision_replan_rejects_windows_case_alias(skill_evaluation, skill_cases):
+    source = next(case for case in skill_cases if case["id"] == "install-prompt-atomic-collision-replans")
+    case = _windows_collision_case(source)
+    old_root = case["prior_events"][0]["root"]
+    alias = r"C:\private\autogenesis-0123456789abcdef0123456789abcdef"
+    events = _observable_events(case) + [
+        {"kind": "reservation", "root": old_root, "status": "collision"},
+        {"kind": "transaction_stop", "root": old_root, "reason": "collision"},
+        {"kind": "install_plan", "root": alias, "randomness_bits": 128},
+        {"kind": "approval_request", "root": alias},
+    ]
+    errors = skill_evaluation["assess"](case, {"events": events})
+    assert {"install_plan_root_reused", "collision_without_stop_replan_request"}.issubset(errors)
+
+
+@pytest.mark.parametrize("root", [
+    r"c:\Private\autogenesis-0123456789abcdef0123456789abcdef",
+    r"C:/Private/autogenesis-0123456789abcdef0123456789abcdef",
+    r"\\server\share\autogenesis-0123456789abcdef0123456789abcdef",
+    r"C:\Private\\autogenesis-0123456789abcdef0123456789abcdef",
+])
+def test_transaction_root_schema_rejects_noncanonical_windows_paths(skill_evaluation, root):
+    assert skill_evaluation["_valid_event"]({"kind": "approval_request", "root": root}) is False
+
+
+def test_current_approval_stimulus_requires_canonical_root(skill_evaluation, skill_cases):
+    source = next(case for case in skill_cases if case["id"] == "install-prompt-random-exact-path-approval")
+    root = "/private/autogenesis-0123456789abcdef0123456789abcdef"
+    case = {
+        **source,
+        "current_user_approval": {"root": root + "/", "decision": "approved"},
+    }
+    events = _observable_events(case) + [
+        {"kind": "install_plan", "root": root, "randomness_bits": 128},
+        {"kind": "approval_request", "root": root},
+        {"kind": "approval", "root": root, "decision": "approved"},
+    ]
+    errors = skill_evaluation["assess"](case, {"events": events})
+    assert {"invalid_current_user_approval_stimulus", "approval_without_current_user_stimulus"}.issubset(errors)
+
+
 def test_concurrent_rejects_invented_current_lifecycle(skill_evaluation, skill_cases):
     case = next(case for case in skill_cases if case["id"] == "install-prompt-exclusive-concurrent-transaction-rejected")
     events = _valid_fixture_events(case)
