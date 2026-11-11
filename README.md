@@ -120,24 +120,27 @@ channel solely for release acceptance after all dependencies below are met:
    downloaded archive bytes against that trusted exact-head CI artifact digest.
    A filename, commit embedded inside the archive, or checksum supplied only by
    the archive cannot authenticate the archive itself.
-3. **Dependency: [prompt-hardening issue #74](https://github.com/FSQ-lab/AutoGenesis/issues/74).**
-   The current Candidate does not yet prove complete checksum closure between
-   its archive, generated prompt, and internal assets. After #74 merges, merge
-   the updated `main` into this branch and obtain independent re-review before
-   continuing Candidate acceptance. Do not paper over the builder mismatch in
-   onboarding text.
+3. Prompt hardening from [issue #74](https://github.com/FSQ-lab/AutoGenesis/issues/74)
+   is merged into `main` and this branch. Use only a new successful Quality
+   Gates run for the exact approved merged-main commit containing that change.
+   Superseded run `42843125727` is historical evidence only and must not be
+   used, promoted, published, or cited as current final-artifact acceptance.
 4. For the post-#74 Candidate, extract into a new private directory and validate
    the complete internal `SHA256SUMS` set before interpreting
    `candidate-install-prompt.txt`, any manifest, or any lock. Stop on any
    missing, extra, or mismatched asset.
 5. Perform Agent-first and CLI-first acceptance only in a dedicated disposable
-   Python virtual environment and disposable business project. Delete both to
-   roll back; never force-reinstall into an arbitrary active Python environment.
-6. If a third-party registry is required, let the package manager use its
-   existing trusted configuration opaquely. Do not read, print, copy, or expose
-   credential values or a credential-bearing URL. Evidence may name only the
-   sanitized registry host and configuration source; omit userinfo, tokens,
-   credentials, and URL query strings.
+   Python virtual environment and disposable business project, using project
+   Skill scope. Rollback removes only still-matching prompt-created environment,
+   download, extraction, staging, cache, project-Skill, and MCP state; it
+   preserves every mismatched, substituted, pre-existing, or unrelated path.
+6. Use only the independently approved opaque package-source/auth interface.
+   Omit every ambient `PIP_*` and `UV_*` value without reading it; use isolated
+   pip with the platform null configuration, transaction-owned cache/staging,
+   and offline hash-locked installation after staging. Never use or inspect
+   ambient user/global package configuration, targets, prefixes, credentials,
+   or source URLs. Evidence is limited to validated sanitized host and
+   config-source class metadata.
 7. Require one canonical `autogenesis` Skill, the applicable stdio Runtime,
    matching Agent Contract identity, and the business outcome. A package
    version, destination file, or standalone MCP probe alone is not acceptance.
@@ -248,8 +251,8 @@ with recorded SHA-256 values:
   `autogenesis-windows-mcp==0.5.0`, and `autogenesis-cli==0.2.0`;
 - `autogenesis-release.lock`: immutable URL and SHA-256; and
 - `SHA256SUMS`: immutable URL and SHA-256, with entries matching the exact
-  Skill, Release manifest, Release lock, generated prompt, and every published
-  asset after #74 supplies complete checksum closure.
+  Skill, Release manifest, Release lock, generated prompt, and every other
+  published asset; only `SHA256SUMS` itself is excluded from its rows.
 
 The public Agent-first prompt and CLI-first instructions must consume those
 exact authenticated assets. CLI-first must create a dedicated disposable
@@ -258,8 +261,7 @@ environment and the explicitly installed Skill bytes as rollback. Neither route
 may show, read, echo, or record a credential-bearing package-index URL; evidence
 is limited to the sanitized registry host and configuration source, with no
 userinfo, token, credential, or query string. Remove the not-public warning only
-after #74 merges, updated `main` is merged here and independently re-reviewed,
-and clean final-artifact acceptance confirms the published bytes, integrated
+after clean public-artifact acceptance confirms the published bytes, integrated
 safe Preview boundary, and advertised support tiers.
 
 ## Technical references
