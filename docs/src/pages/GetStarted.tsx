@@ -59,7 +59,7 @@ const WindowsContent = () => (
         <ul className="list-disc list-inside space-y-2 text-slate-700">
           <li>Python 3.10 or higher</li>
           <li>Windows operating system</li>
-          <li>uv package manager (recommended)</li>
+          <li>pip package manager (included with Python)</li>
           <li>VS Code or Cursor</li>
         </ul>
       </div>
