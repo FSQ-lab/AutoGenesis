@@ -1,3 +1,4 @@
+import base64
 import hashlib
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import json
@@ -130,17 +131,20 @@ def test_poisoned_user_pip_config_cannot_escape_reserved_offline_install(tmp_pat
 
     wheel = stage / "poisonproof-1.0-py3-none-any.whl"
     dist_info = "poisonproof-1.0.dist-info"
+    wheel_members = {
+        "poisonproof/__init__.py": b"VALUE = 'offline-ok'\n",
+        f"{dist_info}/METADATA": b"Metadata-Version: 2.1\nName: poisonproof\nVersion: 1.0\n\n",
+        f"{dist_info}/WHEEL": b"Wheel-Version: 1.0\nGenerator: autogenesis-test\nRoot-Is-Purelib: true\nTag: py3-none-any\n",
+    }
+    record_rows = []
+    for name, content in wheel_members.items():
+        digest = base64.urlsafe_b64encode(hashlib.sha256(content).digest()).rstrip(b"=").decode("ascii")
+        record_rows.append(f"{name},sha256={digest},{len(content)}")
+    record_rows.append(f"{dist_info}/RECORD,,")
     with zipfile.ZipFile(wheel, "w") as archive:
-        archive.writestr("poisonproof/__init__.py", "VALUE = 'offline-ok'\n")
-        archive.writestr(
-            f"{dist_info}/METADATA",
-            "Metadata-Version: 2.1\nName: poisonproof\nVersion: 1.0\n\n",
-        )
-        archive.writestr(
-            f"{dist_info}/WHEEL",
-            "Wheel-Version: 1.0\nGenerator: autogenesis-test\nRoot-Is-Purelib: true\nTag: py3-none-any\n",
-        )
-        archive.writestr(f"{dist_info}/RECORD", "")
+        for name, content in wheel_members.items():
+            archive.writestr(name, content)
+        archive.writestr(f"{dist_info}/RECORD", "\n".join(record_rows) + "\n")
     requirements = transaction / "requirements.txt"
     requirements.write_text(
         f"poisonproof==1.0 --hash=sha256:{hashlib.sha256(wheel.read_bytes()).hexdigest()}\n",
