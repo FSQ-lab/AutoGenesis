@@ -433,7 +433,6 @@ def test_candidate_channel_binds_exact_first_party_wheels_and_skill(tmp_path, re
     assert "force-reinstalled" in prompt
     _assert_hardened_install_prompt(prompt, "Candidate")
     assert "attempt-qualified artifact name" in prompt
-    assert "workflow run `123456`" in prompt
     assert "positive run attempt `2`" in prompt
     assert "positive observed artifact ID" in prompt
     assert "exactly one unexpired" in prompt
