@@ -1,4 +1,5 @@
 import hashlib
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import json
 import os
 import re
@@ -7,6 +8,7 @@ import shutil
 import secrets
 import subprocess
 import sys
+import threading
 from importlib import resources
 import zipfile
 
@@ -54,8 +56,10 @@ def _assert_hardened_install_prompt(prompt, channel):
     ))
     assert "isolated mode (`-I`, `-E`, `-s`, plus `-S`" in prompt
     assert "all `PYTHON*` variables (including `PYTHONPATH`)" in prompt and "`sitecustomize`" in prompt
-    assert "every `PIP_*` and `UV_*` source, auth, config, cache, target, prefix, user, and override variable" in prompt
-    assert "Disable user site, ambient package configuration, and ambient caches" in prompt
+    assert "Remove every ambient `PIP_*` and `UV_*` variable by name without reading its value" in prompt
+    assert "`PIP_CONFIG_FILE` to `/dev/null` on macOS and `NUL` on Windows" in prompt
+    assert "`pip --isolated`" in prompt and "`uv --no-config`" in prompt
+    assert "--no-index --no-cache-dir --find-links <transaction-stage> --require-hashes --no-deps" in prompt
     assert "After staging, every package operation is offline and no-index" in prompt
     assert "managed-policy`, `user-approved`, `default-public`, or `undisclosed" in prompt
     assert "canonical lowercase ASCII DNS hostname" in prompt
@@ -65,7 +69,7 @@ def _assert_hardened_install_prompt(prompt, channel):
     ))
 
 
-def test_reserved_transaction_allows_standard_pathname_venv(tmp_path, repo_root):
+def test_poisoned_user_pip_config_cannot_escape_reserved_offline_install(tmp_path, repo_root):
     module = runpy.run_path(str(repo_root / "agent-contract/tools/install_prompt.py"))
     prompt = module["hardened_install_contract"](
         channel="Candidate",
@@ -74,7 +78,8 @@ def test_reserved_transaction_allows_standard_pathname_venv(tmp_path, repo_root)
         install="Install authenticated wheels.",
         cleanup="prompt-created staging state",
     )
-    assert "standard pathname-based stdlib `venv`, `pip`" in prompt
+    assert "`PIP_CONFIG_FILE` to `/dev/null` on macOS and `NUL` on Windows" in prompt
+    assert "`pip --isolated`" in prompt and "`uv --no-config`" in prompt
 
     private_parent = tmp_path / "private-user-installations"
     private_parent.mkdir(mode=0o700)
@@ -82,6 +87,65 @@ def test_reserved_transaction_allows_standard_pathname_venv(tmp_path, repo_root)
     assert len(bytes.fromhex(random_leaf.removeprefix("autogenesis-"))) * 8 == 128
     transaction = private_parent / random_leaf
     transaction.mkdir(mode=0o700)
+    stage = transaction / "stage"
+    stage.mkdir()
+    environment = transaction / "venv"
+
+    outside = tmp_path / "outside-transaction"
+    outside_target = outside / "target"
+    outside_cache = outside / "cache"
+    outside_prefix = outside / "prefix"
+    poison_home = outside / "home"
+    outside_target.mkdir(parents=True)
+    outside_cache.mkdir()
+
+    requests = []
+
+    class PoisonSource(BaseHTTPRequestHandler):
+        def do_GET(self):
+            requests.append(self.path)
+            self.send_response(500)
+            self.end_headers()
+
+        def log_message(self, _format, *args):
+            pass
+
+    source = ThreadingHTTPServer(("127.0.0.1", 0), PoisonSource)
+    source_thread = threading.Thread(target=source.serve_forever, daemon=True)
+    source_thread.start()
+    poison_url = f"http://127.0.0.1:{source.server_port}/simple"
+    if os.name == "nt":
+        config = poison_home / "pip" / "pip.ini"
+    else:
+        config = poison_home / ".config" / "pip" / "pip.conf"
+    config.parent.mkdir(parents=True)
+    config.write_text(
+        "[global]\n"
+        f"target = {outside_target}\n"
+        f"prefix = {outside_prefix}\n"
+        f"index-url = {poison_url}\n"
+        f"cache-dir = {outside_cache}\n",
+        encoding="utf-8",
+    )
+
+    wheel = stage / "poisonproof-1.0-py3-none-any.whl"
+    dist_info = "poisonproof-1.0.dist-info"
+    with zipfile.ZipFile(wheel, "w") as archive:
+        archive.writestr("poisonproof/__init__.py", "VALUE = 'offline-ok'\n")
+        archive.writestr(
+            f"{dist_info}/METADATA",
+            "Metadata-Version: 2.1\nName: poisonproof\nVersion: 1.0\n\n",
+        )
+        archive.writestr(
+            f"{dist_info}/WHEEL",
+            "Wheel-Version: 1.0\nGenerator: autogenesis-test\nRoot-Is-Purelib: true\nTag: py3-none-any\n",
+        )
+        archive.writestr(f"{dist_info}/RECORD", "")
+    requirements = transaction / "requirements.txt"
+    requirements.write_text(
+        f"poisonproof==1.0 --hash=sha256:{hashlib.sha256(wheel.read_bytes()).hexdigest()}\n",
+        encoding="ascii",
+    )
 
     exclusive = os.O_RDWR | os.O_CREAT | os.O_EXCL | getattr(os, "O_CLOEXEC", 0)
     lock_descriptor = os.open(transaction / ".transaction.lock", exclusive, 0o600)
@@ -91,13 +155,13 @@ def test_reserved_transaction_allows_standard_pathname_venv(tmp_path, repo_root)
         marker_descriptor = os.open(transaction / ".ownership-marker", exclusive, 0o600)
         os.close(marker_descriptor)
 
-        child_environment = {
-            name: os.environ[name]
-            for name in ("HOME", "USERPROFILE", "SYSTEMROOT", "WINDIR", "TEMP", "TMP", "TMPDIR")
-            if name in os.environ
-        }
+        allowed = ("SYSTEMROOT", "WINDIR", "TEMP", "TMP", "TMPDIR")
+        child_environment = {name: os.environ[name] for name in allowed if name in os.environ}
+        child_environment["HOME"] = str(poison_home)
+        child_environment["USERPROFILE"] = str(poison_home)
+        child_environment["APPDATA"] = str(poison_home)
         created = subprocess.run(
-            [sys.executable, "-I", "-E", "-s", "-m", "venv", str(transaction)],
+            [sys.executable, "-I", "-E", "-s", "-m", "venv", str(environment)],
             env=child_environment,
             capture_output=True,
             text=True,
@@ -105,19 +169,48 @@ def test_reserved_transaction_allows_standard_pathname_venv(tmp_path, repo_root)
             timeout=60,
         )
         assert created.returncode == 0, created.stderr
-        environment_python = transaction / ("Scripts/python.exe" if os.name == "nt" else "bin/python")
-        package_manager = subprocess.run(
-            [str(environment_python), "-I", "-E", "-s", "-m", "pip", "--version"],
+        environment_python = environment / ("Scripts/python.exe" if os.name == "nt" else "bin/python")
+
+        pip_environment = dict(child_environment)
+        pip_environment["PIP_CONFIG_FILE"] = "NUL" if os.name == "nt" else "/dev/null"
+        assert set(name for name in pip_environment if name.startswith("PIP_")) == {"PIP_CONFIG_FILE"}
+        installed = subprocess.run(
+            [
+                str(environment_python), "-I", "-E", "-s", "-m", "pip",
+                "--isolated", "--disable-pip-version-check", "install", "--no-input",
+                "--no-index", "--no-cache-dir", "--find-links", str(stage),
+                "--require-hashes", "--no-deps", "-r", str(requirements),
+            ],
+            env=pip_environment,
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=60,
+        )
+        assert installed.returncode == 0, installed.stderr
+        imported = subprocess.run(
+            [
+                str(environment_python), "-I", "-E", "-s", "-c",
+                "import importlib.metadata, poisonproof; print(poisonproof.VALUE + '|' + importlib.metadata.version('poisonproof'))",
+            ],
             env=child_environment,
             capture_output=True,
             text=True,
             check=False,
             timeout=30,
         )
-        assert package_manager.returncode == 0, package_manager.stderr
+        assert imported.returncode == 0, imported.stderr
+        assert imported.stdout.strip() == "offline-ok|1.0"
+        assert requests == []
+        assert list(outside_target.iterdir()) == []
+        assert list(outside_cache.iterdir()) == []
+        assert not outside_prefix.exists()
         assert (transaction / ".ownership-marker").is_file()
     finally:
         os.close(lock_descriptor)
+        source.shutdown()
+        source.server_close()
+        source_thread.join(timeout=5)
 
 
 def _checksums(output):
@@ -209,7 +302,8 @@ def test_guided_install_and_readiness_references_are_operational(repo_root):
         "marker mismatch",
         "forbids entering or deleting that state",
         "Never delete or repurpose a pre-existing or mismatched object",
-        "PYTHONPATH", "sitecustomize", "offline and no-index",
+        "PYTHONPATH", "sitecustomize", "offline and no-index", "PIP_CONFIG_FILE",
+        "`/dev/null` on macOS", "`NUL` on Windows", "--isolated", "--no-config",
         "managed-policy`, `user-approved`, `default-public`, or `undisclosed",
         "private unpredictable ownership marker",
     ))

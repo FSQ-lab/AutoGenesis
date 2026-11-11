@@ -16,7 +16,7 @@ from mcp.server.fastmcp import FastMCP
 # These pins belong to the runtime release, independently of the installed wheel.
 required = RuntimeContractRequirement(
     contract_version="2.1.0",
-    manifest_sha256="dd0a3cc3ea1b0f54c9f809688bb40f3c93f435ce4cfafa99afaf6f4810456db7",
+    manifest_sha256="e0f68e4e947114dc6982c3502dab37cdfa5154fb45abe3092d78341da4a4045f",
 )
 contract = load_contract(ContractIdentity(required.contract_version, required.manifest_sha256))
 appendix = load_project_appendix("/absolute/business-project")
@@ -138,11 +138,18 @@ lock, changed parent permission or identity, substituted leaf, marker mismatch, 
 reparse point, or ambiguity forbids deletion and preserves the state.
 
 The base Python creates the venv in isolated mode. Every child receives an explicit
-minimal environment that omits all `PYTHON*`, startup customization, and pip/uv source,
-auth, config, cache, target, prefix, user, and override variables by name without
-reading values. No ambient package config/cache is inherited; source/auth flows only
-through the approved opaque non-disclosing interface and package operations become
-offline/no-index after staging. All subsequent operations use absolute disposable-
+minimal environment that omits all `PYTHON*` and startup customization. Ambient
+`PIP_*` and `UV_*` names are removed without reading their values. Pip then receives
+only `PIP_CONFIG_FILE=/dev/null` on macOS or `PIP_CONFIG_FILE=NUL` on Windows and
+always runs with `--isolated`; failure to establish the platform null configuration
+stops installation. Acquisition binds destination, staging, cache, authenticated
+requirements/hashes, and the approved opaque source/auth interface to transaction
+roots. Offline pip installation additionally fixes `--no-index`, `--no-cache-dir`,
+`--find-links`, `--require-hashes`, and `--no-deps` and targets only the reserved venv.
+If uv is used, it always receives `--no-config` and explicit transaction cache,
+staging, destination, Python, and source bindings; after staging it is likewise
+offline/no-index. No ambient user/global configuration, source, cache, target, prefix,
+or credentials are inherited. All subsequent operations use absolute disposable-
 environment entrypoints while the phase-boundary checks continue to pass.
 
 Before echo/use, source metadata must be a canonical lowercase ASCII DNS hostname,

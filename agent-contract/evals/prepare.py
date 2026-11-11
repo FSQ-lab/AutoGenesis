@@ -39,7 +39,7 @@ def main() -> None:
         os.replace(temporary, output / "skill-requests.json")
     finally:
         Path(temporary).unlink(missing_ok=True)
-    print("Prepared paired eval requests. Agent behavior has not been evaluated.")
+    print("Prepared Runtime and Skill request packets only; agent behavior has not been executed or evaluated. Record external traces, then run evaluate.py and evaluate_skill.py.")
 
 
 if __name__ == "__main__":
