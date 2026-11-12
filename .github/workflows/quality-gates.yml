@@ -157,7 +157,7 @@ jobs:
       matrix:
         include:
           - target: darwin-arm64-py311
-            os: macos-15
+            os: macos-26
             python: '3.11'
           - target: win32-amd64-py312
             os: windows-2022
@@ -264,7 +264,7 @@ jobs:
       matrix:
         include:
           - target: darwin-arm64-py311
-            os: macos-15
+            os: macos-26
             python: '3.11'
           - target: win32-amd64-py312
             os: windows-2022
