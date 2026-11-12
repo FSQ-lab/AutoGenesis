@@ -366,6 +366,7 @@ def test_candidate_builder_covers_nested_wheelhouses_and_offline_prompt(
     for relative in ("agent-contract", "appium-mcp-server", "pywinauto-mcp-server", "autogenesis-cli"):
         shutil.copytree(repo_root / relative, source / relative, ignore=shutil.ignore_patterns("__pycache__", ".pytest_cache", ".venv"))
     subprocess.run(["git", "init", "-q", str(source)], check=True)
+    subprocess.run(["git", "-C", str(source), "config", "core.longpaths", "true"], check=True)
     subprocess.run(["git", "-C", str(source), "add", "."], check=True)
     subprocess.run([
         "git", "-C", str(source), "-c", "user.name=Candidate Contract Test",
