@@ -36,7 +36,7 @@
         {
           "type": "named",
           "name": "--project-root",
-          "description": "Existing business-project root that scopes generated writes.",
+          "description": "Existing business-project root that scopes proposed generated-code preview destinations; no generated-file write occurs.",
           "format": "filepath",
           "isRequired": true
         }

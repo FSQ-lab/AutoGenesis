@@ -3,7 +3,6 @@ from autogenesis_agent_contract import (
     SecretBindings,
     SecretReferenceError,
     apply_bindings,
-    commit_generation_preview,
     prepare_generation_preview,
     validate_generation_destination,
     serialize,
@@ -45,10 +44,9 @@ def register_gen_code_tools(mcp, app_manager, business_root=None):
                 If not specified, do not provide a random value.
                 
         Returns:
-            str: JSON response containing:
-                - status: "success" or "error"
-                - data: Dictionary with gen_code_id, steps_dir, and step_file_target
-                - error: Error message if operation failed
+            str: JSON response containing success status and an opaque gen_code_id.
+            Proposed destinations are returned only by preview_code_changes as
+            project-relative paths.
          
         """
         try:
@@ -71,11 +69,7 @@ def register_gen_code_tools(mcp, app_manager, business_root=None):
             app_manager.steps_dir = str(Path(app_manager.step_file_target).parent)
 
             resp["status"] = "success"
-            resp["data"] = {
-                "gen_code_id": app_manager.gen_code_id,
-                "steps_dir": app_manager.steps_dir,
-                "step_file_target": app_manager.step_file_target,
-            }
+            resp["data"] = {"gen_code_id": app_manager.gen_code_id}
         except Exception as e:
             resp["error"] = safe_error()
             logger.error('Error during code generation: [redacted]')
@@ -86,14 +80,13 @@ def register_gen_code_tools(mcp, app_manager, business_root=None):
     @mcp.tool()
     @log_tool_call
     async def preview_code_changes(secret_bindings: SecretBindings | None = None) -> str:
-        """Preview generated test code changes and confirm before applying"""
+        """Return a read-only preview of generated test code changes."""
         if app_manager.recording_warnings:
             raise SecretReferenceError(SECRET_REFERENCE_REQUIRED, app_manager.recording_warnings[0])
         if not app_manager.gen_code_id or not app_manager.gen_code_cache:
             return "No pending code changes to preview"
         
         bound_cache = serialize(apply_bindings(app_manager.gen_code_cache, secret_bindings))
-        app_manager.pending_write = None
         result = gen_code_preview(app_manager, bound_cache)
         append_payload = result.get("append_payload", "")
         if not append_payload:
@@ -107,38 +100,11 @@ def register_gen_code_tools(mcp, app_manager, business_root=None):
             app_manager.gen_code_id,
             append_payload,
         )
-        app_manager.pending_write = preview
         resp = init_tool_response()
         resp["status"] = "success"
         resp["data"] = {"diff_preview": result.get("diff_preview"), **preview.to_dict()}
         return format_tool_response(resp)
 
 
-    @mcp.tool()
-    @log_tool_call
-    async def confirm_code_changes(
-        preview_id: str = "",
-        digest: str = "",
-        approved: bool = False,
-    ) -> str:
-        """Atomically commit exactly the complete, current, approved preview."""
-        preview = getattr(app_manager, "pending_write", None)
-        count = len(app_manager.proposed_changes or [])
-        destination = commit_generation_preview(
-            preview,
-            preview_id=preview_id,
-            digest=digest,
-            approved=approved,
-        )
-        app_manager.new_steps_count = count
-        app_manager.clear_gen_code_cache()
-        resp = init_tool_response()
-        resp["status"] = "success"
-        resp["data"] = {
-            "message": "Approved generated code committed atomically",
-            "destination": destination,
-            "new_steps_count": count,
-        }
-        return format_tool_response(resp)
 
 

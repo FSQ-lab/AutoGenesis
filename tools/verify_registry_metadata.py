@@ -13,6 +13,7 @@ import tempfile
 import time
 import tomllib
 import urllib.error
+import urllib.parse
 import urllib.request
 import zipfile
 
@@ -45,6 +46,7 @@ SERVERS = {
 CLI_PROJECT = "autogenesis-cli/pyproject.toml"
 CLI_ENTRYPOINT = "autogenesis = autogenesis_cli.cli:main"
 RELEASE_MANIFEST_SCHEMA = 1
+SKILL_REVIEW_MANIFEST_SCHEMA = 1
 RELEASE_PROVENANCE_KEYS = {
     "repository",
     "workflow_ref",
@@ -53,6 +55,10 @@ RELEASE_PROVENANCE_KEYS = {
     "run_id",
     "run_attempt",
 }
+PUBLIC_METADATA_TIMEOUT_SECONDS = 15
+MAX_PUBLIC_METADATA_BYTES = 1024 * 1024
+MAX_PUBLIC_ATTEMPTS = 20
+MAX_PUBLIC_DELAY_SECONDS = 30
 
 
 
@@ -315,9 +321,38 @@ def _github_provenance() -> dict[str, str]:
         raise VerificationError("Release provenance repository is not canonical")
     if not re.fullmatch(r"[0-9a-f]{40}", provenance["commit"]):
         raise VerificationError("Release provenance commit is invalid")
-    if not provenance["run_id"].isdigit() or not provenance["run_attempt"].isdigit():
+    if (
+        not provenance["run_id"].isdigit()
+        or int(provenance["run_id"]) < 1
+        or not provenance["run_attempt"].isdigit()
+        or int(provenance["run_attempt"]) < 1
+    ):
         raise VerificationError("Release provenance run identity is invalid")
     return provenance
+
+
+def _validate_manifest_provenance(provenance: object) -> None:
+    if not isinstance(provenance, dict) or set(provenance) != RELEASE_PROVENANCE_KEYS:
+        raise VerificationError("Release manifest provenance is invalid")
+    if any(not isinstance(value, str) or not value for value in provenance.values()):
+        raise VerificationError("Release manifest provenance is incomplete")
+    if (
+        provenance["repository"] != "FSQ-lab/AutoGenesis"
+        or re.fullmatch(r"[0-9a-f]{40}", provenance["commit"]) is None
+        or not provenance["run_id"].isdigit()
+        or int(provenance["run_id"]) < 1
+        or not provenance["run_attempt"].isdigit()
+        or int(provenance["run_attempt"]) < 1
+    ):
+        raise VerificationError("Release manifest provenance is invalid")
+
+
+def _require_reviewed_provenance(reviewed: dict, expected: dict) -> None:
+    stable_keys = RELEASE_PROVENANCE_KEYS - {"run_attempt"}
+    if any(reviewed[key] != expected[key] for key in stable_keys):
+        raise VerificationError("Release manifest provenance differs from the current workflow run")
+    if int(reviewed["run_attempt"]) > int(expected["run_attempt"]):
+        raise VerificationError("Release manifest comes from a later workflow attempt")
 
 
 def _validate_release_manifest(document: dict) -> None:
@@ -326,10 +361,7 @@ def _validate_release_manifest(document: dict) -> None:
     if document["schema_version"] != RELEASE_MANIFEST_SCHEMA:
         raise VerificationError("Release manifest schema is unsupported")
     provenance = document["provenance"]
-    if not isinstance(provenance, dict) or set(provenance) != RELEASE_PROVENANCE_KEYS:
-        raise VerificationError("Release manifest provenance is invalid")
-    if any(not isinstance(value, str) or not value for value in provenance.values()):
-        raise VerificationError("Release manifest provenance is incomplete")
+    _validate_manifest_provenance(provenance)
     wheels = document["wheels"]
     if not isinstance(wheels, list) or not wheels:
         raise VerificationError("Release manifest wheel set is empty")
@@ -373,8 +405,8 @@ def _write_release_manifest(path: Path, records: list[dict], provenance: dict[st
 def _load_release_manifest(path: Path, expected_provenance: dict[str, str] | None = None) -> dict:
     document = _read_json(path)
     _validate_release_manifest(document)
-    if expected_provenance is not None and document["provenance"] != expected_provenance:
-        raise VerificationError("Release manifest provenance differs from the current workflow run")
+    if expected_provenance is not None:
+        _require_reviewed_provenance(document["provenance"], expected_provenance)
     return document
 
 
@@ -392,23 +424,163 @@ def _verify_manifest_wheels(wheel_dir: Path, manifest: dict) -> None:
             raise VerificationError("Downloaded wheel bytes differ from the reviewed release manifest")
 
 
-def _pypi_version(identifier: str, version: str, opener=urllib.request.urlopen) -> dict | None:
-    url = f"https://pypi.org/pypi/{identifier}/{version}/json"
+def _skill_asset_records(asset_dir: Path) -> list[dict]:
     try:
-        raw = opener(url, timeout=30).read()
+        assets = sorted(asset_dir.iterdir(), key=lambda path: path.name)
+    except OSError:
+        raise VerificationError("Reviewed Skill asset directory is unavailable") from None
+    if not assets:
+        raise VerificationError("Reviewed Skill asset directory is empty")
+    records = []
+    for asset in assets:
+        if asset.is_symlink() or not asset.is_file() or Path(asset.name).name != asset.name:
+            raise VerificationError("Reviewed Skill assets must be regular files")
+        try:
+            raw = asset.read_bytes()
+        except OSError:
+            raise VerificationError("Reviewed Skill asset could not be read") from None
+        if not raw:
+            raise VerificationError("Reviewed Skill asset is empty")
+        records.append(
+            {
+                "filename": asset.name,
+                "sha256": hashlib.sha256(raw).hexdigest(),
+                "size": len(raw),
+            }
+        )
+    return records
+
+def _verify_skill_checksum_closure(asset_dir: Path, records: list[dict] | None = None) -> None:
+    actual = records if records is not None else _skill_asset_records(asset_dir)
+    by_name = {record["filename"]: record for record in actual}
+    sums = by_name.get("SHA256SUMS")
+    if sums is None:
+        raise VerificationError("Skill release checksum set is missing")
+    try:
+        raw = (asset_dir / "SHA256SUMS").read_bytes()
+        text = raw.decode("ascii")
+    except (OSError, UnicodeError):
+        raise VerificationError("Skill release checksum set is invalid") from None
+    if not text.endswith("\n") or "\r" in text:
+        raise VerificationError("Skill release checksum set is invalid")
+    checksums: dict[str, str] = {}
+    for line in text.splitlines():
+        match = re.fullmatch(r"([0-9a-f]{64})  ([A-Za-z0-9][A-Za-z0-9._-]*)", line)
+        if match is None:
+            raise VerificationError("Skill release checksum set is invalid")
+        digest, filename = match.groups()
+        if filename == "SHA256SUMS" or filename in checksums or Path(filename).name != filename:
+            raise VerificationError("Skill release checksum set is invalid")
+        checksums[filename] = digest
+    expected_names = set(by_name) - {"SHA256SUMS"}
+    if set(checksums) != expected_names:
+        raise VerificationError("Skill release checksum set does not cover the complete asset set")
+    if any(checksums[name] != by_name[name]["sha256"] for name in expected_names):
+        raise VerificationError("Skill release asset differs from SHA256SUMS")
+
+
+def _validate_skill_review_manifest(document: dict) -> None:
+    if set(document) != {"schema_version", "provenance", "assets"}:
+        raise VerificationError("Skill review manifest has unexpected fields")
+    if document["schema_version"] != SKILL_REVIEW_MANIFEST_SCHEMA:
+        raise VerificationError("Skill review manifest schema is unsupported")
+    _validate_manifest_provenance(document["provenance"])
+    assets = document["assets"]
+    if not isinstance(assets, list) or not assets:
+        raise VerificationError("Skill review manifest asset set is empty")
+    filenames = set()
+    for asset in assets:
+        if (
+            not isinstance(asset, dict)
+            or set(asset) != {"filename", "sha256", "size"}
+            or not isinstance(asset["filename"], str)
+            or Path(asset["filename"]).name != asset["filename"]
+            or asset["filename"] in filenames
+            or not isinstance(asset["sha256"], str)
+            or re.fullmatch(r"[0-9a-f]{64}", asset["sha256"]) is None
+            or not isinstance(asset["size"], int)
+            or isinstance(asset["size"], bool)
+            or asset["size"] <= 0
+        ):
+            raise VerificationError("Skill review manifest asset entry is invalid")
+        filenames.add(asset["filename"])
+
+
+def _write_skill_review_manifest(
+    path: Path, asset_dir: Path, release_manifest_path: Path, release_manifest: dict
+) -> None:
+    released_manifest = asset_dir / "release-manifest.json"
+    try:
+        if released_manifest.read_bytes() != release_manifest_path.read_bytes():
+            raise VerificationError("Released manifest differs from the reviewed release manifest")
+    except OSError:
+        raise VerificationError("Released manifest is unavailable") from None
+    records = _skill_asset_records(asset_dir)
+    _verify_skill_checksum_closure(asset_dir, records)
+    document = {
+        "schema_version": SKILL_REVIEW_MANIFEST_SCHEMA,
+        "provenance": release_manifest["provenance"],
+        "assets": records,
+    }
+    _validate_skill_review_manifest(document)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.with_name(f"{path.name}.tmp")
+    temporary.write_text(json.dumps(document, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    temporary.replace(path)
+
+
+def _load_skill_review_manifest(path: Path, expected_provenance: dict) -> dict:
+    document = _read_json(path)
+    _validate_skill_review_manifest(document)
+    _require_reviewed_provenance(document["provenance"], expected_provenance)
+    return document
+
+
+def _verify_skill_review_manifest(
+    asset_dir: Path, review_manifest: dict, release_manifest_path: Path
+) -> None:
+    expected = review_manifest["assets"]
+    actual = _skill_asset_records(asset_dir)
+    _verify_skill_checksum_closure(asset_dir, actual)
+    if actual != expected:
+        raise VerificationError("Skill release assets differ from the external review manifest")
+    released_manifest = asset_dir / "release-manifest.json"
+    try:
+        if released_manifest.read_bytes() != release_manifest_path.read_bytes():
+            raise VerificationError("Released manifest differs from the reviewed release manifest")
+    except OSError:
+        raise VerificationError("Released manifest is unavailable") from None
+
+
+def _read_public_json(response, service: str) -> dict:
+    try:
+        raw = response.read(MAX_PUBLIC_METADATA_BYTES + 1)
+    except (OSError, urllib.error.URLError):
+        raise VerificationError(f"{service} metadata could not be retrieved") from None
+    if len(raw) > MAX_PUBLIC_METADATA_BYTES:
+        raise VerificationError(f"{service} metadata response is too large")
+    try:
+        document = json.loads(raw)
+    except (UnicodeError, ValueError):
+        raise VerificationError(f"{service} returned invalid metadata") from None
+    if not isinstance(document, dict):
+        raise VerificationError(f"{service} returned invalid metadata")
+    return document
+
+
+def _pypi_version(identifier: str, version: str, opener=urllib.request.urlopen) -> dict | None:
+    package_path = urllib.parse.quote(identifier, safe="")
+    version_path = urllib.parse.quote(version, safe="")
+    url = f"https://pypi.org/pypi/{package_path}/{version_path}/json"
+    try:
+        response = opener(url, timeout=PUBLIC_METADATA_TIMEOUT_SECONDS)
     except urllib.error.HTTPError as error:
         if error.code == 404:
             return None
         raise VerificationError("PyPI release metadata could not be retrieved") from None
     except (OSError, urllib.error.URLError):
         raise VerificationError("PyPI release metadata could not be retrieved") from None
-    try:
-        response = json.loads(raw)
-    except (UnicodeError, ValueError):
-        raise VerificationError("PyPI returned invalid release metadata") from None
-    if not isinstance(response, dict):
-        raise VerificationError("PyPI returned invalid release metadata")
-    return response
+    return _read_public_json(response, "PyPI")
 
 
 def _release_packages(manifest: dict) -> dict[tuple[str, str], list[dict]]:
@@ -416,6 +588,141 @@ def _release_packages(manifest: dict) -> dict[tuple[str, str], list[dict]]:
     for wheel in manifest["wheels"]:
         packages.setdefault((wheel["package"], wheel["version"]), []).append(wheel)
     return packages
+
+
+def _registry_candidates(repo: Path, manifest: dict) -> dict[str, dict]:
+    release_coordinates = {
+        (_normalized_package(package), version)
+        for package, version in _release_packages(manifest)
+    }
+    candidates = {}
+    for key, expected in SERVERS.items():
+        candidate = _read_json(repo / expected["path"])
+        packages = candidate.get("packages")
+        package = packages[0] if isinstance(packages, list) and len(packages) == 1 else None
+        version = candidate.get("version")
+        expected_repository = {
+            "url": REPOSITORY,
+            "source": "github",
+            "id": REPOSITORY_ID,
+            "subfolder": expected["path"].rsplit("/", 1)[0],
+        }
+        if (
+            candidate.get("name") != expected["name"]
+            or not isinstance(version, str)
+            or not version
+            or len(version) > 255
+            or not isinstance(package, dict)
+            or package.get("identifier") != expected["package"]
+            or package.get("version") != version
+            or package.get("registryType") != "pypi"
+            or package.get("registryBaseUrl") != "https://pypi.org"
+            or package.get("runtimeHint") != "uvx"
+            or package.get("transport") != {"type": "stdio"}
+            or candidate.get("repository") != expected_repository
+            or candidate.get("remotes")
+            or (_normalized_package(expected["package"]), version) not in release_coordinates
+        ):
+            raise VerificationError(f"Registry candidate metadata is not bound to the reviewed {key} release")
+        candidates[key] = candidate
+    return candidates
+
+
+def _registry_version(candidate: dict, opener=urllib.request.urlopen) -> dict | None:
+    name_path = urllib.parse.quote(candidate["name"], safe="")
+    version_path = urllib.parse.quote(candidate["version"], safe="")
+    url = f"https://registry.modelcontextprotocol.io/v0.1/servers/{name_path}/versions/{version_path}"
+    try:
+        response = opener(url, timeout=PUBLIC_METADATA_TIMEOUT_SECONDS)
+    except urllib.error.HTTPError as error:
+        if error.code == 404:
+            return None
+        raise VerificationError("MCP Registry metadata could not be retrieved") from None
+    except (OSError, urllib.error.URLError):
+        raise VerificationError("MCP Registry metadata could not be retrieved") from None
+    return _read_public_json(response, "MCP Registry")
+
+
+def _verify_registry_response(key: str, candidate: dict, response: dict) -> None:
+    metadata = response.get("_meta")
+    official = metadata.get("io.modelcontextprotocol.registry/official") if isinstance(metadata, dict) else None
+    if response.get("server") != candidate:
+        raise VerificationError(f"Published MCP Registry {key} candidate metadata differs")
+    if not isinstance(official, dict) or official.get("status") != "active":
+        raise VerificationError(f"Published MCP Registry {key} record is not active")
+    if official.get("isLatest") is not True:
+        raise VerificationError(f"Published MCP Registry {key} record is not the latest version")
+
+
+def _preflight_registry_release(
+    candidates: dict[str, dict], opener=urllib.request.urlopen
+) -> dict[str, str]:
+    states = {}
+    for key, candidate in candidates.items():
+        response = _registry_version(candidate, opener)
+        if response is None:
+            states[key] = "absent"
+            continue
+        try:
+            _verify_registry_response(key, candidate, response)
+        except VerificationError:
+            raise VerificationError(
+                f"MCP Registry collision for {key}; the existing version is not the reviewed candidate"
+            ) from None
+        states[key] = "exact"
+    return states
+
+
+def _write_registry_plan(path: Path, states: dict[str, str]) -> None:
+    if set(states) != set(SERVERS) or any(value not in {"absent", "exact"} for value in states.values()):
+        raise VerificationError("MCP Registry preflight plan is invalid")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.with_name(f"{path.name}.tmp")
+    temporary.write_text(json.dumps(states, sort_keys=True) + "\n", encoding="utf-8")
+    temporary.replace(path)
+
+
+def _verify_registry_record(key: str, candidate: dict, opener=urllib.request.urlopen) -> None:
+    response = _registry_version(candidate, opener)
+    if response is None:
+        raise VerificationError(f"Published MCP Registry {key} record is unavailable")
+    _verify_registry_response(key, candidate, response)
+
+
+def _verify_registry_record_with_retries(
+    key: str,
+    candidate: dict,
+    attempts: int,
+    delay_seconds: float,
+    opener=urllib.request.urlopen,
+    sleeper=time.sleep,
+) -> None:
+    for attempt in range(1, attempts + 1):
+        try:
+            _verify_registry_record(key, candidate, opener)
+            return
+        except VerificationError:
+            if attempt == attempts:
+                raise
+            sleeper(delay_seconds)
+
+
+def _verify_registry_release_with_retries(
+    candidates: dict[str, dict],
+    attempts: int,
+    delay_seconds: float,
+    opener=urllib.request.urlopen,
+    sleeper=time.sleep,
+) -> None:
+    for attempt in range(1, attempts + 1):
+        try:
+            for key, candidate in candidates.items():
+                _verify_registry_record(key, candidate, opener)
+            return
+        except VerificationError:
+            if attempt == attempts:
+                raise
+            sleeper(delay_seconds)
 
 
 def _verify_pypi_response(package: str, version: str, records: list[dict], response: dict) -> None:
@@ -494,30 +801,119 @@ def main() -> None:
     release_mode.add_argument("--preflight-pypi-release", action="store_true")
     release_mode.add_argument("--verify-manifest-wheels", action="store_true")
     release_mode.add_argument("--verify-pypi-release", action="store_true")
+    release_mode.add_argument("--write-skill-review-manifest", type=Path)
+    release_mode.add_argument("--verify-skill-review-manifest", action="store_true")
+    release_mode.add_argument("--preflight-registry-release", action="store_true")
+    release_mode.add_argument("--verify-registry-record", choices=sorted(SERVERS))
+    release_mode.add_argument("--verify-registry-release", action="store_true")
+    parser.add_argument("--registry-plan", type=Path)
+    parser.add_argument("--skill-asset-dir", type=Path)
+    parser.add_argument("--skill-review-manifest", type=Path)
     parser.add_argument("--pypi-attempts", type=int, default=1)
     parser.add_argument("--pypi-delay-seconds", type=float, default=0)
+    parser.add_argument("--registry-attempts", type=int, default=1)
+    parser.add_argument("--registry-delay-seconds", type=float, default=0)
     args = parser.parse_args()
-    selected_release_mode = args.preflight_pypi_release or args.verify_manifest_wheels or args.verify_pypi_release
+    selected_release_mode = any(
+        (
+            args.preflight_pypi_release,
+            args.verify_manifest_wheels,
+            args.verify_pypi_release,
+            args.write_skill_review_manifest is not None,
+            args.verify_skill_review_manifest,
+            args.preflight_registry_release,
+            args.verify_registry_record is not None,
+            args.verify_registry_release,
+        )
+    )
+    if not 1 <= args.pypi_attempts <= MAX_PUBLIC_ATTEMPTS or not 0 <= args.pypi_delay_seconds <= MAX_PUBLIC_DELAY_SECONDS:
+        parser.error("PyPI retry values exceed the public metadata bounds")
+    if not 1 <= args.registry_attempts <= MAX_PUBLIC_ATTEMPTS or not 0 <= args.registry_delay_seconds <= MAX_PUBLIC_DELAY_SECONDS:
+        parser.error("Registry retry values exceed the public metadata bounds")
     if selected_release_mode:
         if args.release_manifest is None:
             parser.error("release verification modes require --release-manifest")
-        if args.pypi_attempts < 1 or args.pypi_delay_seconds < 0:
-            parser.error("PyPI retry values must be non-negative and attempts must be positive")
-        manifest = _load_release_manifest(args.release_manifest.resolve(strict=True), _github_provenance())
+        if args.registry_plan is not None and not args.preflight_registry_release:
+            parser.error("--registry-plan requires --preflight-registry-release")
+        if args.preflight_registry_release and args.registry_plan is None:
+            parser.error("--preflight-registry-release requires --registry-plan")
+        if args.write_skill_review_manifest is not None and args.skill_asset_dir is None:
+            parser.error("--write-skill-review-manifest requires --skill-asset-dir")
+        if args.verify_skill_review_manifest and (
+            args.skill_asset_dir is None or args.skill_review_manifest is None
+        ):
+            parser.error("--verify-skill-review-manifest requires both Skill review inputs")
+        if args.skill_review_manifest is not None and not args.verify_skill_review_manifest:
+            parser.error("--skill-review-manifest requires --verify-skill-review-manifest")
+        if args.skill_asset_dir is not None and not (
+            args.write_skill_review_manifest is not None or args.verify_skill_review_manifest
+        ):
+            parser.error("--skill-asset-dir requires a Skill review manifest mode")
+        if (args.pypi_attempts != 1 or args.pypi_delay_seconds != 0) and not args.verify_pypi_release:
+            parser.error("PyPI retry options require --verify-pypi-release")
+        if (args.registry_attempts != 1 or args.registry_delay_seconds != 0) and not (
+            args.verify_registry_record or args.verify_registry_release
+        ):
+            parser.error("Registry retry options require a Registry verification mode")
+        release_manifest_path = args.release_manifest.resolve(strict=True)
+        manifest = _load_release_manifest(release_manifest_path, _github_provenance())
         if args.preflight_pypi_release:
             _preflight_pypi_release(manifest)
         elif args.verify_manifest_wheels:
             if args.wheel_dir is None:
                 parser.error("--verify-manifest-wheels requires --wheel-dir")
             _verify_manifest_wheels(args.wheel_dir.resolve(strict=True), manifest)
-        else:
+        elif args.verify_pypi_release:
             _verify_pypi_release_with_retries(manifest, args.pypi_attempts, args.pypi_delay_seconds)
-        print("Release manifest and public package bytes agree.")
+        elif args.write_skill_review_manifest is not None:
+            _write_skill_review_manifest(
+                args.write_skill_review_manifest.resolve(),
+                args.skill_asset_dir.resolve(strict=True),
+                release_manifest_path,
+                manifest,
+            )
+        elif args.verify_skill_review_manifest:
+            review_manifest = _load_skill_review_manifest(
+                args.skill_review_manifest.resolve(strict=True), manifest["provenance"]
+            )
+            _verify_skill_review_manifest(
+                args.skill_asset_dir.resolve(strict=True), review_manifest, release_manifest_path
+            )
+        elif args.preflight_registry_release:
+            candidates = _registry_candidates(Path(__file__).resolve().parents[1], manifest)
+            states = _preflight_registry_release(candidates)
+            _write_registry_plan(args.registry_plan.resolve(), states)
+        elif args.verify_registry_record:
+            candidates = _registry_candidates(Path(__file__).resolve().parents[1], manifest)
+            _verify_registry_record_with_retries(
+                args.verify_registry_record,
+                candidates[args.verify_registry_record],
+                args.registry_attempts,
+                args.registry_delay_seconds,
+            )
+        elif args.verify_registry_release:
+            candidates = _registry_candidates(Path(__file__).resolve().parents[1], manifest)
+            _verify_registry_release_with_retries(
+                candidates,
+                args.registry_attempts,
+                args.registry_delay_seconds,
+            )
+        print("Reviewed release provenance and requested public metadata agree.")
         return
-    if args.release_manifest is not None:
-        parser.error("--release-manifest requires a release verification mode")
+    if any(
+        value is not None
+        for value in (
+            args.release_manifest,
+            args.registry_plan,
+            args.skill_asset_dir,
+            args.skill_review_manifest,
+        )
+    ):
+        parser.error("release inputs require a release verification mode")
     if args.pypi_attempts != 1 or args.pypi_delay_seconds != 0:
         parser.error("PyPI retry options require --verify-pypi-release")
+    if args.registry_attempts != 1 or args.registry_delay_seconds != 0:
+        parser.error("Registry retry options require a Registry verification mode")
 
     repo = Path(__file__).resolve().parents[1]
     metadata = _metadata(repo, _official_schema())

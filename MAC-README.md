@@ -35,7 +35,7 @@ uvx --from autogenesis-appium-mcp==0.5.0 autogenesis-appium-mcp --platform mac -
 ```
 
 Agent Contract is pinned to **2.1.0**, manifest SHA-256
-`89ec8f67dfbb9522eb3138488fbaf2b823abf5ed42b3140a82abfc45a883e98a`.
+`c3c87437b140520e9e3d502e0ac52a1f11c532df8ac8f64847f775fec1fb533f`.
 A mismatched or corrupt contract prevents startup.
 
 Standard MCP Registry metadata is `appium-mcp-server/server.json`. From a source
@@ -115,11 +115,12 @@ The installed and source entrypoints expose stdio only.
 Canonical workflows are prompts `execute_scenario`, `generate_scenario_test`,
 and `execute_natural_language_task`. Identity is available at
 `autogenesis://agent-contract/identity`. Use the generation workflow for the
-selected feature/scenario. Preview returns the complete payload, identity, and
-digest; confirmation must echo the identity and digest with `approved=true`.
-The runtime rejects stale base files, escaping paths and symlinks, then atomically
-replaces the target. Default output is business-local
-`features/steps/common_steps.py`; explicit paths must remain inside the project.
+selected feature/scenario. `before_gen_code` records successful operations and
+returns only an opaque generation ID. `preview_code_changes` returns the complete
+proposed payload, project-relative destination, identity, and digest without
+writing it. Recording stops after this read-only preview: generated-file writes
+are unavailable, and the stdio Runtime exposes no confirmation, commit, save, or
+alternate copy route.
 
 ## Source development and existing Behave projects
 
@@ -143,6 +144,10 @@ exact contract package. For automation failures, check the Mac2 driver, bundle
 identifier, application installation, and Accessibility permissions. Startup and
 discovery alone do not require a running Appium server.
 
-Uninstall with `python -m pip uninstall autogenesis-appium-mcp autogenesis-agent-contract`
-inside the environment, or remove it and its MCP client entry. Business config
-and generated tests remain intact.
+Rollback a Candidate by uninstalling `autogenesis-appium-mcp`,
+`autogenesis-agent-contract`, and `autogenesis-cli` from its environment, then
+remove that environment, the selected-scope `autogenesis` Skill, its MCP client
+entry, downloaded/extracted Candidate channel, and the Agent's cached Skill/tool
+schemas. Never restore a cached write-capable generation inventory; reload the
+Agent and prove the removed or newly accepted inventory. Business configuration
+and pre-existing generated tests remain intact.

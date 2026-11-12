@@ -16,7 +16,7 @@ from mcp.server.fastmcp import FastMCP
 # These pins belong to the runtime release, independently of the installed wheel.
 required = RuntimeContractRequirement(
     contract_version="2.1.0",
-    manifest_sha256="89ec8f67dfbb9522eb3138488fbaf2b823abf5ed42b3140a82abfc45a883e98a",
+    manifest_sha256="c3c87437b140520e9e3d502e0ac52a1f11c532df8ac8f64847f775fec1fb533f",
 )
 contract = load_contract(ContractIdentity(required.contract_version, required.manifest_sha256))
 appendix = load_project_appendix("/absolute/business-project")
@@ -61,7 +61,7 @@ register_mcp(server, contract, appendix, required)
   canonical prompt content or identity JSON. Initialize instructions already
   belong to the constructed server, so serving a failed instance is unsupported.
 - `SecretRef` serializes as `{"$secret": "env:NAME"}`. Runtimes retain this
-  reference through recording, preview, confirmation, and generated code, and
+  reference through recording and the read-only generated-code preview, and
   resolve plaintext only inside the current tool execution.
 - `UnboundSecret` serializes as `{"$secret": "unbound:BINDING"}` and blocks
   preview until a Coding Agent supplies an explicit environment-backed binding.
@@ -92,10 +92,96 @@ applicable Background followed by the selected Scenario, in source order.
 Feature paths are context data: rendering does not read them or authorize writes.
 Only the generation workflow references generation operations.
 
+The generation workflow ends after `preview_code_changes`. The public Preview
+does not expose a generated-file confirmation or commit tool; proposed bytes
+cannot be saved through the Contract's stdio surface or an alternate copy route.
+
 `autogenesis://agent-contract/identity` returns contract identity plus appendix
 presence, the constant relative appendix path, and its separate SHA-256. It
 never returns appendix text or a user's absolute project path. Its schema is
 `assets/schemas/identity.schema.json`.
+
+## Agent Install Prompt boundary
+
+Candidate and public generators share one fail-closed installation contract. The
+Candidate prompt is externally anchored to one canonical repository, positive Actions
+run and attempt, head commit, attempt-qualified name, and exactly one unexpired
+immutable artifact with a positive observed artifact ID. Before extraction, the
+downloaded archive must also match GitHub's independently supplied positive artifact
+service digest; internal checksums never substitute for this external anchor. Candidate
+schema 3 contains one complete `darwin-arm64-py311` wheelhouse and one complete
+`win32-amd64-py312` wheelhouse. Each target manifest binds normalized package/version,
+wheel filename and tags, byte size, SHA-256, universal-lock digest, first-party wheel-set
+digest, fixed `pypi.org`/`default-public` acquisition source, and same-run provenance.
+The universal dependency lock is resolved from verified local first-party wheel paths;
+the Windows Runtime root is qualified with `sys_platform == 'win32'` before resolution
+so its unique transitive closure is absent from the macOS target.
+
+Acquisition runs in a newly created private empty home with null netrc, disabled pip
+keyring, null pip configuration, no ambient proxy/source/cache/target/prefix/user
+settings, and wheel-only strict hashes. Because the supported Python interface is a
+minor version rather than one patch release, locks containing
+`python_full_version` or `implementation_version` markers fail closed. Compatibility
+uses packaging's CPython tag model; macOS arm64 is conservatively bounded to its
+macOS 11 deployment baseline, including compatible `abi3` and `universal2` tags.
+
+The public prompt remains anchored to the exact canonical immutable GitHub Release ID,
+tag, commit, and asset set. Builders accept only local `.` for Candidate assets and the
+exact canonical GitHub Release URLs for public assets. `SHA256SUMS` is generated after
+the final prompt and covers every shipped file at its canonical relative path except
+itself; self-consistent copied bytes are insufficient.
+
+Each prompt selects one local private per-user parent with stable native identity,
+current-user ownership, and permissions/ACLs that deny every other OS identity
+write/create/delete/delete-child control. Shared, untrusted, unsafe, network-backed,
+symlink, and reparse parents are rejected. A cryptographically random leaf with at
+least 128 bits of entropy is generated for the exact installation, and its exact
+absolute transaction path plus environment/staging/download/extraction/cache children
+appear in the immutable plan before explicit approval.
+
+After approval, the exact leaf is atomically created with fail-if-exists and no-follow
+reservation semantics. Collision or changed parent/leaf state stops and requires a new
+random path, plan, and approval. One exclusive transaction lock is held for the complete
+create/install/verify/rollback/cleanup lifecycle. Stable parent/leaf identities and a
+private unpredictable ownership marker are recorded. The lock, private parent ownership
+and permissions, leaf identity, and marker are rechecked before and after each phase.
+Final placement remains native atomic no-replace.
+
+After successful reservation, standard pathname-based stdlib `venv`, `pip`, and
+installed CLI operations are permitted within the exact transaction root. The boundary
+explicitly trusts processes already running as the same OS user identity and does not
+claim to prevent malicious same-user replacement of pathname-addressed state; no native
+privileged/sandboxed Bootstrap is introduced. Reservation and cleanup use no-follow
+opens where supported. Cleanup deletes only still-matching prompt-owned state; a missing
+lock, changed parent permission or identity, substituted leaf, marker mismatch, symlink,
+reparse point, or ambiguity forbids deletion and preserves the state.
+
+The base Python creates the venv in isolated mode. Every child receives an explicit
+minimal environment that omits all `PYTHON*` and startup customization. Ambient
+`PIP_*` and `UV_*` names are removed without reading their values as defensive
+scrubbing. Pip is the sole package manager for Candidate and public Release prompt
+installations; uv and other package managers are never invoked. Pip receives only
+`PIP_CONFIG_FILE=/dev/null` on macOS or the exact pip sentinel `PIP_CONFIG_FILE=nul` on
+Windows and always runs with `--isolated`; failure to establish the platform null
+configuration stops installation.
+
+Candidate installation proves native host architecture, CPython minor version, and
+exactly one matching target manifest, then uses only that authenticated local
+wheelhouse with `--no-index`, `--no-cache-dir`, `--only-binary=:all:`, `--find-links`,
+`--require-hashes`, `--no-deps`, and `--force-reinstall`. It never requests or reads a
+package source, mirror, proxy, credential, configuration, cache, source tree, VCS
+checkout, sdist, editable input, or installed-distribution substitute after the exact
+Actions artifact is obtained. The public Release prompt retains its approved opaque
+source/auth acquisition before switching to the same offline installation policy. All
+subsequent operations use absolute disposable-environment entrypoints while the
+phase-boundary checks continue to pass.
+
+For public Release acquisition only, source metadata must be a canonical lowercase
+ASCII DNS hostname or canonical IP literal and one finite class: `managed-policy`,
+`user-approved`, `default-public`, or `undisclosed`. Interface trust is independent,
+not self-attested. Invalid metadata is never echoed and becomes `undisclosed`, stopping
+installation. Full URLs, credentials, environment/config values, errors, output, and
+evidence are never read for disclosure; redaction after reading is forbidden.
 
 ## Integrity and diagnostics
 
@@ -157,10 +243,11 @@ fetch, include processing, environment expansion, templating, or execution.
 
 Callers must supply secret-free task and domain text, using environment-variable
 references. This package does not detect arbitrary credentials in text. Its
-generation module binds a complete preview to the session, destination, base-file
-state, and digest; confirmation requires explicit approval and atomically replaces
-the file inside the selected project root. Runtime adapters expose that shared
-module through their generation tools.
+generation module binds a complete read-only preview to the session, a
+project-relative proposed destination, base-file state, and digest. Recording
+initialization returns only an opaque generation ID. Neither `register_mcp` nor
+the Runtime adapters register a confirmation or commit tool; generated-file
+writes are unavailable through the public stdio surface.
 
 ## Generated sources
 
@@ -242,10 +329,13 @@ claimed.
 
 ## Rollback and limits
 
-The package writes no project configuration and never edits the appendix. To
-roll back integration, revert the consumer dependency/registration and generated
-projections together, then uninstall `autogenesis-agent-contract` from that
-environment. Business instructions remain intact. There is no fallback to old
-policy text. Prompts cannot guarantee model obedience; eval evidence and runtime
-guards are required. Hashes detect package drift, not an attacker who can replace
-both installed Python code and the independent runtime requirement.
+The package writes no project configuration and never edits the appendix.
+Candidate rollback removes its packages or isolated environment, the selected
+user/project `autogenesis` Skill, MCP entries, downloaded/extracted Candidate
+channel, and the selected Agent's cached Skill and Runtime tool schemas together.
+Never restore old policy text or a cached write-capable generated-code inventory;
+reload the Agent and prove the removed or newly accepted inventory. Business
+instructions remain intact. Prompts cannot guarantee model obedience; eval
+evidence and runtime guards are required. Hashes detect package drift, not an
+attacker who can replace both installed Python code and the independent runtime
+requirement.

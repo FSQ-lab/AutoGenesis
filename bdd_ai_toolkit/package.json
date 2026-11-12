@@ -40,16 +40,6 @@
         }
       ]
     },
-    "configuration": {
-      "title": "BDD AI Toolkit",
-      "properties": {
-        "bddAiToolkit.cucumber.copilotPrompt": {
-          "type": "string",
-          "default": "Please use native-mcp-server to execute the following instructions:\n\n# Original BDD Test Case (strictly follow step-by-step):\n${scenario_text}\n\nRequirements:\nfeature_file = '${feature_file_path}'\n1. Before executing the first step, call `before_gen_code`, and after all steps are completed, sequentially call `preview_code_changes` and `confirm_code_change`.\n2. Execute **each step** exactly as written using native-mcp-server API calls, in order.\n3. **MANDATORY: For EVERY step, you MUST call an MCP tool. Never judge results by screenshots/snapshots alone.**\n4. **Do not modify, merge, skip, or add any step.** Do not lose bdd step keyword.\n5. Do not close browser",
-          "description": "Custom prompt to append when sending test cases to Copilot via the 'Send to Copilot' action. Use ${scenario_text} for scenario content and ${feature_file_path} for file path placeholders."
-        }
-      }
-    },
     "languageModelTools": [
       {
         "name": "sendNaturalLanguageTask",

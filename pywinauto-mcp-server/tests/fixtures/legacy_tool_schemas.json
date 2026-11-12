@@ -633,11 +633,6 @@
       "title": "preview_code_changesArguments",
       "type": "object"
     },
-    "confirm_code_changes": {
-      "properties": {},
-      "title": "confirm_code_changesArguments",
-      "type": "object"
-    },
     "mouse_drag_drop": {
       "properties": {
         "caller": {

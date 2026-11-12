@@ -39,7 +39,7 @@ uvx --from autogenesis-windows-mcp==0.5.0 autogenesis-windows-mcp --config ./app
 
 The runtime depends exactly on autogenesis-agent-contract==2.1.0 and requires
 manifest SHA-256
-89ec8f67dfbb9522eb3138488fbaf2b823abf5ed42b3140a82abfc45a883e98a.
+c3c87437b140520e9e3d502e0ac52a1f11c532df8ac8f64847f775fec1fb533f.
 Missing, corrupt or incompatible contract assets fail startup.
 
 Standard MCP Registry metadata is `pywinauto-mcp-server/server.json`. From a
@@ -106,9 +106,16 @@ process incarnation or its transferred child, including after launcher exit.
 Process creation, trusted top-level window discovery, connection, visibility,
 enabled state and initial binding share one monotonic launch budget. The runtime
 polls readiness at an internal 500 ms interval and uses cancellable asynchronous
-waits; it does not add a probe or sleep after the configured deadline. Multiple
-title-matched windows belonging to the same launch are rejected as ambiguous
-rather than selecting one arbitrarily.
+waits; it does not add a probe or sleep after the configured deadline. Before
+process creation it records every top-level UIA identity. A newly observed
+title-matched window is eligible when it belongs to the launcher process tree.
+For a single-process application such as modern Notepad, a new window may
+instead belong to an exact pre-launch process incarnation that already owned a
+matching window. The process must also match the configured executable path or,
+for packaged modern Notepad, the canonical Windows Notepad package family. That
+fallback must remain the sole eligible identity across two uninterrupted polls
+before binding. Pre-existing identities are never eligible, even if their title
+changes. Multiple eligible new windows are rejected as ambiguous.
 
 `app_launch` failures have a fixed, secret-safe response contract. Alongside
 `status: "error"` and an empty `data` object, responses include `error_code`,
@@ -142,6 +149,12 @@ reincarnated element, identity mismatch, or invalid generation invalidates the
 session and fails the operation; ordinary tools do not reconnect by title or
 restart the application. A subsequent explicit `app_launch` may establish a new
 session.
+
+`app_close` sends close only to the pinned top-level window and never terminates
+its owning process. For modern Notepad, it invokes that selected window's unique
+WinUI discard confirmation when required. Failure to close the selected window
+or identify one selected confirmation leaves the binding intact and returns
+`AUTOGENESIS_APP_CLOSE_FAILED`.
 
 ## Source execution
 
@@ -181,10 +194,10 @@ Agent Contract adapter publishes these official prompts:
 
 The read-only resource autogenesis://agent-contract/identity reports contract
 identity and appendix metadata. The startup-only `--project-root` fixes the
-business-project write scope; generated destinations cannot escape it. The
+business-project preview scope; proposed destinations cannot escape it. The
 canonical adapter currently registers an empty project appendix.
 
-The **22 existing Windows tool names and complete input schemas** are frozen in
+The **21 existing Windows tool names and complete input schemas** are frozen in
 tests/fixtures/legacy_tool_schemas.json, including their required fields,
 defaults, array items and types:
 
@@ -193,7 +206,7 @@ defaults, array items and types:
 - mouse_drag_drop, mouse_hover, mouse_scroll
 - verify_element_exists, verify_element_not_exist, verify_checkbox_state,
   verify_element_value, verify_elements_order, verify_visual_task
-- before_gen_code, preview_code_changes, confirm_code_changes
+- before_gen_code, preview_code_changes
 
 For modern UIA `Document` controls, `enter_text` uses a writable ValuePattern
 and confirms the resulting value before reporting success. `verify_element_value`
@@ -201,12 +214,14 @@ reads the wrapper value when available, then falls back to UIA ValuePattern and
 TextPattern without changing the existing tool schema or containment assertion.
 
 Generated replay continues to use Behave and the business project's
-features.environment helpers. Default generation paths are relative to the
-business working directory under features/steps, never inside site-packages.
-Preview returns the complete payload, identity, and digest. Confirmation must
-echo that identity and digest with `approved=true`; the runtime rejects stale
-base files, escaping paths and symlinks, then atomically replaces the target.
-Prefer explicit feature_file or step_file paths inside the project root.
+features.environment helpers. `before_gen_code` returns only an opaque generation
+ID. Default proposed generation paths are relative to the business working
+directory under features/steps, never inside site-packages. Preview returns the
+complete proposed payload, project-relative destination, identity, and digest
+without writing it. Recording stops after this read-only preview: generated-file
+writes are unavailable, and the stdio Runtime exposes no confirmation, commit,
+save, or alternate copy route.
+
 Visual verification retains the Azure OpenAI and local provider paths;
 AZURE_OPENAI_API_KEY and AZURE_OPENAI_ENDPOINT are read from the environment.
 No provider implementation needs credential edits.
@@ -229,7 +244,7 @@ verifier creates a new venv and business directory, installs both local wheels,
 copies only the acceptance harness and thin source launcher, and runs from that
 business directory with isolated Python imports. It records wheel hashes,
 runner image/version, installed module locations, install log, test report,
-full protocol responses, the 22-tool snapshot, canonical prompts/identity,
+full protocol responses, the 21-tool snapshot, canonical prompts/identity,
 EOF shutdown, SIGINT shutdown, and secret-canary results. Canary-bearing output
 is rejected before protocol evidence is written. On Linux, only metadata,
 package-data and import tests are selected; this is not Windows acceptance.
@@ -252,18 +267,21 @@ available bytes, so SIGINT/EOF cancellation leaves no blocked reader worker.
 
 Credential configuration must use `${NAME}`, `$NAME`, or `%NAME%` references;
 plaintext credential fields are rejected. Coding Agents may pass
-`{"$secret":"env:NAME"}` to secret-aware text tools. Recording, preview,
-confirmation, and generated files retain that reference and resolve it only at
+`{"$secret":"env:NAME"}` to secret-aware text tools. Recording and preview
+retain that reference in the proposed code and resolve it only during tool
 execution. Plaintext secure-control input becomes an unbound requirement, and
 preview fails until the Coding Agent supplies an explicit SecretRef binding.
-Generated code contains literals and references only—never plaintext credentials
+Proposed code contains literals and references only—never plaintext credentials
 or executable `[REDACTED]` placeholders.
 
-Uninstall the runtime from the business venv to roll back:
+Rollback a Candidate by uninstalling its packages from the business environment:
 
 ```powershell
-.venv/Scripts/python -m pip uninstall autogenesis-windows-mcp
+.venv/Scripts/python -m pip uninstall autogenesis-windows-mcp autogenesis-agent-contract autogenesis-cli
 ```
 
-Remove the client's server entry separately. Business configurations and
-generated test files remain in the business project.
+Then remove that environment, the selected-scope `autogenesis` Skill, its MCP
+client entry, downloaded/extracted Candidate channel, and the Agent's cached
+Skill/tool schemas. Never restore a cached write-capable generation inventory;
+reload the Agent and prove the removed or newly accepted inventory. Business
+configuration and pre-existing generated test files remain in the project.
