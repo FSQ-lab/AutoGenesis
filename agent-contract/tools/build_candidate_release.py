@@ -76,6 +76,7 @@ def main() -> None:
     parser.add_argument("--output-dir", required=True, type=Path)
     parser.add_argument("--base-url", required=True)
     parser.add_argument("--commit", required=True)
+
     parser.add_argument("--workflow-run-id", required=True)
     parser.add_argument("--workflow-run-attempt", required=True)
     args = parser.parse_args()

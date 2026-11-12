@@ -447,6 +447,7 @@ def test_skill_release_assets_match_contract_and_bootstrap_prompt(tmp_path, repo
     assert "generateScenarioText" not in command_handlers
     assert "generateBackgroundText" not in command_handlers
 
+
     package = json.loads((repo_root / "bdd_ai_toolkit/package.json").read_bytes())
     configuration = package["contributes"].get("configuration", {}).get("properties", {})
     assert "bddAiToolkit.cucumber.copilotPrompt" not in configuration
@@ -585,6 +586,8 @@ def test_source_metadata_injection_becomes_undisclosed_before_echo(repo_root, ho
 def test_source_metadata_accepts_only_canonical_host_and_finite_source_class(repo_root, host, source):
     module = runpy.run_path(str(repo_root / "agent-contract/tools/install_prompt.py"))
     assert module["validate_source_metadata"](host, source) == (host, source)
+
+
 
 
 
