@@ -122,8 +122,10 @@ keyring, null pip configuration, no ambient proxy/source/cache/target/prefix/use
 settings, and wheel-only strict hashes. Because the supported Python interface is a
 minor version rather than one patch release, locks containing
 `python_full_version` or `implementation_version` markers fail closed. Compatibility
-uses packaging's CPython tag model; macOS arm64 is conservatively bounded to its
-macOS 11 deployment baseline, including compatible `abi3` and `universal2` tags.
+uses packaging's CPython tag model; the macOS wheelhouse is bounded to deployment
+version 15.0 and requires a trusted local macOS version of 15.0 or newer before target
+selection. Compatible deployment tags through macOS 15, including `abi3` and
+`universal2`, are accepted.
 
 The public prompt remains anchored to the exact canonical immutable GitHub Release ID,
 tag, commit, and asset set. Builders accept only local `.` for Candidate assets and the
