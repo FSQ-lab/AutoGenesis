@@ -233,7 +233,8 @@ def test_target_tags_accept_abi3_and_reject_newer_macos_or_wrong_architecture(wh
     assert compatible("cp310-abi3-macosx_11_0_arm64", "darwin-arm64-py311")
     assert compatible("cp310-abi3-macosx_11_0_universal2", "darwin-arm64-py311")
     assert compatible("cp310-abi3-win_amd64", "win32-amd64-py312")
-    assert not compatible("cp310-abi3-macosx_12_0_arm64", "darwin-arm64-py311")
+    assert compatible("cp310-abi3-macosx_12_0_arm64", "darwin-arm64-py311")
+    assert not compatible("cp310-abi3-macosx_16_0_arm64", "darwin-arm64-py311")
     assert not compatible("cp311-cp311-macosx_11_0_x86_64", "darwin-arm64-py311")
     assert not compatible("cp312-cp312-win32", "win32-amd64-py312")
 
@@ -280,6 +281,7 @@ def test_acquisition_uses_only_fixed_isolated_source_and_no_cache(
     monkeypatch.setattr(module["platform"], "machine", lambda: "arm64")
     monkeypatch.setattr(module["sys"], "platform", "darwin")
     monkeypatch.setattr(module["sys"], "version_info", SimpleNamespace(major=3, minor=11))
+    monkeypatch.setattr(module["platform"], "mac_ver", lambda: ("15.7.1", ("", "", ""), ""))
     output = tmp_path / "acquired"
     module["acquire_wheelhouse"](base_dir, "darwin-arm64-py311", output, *COMMIT_RUN)
     command = captured["command"]
@@ -301,6 +303,26 @@ def test_acquisition_uses_only_fixed_isolated_source_and_no_cache(
         output, module["verify_base"](base_dir, *COMMIT_RUN)[0],
         (base_dir / module["LOCK_NAME"]).read_bytes(), "darwin-arm64-py311", *COMMIT_RUN,
     )[0]["source"] == {"host": "pypi.org", "class": "default-public"}
+
+
+@pytest.mark.parametrize("macos_version", ["15.0", "15.7.1", "16.0"])
+def test_supported_macos_deployment_selects_target(wheelhouse_module, monkeypatch, macos_version):
+    module = wheelhouse_module
+    monkeypatch.setattr(module["platform"], "machine", lambda: "arm64")
+    monkeypatch.setattr(module["platform"], "mac_ver", lambda: (macos_version, ("", "", ""), ""))
+    monkeypatch.setattr(module["sys"], "platform", "darwin")
+    monkeypatch.setattr(module["sys"], "version_info", SimpleNamespace(major=3, minor=11))
+    module["_assert_target_host"]("darwin-arm64-py311")
+
+
+def test_older_macos_deployment_fails_before_acquisition(wheelhouse_module, monkeypatch):
+    module = wheelhouse_module
+    monkeypatch.setattr(module["platform"], "machine", lambda: "arm64")
+    monkeypatch.setattr(module["platform"], "mac_ver", lambda: ("14.7", ("", "", ""), ""))
+    monkeypatch.setattr(module["sys"], "platform", "darwin")
+    monkeypatch.setattr(module["sys"], "version_info", SimpleNamespace(major=3, minor=11))
+    with pytest.raises(module["WheelhouseError"], match="does not match"):
+        module["_assert_target_host"]("darwin-arm64-py311")
 
 
 @pytest.mark.parametrize("target, machine, sys_platform, version", [

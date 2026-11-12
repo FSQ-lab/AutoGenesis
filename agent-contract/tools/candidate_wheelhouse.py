@@ -53,6 +53,7 @@ TARGETS = {
         "sys_platform": "darwin",
         "platform": "macos",
         "architecture": "arm64",
+        "deployment_version": "15.0",
         "os_name": "posix",
         "platform_system": "Darwin",
         "platform_machine": "arm64",
@@ -275,9 +276,8 @@ def _target_tags(target_key: str) -> frozenset[str]:
     target = TARGETS[target_key]
     python_version = tuple(int(value) for value in target["python_version"].split("."))
     if target["sys_platform"] == "darwin":
-        # Native arm64 exists from macOS 11 onward; this conservative baseline
-        # prevents a wheelhouse from claiming support via a newer deployment tag.
-        platforms = tuple(mac_platforms(version=(11, 0), arch="arm64"))
+        deployment_version = tuple(int(value) for value in target["deployment_version"].split("."))
+        platforms = tuple(mac_platforms(version=deployment_version, arch="arm64"))
     else:
         platforms = ("win_amd64",)
     tags = set(cpython_tags(python_version=python_version, platforms=platforms))
@@ -457,11 +457,18 @@ def _assert_target_host(target_key: str) -> None:
     machine = platform.machine().lower()
     architecture = "arm64" if machine in {"arm64", "aarch64"} else "amd64" if machine in {"amd64", "x86_64"} else machine
     observed_version = f"{sys.version_info.major}.{sys.version_info.minor}"
+    deployment_ok = True
+    if target["sys_platform"] == "darwin":
+        try:
+            deployment_ok = Version(platform.mac_ver()[0]) >= Version(target["deployment_version"])
+        except Exception:
+            deployment_ok = False
     if (
         sys.implementation.name != "cpython"
         or observed_version != target["python_version"]
         or sys.platform != target["sys_platform"]
         or architecture != target["architecture"]
+        or not deployment_ok
     ):
         raise WheelhouseError("acquisition host does not match the exact Candidate target")
 

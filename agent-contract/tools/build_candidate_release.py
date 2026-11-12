@@ -240,9 +240,10 @@ def main() -> None:
         acquire=(
             "Use only the two manifest-bound target wheelhouses, universal lock, complete offline-install lock, "
             "first-party wheels, and Skill bytes already present in the exact Actions artifact. Prove the native "
-            "host from local facts, then select exactly one compatible target: native macOS arm64 with CPython 3.11 "
-            "selects `darwin-arm64-py311`; native Windows x64 with CPython 3.12 selects `win32-amd64-py312`. "
-            "Reject Linux, WSL, another Python implementation/version/architecture, zero matches, or multiple matches. "
+            "host from trusted local facts, then select exactly one compatible target: native macOS 15 or newer on "
+            "arm64 with CPython 3.11 selects `darwin-arm64-py311`; native Windows x64 with CPython 3.12 selects "
+            "`win32-amd64-py312`. Reject older macOS, Linux, WSL, another Python implementation/version/architecture, "
+            "zero matches, or multiple matches. "
             "Verify the selected target manifest and every listed wheel against the Candidate manifest and complete "
             "checksums before installation. Do not query or use a package index, mirror, proxy, credential, package "
             "configuration, cache, source tree, VCS checkout, sdist, editable input, or installed distribution."
