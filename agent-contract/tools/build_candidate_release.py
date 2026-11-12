@@ -4,112 +4,42 @@ from __future__ import annotations
 
 import argparse
 import hashlib
-import io
 import json
-import os
 import re
-import stat
+import shutil
 import subprocess
-import zipfile
-from email.parser import BytesParser
 from pathlib import Path
 
 from _files import atomic_write
+from candidate_wheelhouse import (
+    EXPECTED,
+    LOCK_NAME,
+    PLATFORMS,
+    TARGETS,
+    WHEELHOUSE_MANIFEST,
+    WheelhouseError,
+    canonical_json,
+    read_regular,
+    verify_base,
+    verify_wheelhouse,
+)
 from freeze_assets import PACKAGE, load_asset_io, release_bytes
 from install_prompt import REPOSITORY, candidate_asset_location, hardened_install_contract
 
-EXPECTED = {
-    "autogenesis-agent-contract": "2.1.0",
-    "autogenesis-appium-mcp": "0.5.0",
-    "autogenesis-windows-mcp": "0.5.0",
-    "autogenesis-cli": "0.2.0",
-}
-PLATFORMS = {
-    "autogenesis-agent-contract": ("darwin", "win32"),
-    "autogenesis-appium-mcp": ("darwin", "win32"),
-    "autogenesis-windows-mcp": ("win32",),
-    "autogenesis-cli": ("darwin", "win32"),
-}
-_MAX_LOCK_BYTES = 4 * 1024 * 1024
-_HASH = re.compile(r"--hash=sha256:[0-9a-f]{64}(?:\s|$)")
 SKILL = "skills/autogenesis/SKILL.md"
-_MAX_WHEEL_BYTES = 64 * 1024 * 1024
-_MAX_METADATA_BYTES = 256 * 1024
+_MAX_LOCK_BYTES = 4 * 1024 * 1024
+_MAX_WHEEL_BYTES = 128 * 1024 * 1024
 
 
-def _read_regular(path: Path, maximum: int) -> bytes:
-    nofollow = getattr(os, "O_NOFOLLOW", 0)
-    try:
-        expected = os.lstat(path)
-        if not stat.S_ISREG(expected.st_mode) or expected.st_size <= 0 or expected.st_size > maximum:
-            raise ValueError("candidate input must be a bounded regular non-symlink file")
-        descriptor = os.open(path, os.O_RDONLY | getattr(os, "O_BINARY", 0) | nofollow)
-        try:
-            opened = os.fstat(descriptor)
-            if (opened.st_dev, opened.st_ino, opened.st_size) != (expected.st_dev, expected.st_ino, expected.st_size):
-                raise ValueError("candidate input changed before read")
-            raw = bytearray()
-            while len(raw) <= maximum:
-                chunk = os.read(descriptor, min(1024 * 1024, maximum + 1 - len(raw)))
-                if not chunk:
-                    break
-                raw.extend(chunk)
-            final = os.fstat(descriptor)
-        finally:
-            os.close(descriptor)
-    except OSError:
-        raise ValueError("candidate input could not be read securely") from None
-    if len(raw) != expected.st_size or len(raw) > maximum or (final.st_dev, final.st_ino, final.st_size) != (expected.st_dev, expected.st_ino, expected.st_size):
-        raise ValueError("candidate input changed during read")
-    return bytes(raw)
+def _copy_verified(root: Path, relative: str, source: Path, maximum: int) -> tuple[str, int]:
+    raw = read_regular(source, maximum)
+    atomic_write(root, relative, raw)
+    return hashlib.sha256(raw).hexdigest(), len(raw)
 
 
-def _wheel_identity(raw: bytes) -> tuple[str, str]:
-    try:
-        with zipfile.ZipFile(io.BytesIO(raw)) as archive:
-            names = [name for name in archive.namelist() if name.endswith(".dist-info/METADATA")]
-            if len(names) != 1 or archive.getinfo(names[0]).file_size > _MAX_METADATA_BYTES:
-                raise ValueError("candidate wheel metadata is invalid")
-            metadata = BytesParser().parsebytes(archive.read(names[0]))
-    except (OSError, zipfile.BadZipFile, KeyError):
-        raise ValueError("candidate wheel is invalid") from None
-    name = metadata.get("Name")
-    version = metadata.get("Version")
-    if not isinstance(name, str) or not isinstance(version, str):
-        raise ValueError("candidate wheel identity is missing")
-    return name.lower().replace("_", "-"), version
-def _dependency_lock(raw: bytes) -> None:
-    try:
-        text = raw.decode("utf-8")
-    except UnicodeError:
-        raise ValueError("dependency lock must be UTF-8") from None
-    entries: list[str] = []
-    current = ""
-    for line in text.splitlines():
-        stripped = line.strip()
-        if not stripped or stripped.startswith("#"):
-            continue
-        current = f"{current} {stripped}".strip()
-        if current.endswith("\\"):
-            current = current[:-1].rstrip()
-            continue
-        entries.append(current)
-        current = ""
-    if current or not entries:
-        raise ValueError("dependency lock is empty or truncated")
-    for entry in entries:
-        requirement = entry.split(";", 1)[0]
-        if (
-            "==" not in requirement
-            or not _HASH.search(entry)
-            or requirement.startswith("-")
-            or " @ " in requirement
-            or "/" in requirement
-            or "\\" in requirement
-            or "${" in entry
-        ):
-            raise ValueError("dependency lock contains an unpinned or unsafe entry")
-
+def _checksum_row(checksum_rows: list[tuple[str, str]], root: Path, relative: str) -> None:
+    raw = read_regular(root / relative, _MAX_WHEEL_BYTES)
+    checksum_rows.append((hashlib.sha256(raw).hexdigest(), relative))
 
 
 
@@ -140,22 +70,19 @@ def _verify_commit(repo: Path, expected: str) -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--wheel-dir", required=True, type=Path)
+    parser.add_argument("--base-dir", required=True, type=Path)
+    parser.add_argument("--darwin-wheelhouse", required=True, type=Path)
+    parser.add_argument("--windows-wheelhouse", required=True, type=Path)
     parser.add_argument("--output-dir", required=True, type=Path)
     parser.add_argument("--base-url", required=True)
     parser.add_argument("--commit", required=True)
-    parser.add_argument("--dependency-lock", required=True, type=Path)
     parser.add_argument("--workflow-run-id", required=True)
     parser.add_argument("--workflow-run-attempt", required=True)
     args = parser.parse_args()
     if re.fullmatch(r"[0-9a-f]{40}", args.commit) is None:
         raise SystemExit("Candidate commit must be an exact lowercase Git commit.")
-    if not args.workflow_run_id.isdigit() or int(args.workflow_run_id) < 1:
-        raise SystemExit("Candidate workflow run ID must be a positive integer.")
-    if not args.workflow_run_attempt.isdigit() or int(args.workflow_run_attempt) < 1:
-        raise SystemExit("Candidate workflow run attempt must be a positive integer.")
     try:
-        base = candidate_asset_location(args.base_url)
+        base_url = candidate_asset_location(args.base_url)
     except ValueError:
         raise SystemExit("Candidate asset location is unsafe.") from None
 
@@ -169,49 +96,39 @@ def main() -> None:
         asset_io["read_asset"](package, "_release.py", asset_io["MAX_MANIFEST_BYTES"]),
     ) != (expected_manifest, expected_pin):
         raise SystemExit("Release drift: refusing to build a Candidate from unverified assets.")
-    wheel_dir = args.wheel_dir.resolve(strict=True)
 
-    found: dict[str, tuple[str, str, bytes]] = {}
     try:
-        wheel_paths = tuple(wheel_dir.glob("*.whl"))
-        for path in wheel_paths:
-            raw = _read_regular(path, _MAX_WHEEL_BYTES)
-            name, version = _wheel_identity(raw)
-            if name not in EXPECTED:
-                continue
-            if version != EXPECTED[name] or name in found:
-                raise ValueError("candidate wheel set has a version mismatch or duplicate")
-            found[name] = (path.name, version, raw)
-    except (OSError, ValueError) as error:
+        base_dir = args.base_dir.resolve(strict=True)
+        base_manifest, lock_raw = verify_base(
+            base_dir, args.commit, args.workflow_run_id, args.workflow_run_attempt
+        )
+        wheelhouse_inputs = {
+            "darwin-arm64-py311": args.darwin_wheelhouse,
+            "win32-amd64-py312": args.windows_wheelhouse,
+        }
+        verified_wheelhouses = {
+            target: verify_wheelhouse(
+                path, base_manifest, lock_raw, target,
+                args.commit, args.workflow_run_id, args.workflow_run_attempt,
+            )
+            for target, path in wheelhouse_inputs.items()
+        }
+    except (OSError, WheelhouseError) as error:
         raise SystemExit(f"Candidate integrity error: {error}") from None
-    if set(found) != set(EXPECTED):
-        raise SystemExit("Candidate wheel set is incomplete.")
-    try:
-        lock_raw = _read_regular(args.dependency_lock, _MAX_LOCK_BYTES)
-        _dependency_lock(lock_raw)
-    except ValueError as error:
-        raise SystemExit(f"Candidate dependency lock error: {error}") from None
 
     output = args.output_dir.resolve()
     output.mkdir(parents=True, exist_ok=True)
     if any(output.iterdir()):
         raise SystemExit("Candidate output directory must be empty.")
+    checksum_rows: list[tuple[str, str]] = []
     wheels = []
-    checksum_rows = []
-    for name in EXPECTED:
-        filename, version, raw = found[name]
-        digest = hashlib.sha256(raw).hexdigest()
-        atomic_write(output, filename, raw)
-        wheels.append({
-            "package": name,
-            "version": version,
-            "filename": filename,
-            "url": f"{base}/{filename}",
-            "size": len(raw),
-            "platforms": list(PLATFORMS[name]),
-            "sha256": digest,
-        })
-        checksum_rows.append((digest, filename))
+    for row in base_manifest["wheels"]:
+        relative = row["filename"]
+        _copy_verified(output, relative, base_dir / "wheels" / relative, _MAX_WHEEL_BYTES)
+        wheel = {**row, "url": f"{base_url}/{relative}"}
+        wheels.append(wheel)
+        checksum_rows.append((row["sha256"], relative))
+
     install_lock_name = "candidate-install.lock"
     first_party_rows = []
     for wheel in wheels:
@@ -220,16 +137,41 @@ def main() -> None:
             f"{wheel['package']}=={wheel['version']}{marker} \\\n"
             f"    --hash=sha256:{wheel['sha256']}\n"
         )
-    first_party_lock = "".join(first_party_rows).encode("ascii")
-    install_lock = first_party_lock + lock_raw
-    _dependency_lock(install_lock)
+    install_lock = "".join(first_party_rows).encode("ascii") + lock_raw
     install_lock_digest = hashlib.sha256(install_lock).hexdigest()
     atomic_write(output, install_lock_name, install_lock)
     checksum_rows.append((install_lock_digest, install_lock_name))
-    lock_name = "candidate-dependencies.lock"
     lock_digest = hashlib.sha256(lock_raw).hexdigest()
-    atomic_write(output, lock_name, lock_raw)
-    checksum_rows.append((lock_digest, lock_name))
+    atomic_write(output, LOCK_NAME, lock_raw)
+    checksum_rows.append((lock_digest, LOCK_NAME))
+
+    wheelhouses = []
+    for target in TARGETS:
+        document, manifest_raw = verified_wheelhouses[target]
+        source = wheelhouse_inputs[target].resolve(strict=True)
+        prefix = f"wheelhouse/{target}"
+        manifest_relative = f"{prefix}/{WHEELHOUSE_MANIFEST}"
+        atomic_write(output, manifest_relative, manifest_raw)
+        checksum_rows.append((hashlib.sha256(manifest_raw).hexdigest(), manifest_relative))
+        files = []
+        for row in document["files"]:
+            relative = f"{prefix}/{row['filename']}"
+            _copy_verified(output, relative, source / row["filename"], _MAX_WHEEL_BYTES)
+            checksum_rows.append((row["sha256"], relative))
+            files.append({**row, "path": relative, "url": f"{base_url}/{relative}"})
+        wheelhouses.append({
+            "target": document["target"],
+            "source": document["source"],
+            "dependency_lock_sha256": document["dependency_lock_sha256"],
+            "first_party_wheel_set_sha256": document["first_party_wheel_set_sha256"],
+            "manifest": {
+                "path": manifest_relative,
+                "url": f"{base_url}/{manifest_relative}",
+                "size": len(manifest_raw),
+                "sha256": hashlib.sha256(manifest_raw).hexdigest(),
+            },
+            "files": files,
+        })
 
     skill = asset_io["read_asset"](package / "assets", SKILL)
     skill_name = "autogenesis-SKILL.md"
@@ -238,7 +180,7 @@ def main() -> None:
     checksum_rows.append((skill_digest, skill_name))
     identity = json.loads(expected_manifest)
     candidate = {
-        "schema_version": 2,
+        "schema_version": 3,
         "channel": "candidate",
         "provenance": {
             "repository": REPOSITORY,
@@ -252,17 +194,17 @@ def main() -> None:
             "manifest_sha256": hashlib.sha256(expected_manifest).hexdigest(),
         },
         "first_party_index_fallback": False,
-        "third_party_policy": "sanitized-source-with-release-hash-lock",
+        "third_party_policy": "bundled-exact-target-wheelhouses-no-index",
         "dependency_locks": {
-            "download": {
-                "filename": lock_name,
-                "url": f"{base}/{lock_name}",
+            "universal": {
+                "filename": LOCK_NAME,
+                "url": f"{base_url}/{LOCK_NAME}",
                 "size": len(lock_raw),
                 "sha256": lock_digest,
             },
             "offline_install": {
                 "filename": install_lock_name,
-                "url": f"{base}/{install_lock_name}",
+                "url": f"{base_url}/{install_lock_name}",
                 "size": len(install_lock),
                 "sha256": install_lock_digest,
             },
@@ -270,12 +212,13 @@ def main() -> None:
         "skill": {
             "name": "autogenesis",
             "filename": skill_name,
-            "url": f"{base}/{skill_name}",
+            "url": f"{base_url}/{skill_name}",
             "sha256": skill_digest,
         },
         "wheels": wheels,
+        "wheelhouses": wheelhouses,
     }
-    candidate_raw = (json.dumps(candidate, indent=2, sort_keys=True) + "\n").encode("utf-8")
+    candidate_raw = canonical_json(candidate)
     manifest_name = "candidate-manifest.json"
     atomic_write(output, manifest_name, candidate_raw)
     manifest_digest = hashlib.sha256(candidate_raw).hexdigest()
@@ -288,37 +231,44 @@ def main() -> None:
             f"In canonical repository `{REPOSITORY}`, require exact Actions run `{args.workflow_run_id}`, "
             f"positive run attempt `{args.workflow_run_attempt}`, head commit `{args.commit}`, and attempt-qualified "
             f"artifact name `{artifact_name}`. Before interpreting bundle instructions, resolve exactly one unexpired "
-            "immutable GitHub Actions artifact with a positive observed artifact ID matching all those fields, then "
-            "download by that artifact ID. Reject a local directory, zero/multiple/expired artifact matches, another "
-            "run/attempt/commit/name, or superseded run 42843125727."
+            "immutable GitHub Actions artifact with a positive observed artifact ID and independently supplied positive "
+            "GitHub artifact service digest matching all those fields; download by that artifact ID and verify the "
+            "downloaded archive against that service digest before extraction. Reject a local directory, zero/multiple/"
+            "expired artifact matches, another run/attempt/commit/name, a missing or mismatched service digest, or "
+            "superseded run 42843125727."
         ),
         acquire=(
-            "Use only the manifest-bound first-party wheels, locks, and Skill bytes already obtained "
-            "from the exact Actions artifact. Through the approved source, stage third-party artifacts "
-            "under the download lock's strict hash policy in a new Candidate-only staging directory. "
-            "Verify every staged artifact, add the already verified first-party wheel bytes, and then disable indexes."
+            "Use only the two manifest-bound target wheelhouses, universal lock, complete offline-install lock, "
+            "first-party wheels, and Skill bytes already present in the exact Actions artifact. Prove the native "
+            "host from local facts, then select exactly one compatible target: native macOS arm64 with CPython 3.11 "
+            "selects `darwin-arm64-py311`; native Windows x64 with CPython 3.12 selects `win32-amd64-py312`. "
+            "Reject Linux, WSL, another Python implementation/version/architecture, zero matches, or multiple matches. "
+            "Verify the selected target manifest and every listed wheel against the Candidate manifest and complete "
+            "checksums before installation. Do not query or use a package index, mirror, proxy, credential, package "
+            "configuration, cache, source tree, VCS checkout, sdist, editable input, or installed distribution."
         ),
         install=(
-            "Using the disposable environment's absolute Python, install the complete offline-install lock "
-            "from that staging directory in one transaction with strict hashes, dependency resolution disabled, "
-            "and every locked package force-reinstalled. Never accept an installed distribution as satisfying "
-            "the lock. Never resolve or replace a first-party Candidate package from an index. Then run "
-            "`<absolute-disposable-environment-entrypoint>/autogenesis install --scope <user-or-project> "
-            "--project-root <absolute-business-project>` as the sole owner of the Skill write; it must reject "
-            "every other canonical or legacy discovery copy."
+            "Using the disposable environment's absolute Python, install the complete offline-install lock from the "
+            "exact verified target wheelhouse in one transaction with `--no-index --no-cache-dir --only-binary=:all: "
+            "--find-links <verified-target-wheelhouse> --require-hashes --no-deps --force-reinstall`. Never accept an "
+            "installed distribution as satisfying the lock and never resolve or replace any Candidate package. Then "
+            "run `<absolute-disposable-environment-entrypoint>/autogenesis install --scope <user-or-project> "
+            "--project-root <absolute-business-project>` as the sole owner of the Skill write; it must reject every "
+            "other canonical or legacy discovery copy."
         ),
-        cleanup="Candidate-only downloaded, extracted, staged, selected-scope, MCP, and cache state created by this prompt",
+        cleanup="Candidate-only extracted, selected-scope, MCP, and cache state created by this prompt",
+        package_source_required=False,
     )
     prompt = f"""Install this exact AutoGenesis Candidate for pre-release UAT, then stop before a business task.
 
-Candidate manifest: {base}/{manifest_name}
+Candidate manifest: {base_url}/{manifest_name}
 Expected manifest SHA-256: {manifest_digest}
-Complete checksums: {base}/SHA256SUMS
+Complete checksums: {base_url}/SHA256SUMS
 Candidate commit: {args.commit}
 GitHub Actions repository: {REPOSITORY}
 GitHub Actions workflow run: {args.workflow_run_id}
 GitHub Actions workflow run attempt: {args.workflow_run_attempt}
-GitHub Actions artifact ID: resolve one positive immutable ID externally before interpreting this bundle
+GitHub Actions artifact ID and service digest: resolve both externally and verify the archive digest before extraction
 GitHub Actions artifact: {artifact_name}
 
 {contract}""".encode("utf-8")
@@ -326,9 +276,12 @@ GitHub Actions artifact: {artifact_name}
     atomic_write(output, prompt_name, prompt)
     checksum_rows.append((hashlib.sha256(prompt).hexdigest(), prompt_name))
 
-    checksums = "".join(f"{digest}  {name}\n" for digest, name in checksum_rows).encode("ascii")
+    checksums = "".join(
+        f"{digest}  {name}\n" for digest, name in sorted(checksum_rows, key=lambda row: row[1])
+    ).encode("ascii")
     atomic_write(output, "SHA256SUMS", checksums)
-    print(f"Built Candidate channel for {args.commit} with {len(wheels)} exact wheels.")
+    wheel_count = sum(len(wheelhouse["files"]) for wheelhouse in wheelhouses)
+    print(f"Built Candidate channel for {args.commit} with two exact target wheelhouses and {wheel_count} files.")
 
 
 if __name__ == "__main__":
