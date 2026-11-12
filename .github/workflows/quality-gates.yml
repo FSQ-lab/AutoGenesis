@@ -87,9 +87,10 @@ jobs:
         working-directory: docs
         run: pnpm run build
 
-  candidate-channel:
-    name: Build exact Candidate channel
+  candidate-base:
+    name: Build Candidate base
     runs-on: ubuntu-24.04
+    timeout-minutes: 20
     env:
       CANDIDATE_COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}
     steps:
@@ -101,36 +102,192 @@ jobs:
         uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with:
           python-version: '3.12'
-      - name: Install pinned build and lock tooling
-        run: python -m pip --disable-pip-version-check install 'build==1.2.2.post1' 'uv==0.12.5'
+      - name: Install pinned build and lock tooling from the fixed public source
+        run: >-
+          env -i PATH="$PATH" HOME="${RUNNER_TEMP}/candidate-home"
+          PIP_CONFIG_FILE=/dev/null PIP_DISABLE_PIP_VERSION_CHECK=1 PYTHONNOUSERSITE=1
+          python -I -m pip --isolated install --no-input --no-cache-dir --only-binary=:all:
+          --index-url https://pypi.org/simple 'build==1.2.2.post1' 'uv==0.12.5'
       - name: Build all Candidate wheels
         run: |
           python -m build --wheel --outdir dist agent-contract
           python -m build --wheel --outdir dist appium-mcp-server
           python -m build --wheel --outdir dist pywinauto-mcp-server
           python -m build --wheel --outdir dist autogenesis-cli
+      - name: Bind platform-qualified local Candidate roots
+        run: >-
+          python agent-contract/tools/candidate_wheelhouse.py requirements
+          --wheel-dir dist
+          --output-file candidate-requirements.in
       - name: Resolve one universal hashed dependency lock
         run: |
-          printf '%s\n' dist/*.whl > candidate-requirements.in
-          uv pip compile --universal --generate-hashes \
-            --no-emit-package autogenesis-agent-contract \
-            --no-emit-package autogenesis-appium-mcp \
-            --no-emit-package autogenesis-windows-mcp \
-            --no-emit-package autogenesis-cli \
-            candidate-requirements.in --output-file candidate-dependencies.lock
+          env -i PATH="$PATH" HOME="${RUNNER_TEMP}/candidate-home" \
+            UV_NO_CONFIG=1 UV_NO_CACHE=1 \
+            uv pip compile --no-config --no-cache --universal --generate-hashes \
+              --default-index https://pypi.org/simple \
+              --no-emit-package autogenesis-agent-contract \
+              --no-emit-package autogenesis-appium-mcp \
+              --no-emit-package autogenesis-windows-mcp \
+              --no-emit-package autogenesis-cli \
+              candidate-requirements.in --output-file candidate-dependencies.lock
+      - name: Bind Candidate base provenance
+        run: >-
+          python agent-contract/tools/candidate_wheelhouse.py base
+          --wheel-dir dist
+          --dependency-lock candidate-dependencies.lock
+          --output-dir candidate-base
+          --commit "${{ env.CANDIDATE_COMMIT }}"
+          --workflow-run-id "${{ github.run_id }}"
+          --workflow-run-attempt "${{ github.run_attempt }}"
+      - name: Upload same-run Candidate base
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: autogenesis-candidate-base-${{ github.run_id }}-${{ github.run_attempt }}-${{ env.CANDIDATE_COMMIT }}
+          path: candidate-base
+          if-no-files-found: error
+          retention-days: 1
+
+  candidate-wheelhouses:
+    name: Acquire ${{ matrix.target }} wheelhouse
+    needs: candidate-base
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: darwin-arm64-py311
+            os: macos-26
+            python: '3.11'
+          - target: win32-amd64-py312
+            os: windows-2022
+            python: '3.12'
+    env:
+      CANDIDATE_COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}
+    steps:
+      - name: Checkout exact Candidate commit
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: ${{ env.CANDIDATE_COMMIT }}
+      - name: Setup exact target Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Download same-run Candidate base
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: autogenesis-candidate-base-${{ github.run_id }}-${{ github.run_attempt }}-${{ env.CANDIDATE_COMMIT }}
+          path: candidate-base
+      - name: Acquire and verify exact target wheelhouse
+        run: >-
+          python agent-contract/tools/candidate_wheelhouse.py acquire
+          --base-dir candidate-base
+          --target "${{ matrix.target }}"
+          --output-dir candidate-wheelhouse
+          --commit "${{ env.CANDIDATE_COMMIT }}"
+          --workflow-run-id "${{ github.run_id }}"
+          --workflow-run-attempt "${{ github.run_attempt }}"
+      - name: Upload same-run target wheelhouse
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: autogenesis-candidate-wheelhouse-${{ matrix.target }}-${{ github.run_id }}-${{ github.run_attempt }}-${{ env.CANDIDATE_COMMIT }}
+          path: candidate-wheelhouse
+          if-no-files-found: error
+          retention-days: 1
+
+  candidate-channel:
+    name: Build exact Candidate channel
+    needs: candidate-wheelhouses
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      CANDIDATE_COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}
+    steps:
+      - name: Checkout exact Candidate commit
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: ${{ env.CANDIDATE_COMMIT }}
+      - name: Setup Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: '3.12'
+      - name: Download same-run Candidate base
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: autogenesis-candidate-base-${{ github.run_id }}-${{ github.run_attempt }}-${{ env.CANDIDATE_COMMIT }}
+          path: candidate-base
+      - name: Download macOS target wheelhouse
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: autogenesis-candidate-wheelhouse-darwin-arm64-py311-${{ github.run_id }}-${{ github.run_attempt }}-${{ env.CANDIDATE_COMMIT }}
+          path: wheelhouse-darwin
+      - name: Download Windows target wheelhouse
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: autogenesis-candidate-wheelhouse-win32-amd64-py312-${{ github.run_id }}-${{ github.run_attempt }}-${{ env.CANDIDATE_COMMIT }}
+          path: wheelhouse-windows
       - name: Build commit-bound Candidate bundle
         run: >-
           python agent-contract/tools/build_candidate_release.py
-          --wheel-dir dist
+          --base-dir candidate-base
+          --darwin-wheelhouse wheelhouse-darwin
+          --windows-wheelhouse wheelhouse-windows
           --output-dir candidate-channel
           --base-url .
-          --commit "${CANDIDATE_COMMIT}"
-          --dependency-lock candidate-dependencies.lock
+          --commit "${{ env.CANDIDATE_COMMIT }}"
           --workflow-run-id "${{ github.run_id }}"
           --workflow-run-attempt "${{ github.run_attempt }}"
       - name: Upload exact Candidate channel
+        id: candidate-upload
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: autogenesis-candidate-${{ github.run_id }}-${{ github.run_attempt }}-${{ env.CANDIDATE_COMMIT }}
           path: candidate-channel
           if-no-files-found: error
+          retention-days: 14
+      - name: Record final Candidate service identity
+        run: |
+          artifact_id='${{ steps.candidate-upload.outputs.artifact-id }}'
+          artifact_digest='${{ steps.candidate-upload.outputs.artifact-digest }}'
+          [[ "$artifact_id" =~ ^[1-9][0-9]*$ ]]
+          [[ "$artifact_digest" =~ ^(sha256:)?[0-9a-f]{64}$ ]]
+          printf 'Candidate artifact ID: `%s`\n\nCandidate artifact service digest: `%s`\n' \
+            "$artifact_id" "$artifact_digest" >> "$GITHUB_STEP_SUMMARY"
+
+  candidate-offline-install:
+    name: Offline install ${{ matrix.target }} Candidate
+    needs: candidate-channel
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: darwin-arm64-py311
+            os: macos-26
+            python: '3.11'
+          - target: win32-amd64-py312
+            os: windows-2022
+            python: '3.12'
+    env:
+      CANDIDATE_COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}
+    steps:
+      - name: Checkout exact Candidate verifier
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: ${{ env.CANDIDATE_COMMIT }}
+      - name: Setup exact target Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Download final Candidate artifact
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: autogenesis-candidate-${{ github.run_id }}-${{ github.run_attempt }}-${{ env.CANDIDATE_COMMIT }}
+          path: candidate-channel
+      - name: Prove network-denied built-artifact install
+        run: >-
+          python agent-contract/tools/candidate_wheelhouse.py offline-install
+          --candidate-dir candidate-channel
+          --target "${{ matrix.target }}"
+          --environment-dir "${{ runner.temp }}/autogenesis-candidate-venv"

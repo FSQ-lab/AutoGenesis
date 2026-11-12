@@ -106,11 +106,32 @@ never returns appendix text or a user's absolute project path. Its schema is
 Candidate and public generators share one fail-closed installation contract. The
 Candidate prompt is externally anchored to one canonical repository, positive Actions
 run and attempt, head commit, attempt-qualified name, and exactly one unexpired
-immutable artifact with a positive observed artifact ID. The public prompt is anchored
-to the exact canonical immutable GitHub Release ID, tag, commit, and asset set. The
-builders accept only local `.` for Candidate assets and the exact canonical GitHub
-Release URLs for public assets. `SHA256SUMS` is generated after the final prompt and
-covers every shipped asset except itself; self-consistent copied bytes are insufficient.
+immutable artifact with a positive observed artifact ID. Before extraction, the
+downloaded archive must also match GitHub's independently supplied positive artifact
+service digest; internal checksums never substitute for this external anchor. Candidate
+schema 3 contains one complete `darwin-arm64-py311` wheelhouse and one complete
+`win32-amd64-py312` wheelhouse. Each target manifest binds normalized package/version,
+wheel filename and tags, byte size, SHA-256, universal-lock digest, first-party wheel-set
+digest, fixed `pypi.org`/`default-public` acquisition source, and same-run provenance.
+The universal dependency lock is resolved from verified local first-party wheel paths;
+the Windows Runtime root is qualified with `sys_platform == 'win32'` before resolution
+so its unique transitive closure is absent from the macOS target.
+
+Acquisition runs in a newly created private empty home with null netrc, disabled pip
+keyring, null pip configuration, no ambient proxy/source/cache/target/prefix/user
+settings, and wheel-only strict hashes. Because the supported Python interface is a
+minor version rather than one patch release, locks containing
+`python_full_version` or `implementation_version` markers fail closed. Compatibility
+uses packaging's CPython tag model; the macOS wheelhouse is bounded to deployment
+version 15.0 and requires a trusted local macOS version of 15.0 or newer before target
+selection. Compatible deployment tags through macOS 15, including `abi3` and
+`universal2`, are accepted.
+
+The public prompt remains anchored to the exact canonical immutable GitHub Release ID,
+tag, commit, and asset set. Builders accept only local `.` for Candidate assets and the
+exact canonical GitHub Release URLs for public assets. `SHA256SUMS` is generated after
+the final prompt and covers every shipped file at its canonical relative path except
+itself; self-consistent copied bytes are insufficient.
 
 Each prompt selects one local private per-user parent with stable native identity,
 current-user ownership, and permissions/ACLs that deny every other OS identity
@@ -142,22 +163,27 @@ minimal environment that omits all `PYTHON*` and startup customization. Ambient
 `PIP_*` and `UV_*` names are removed without reading their values as defensive
 scrubbing. Pip is the sole package manager for Candidate and public Release prompt
 installations; uv and other package managers are never invoked. Pip receives only
-`PIP_CONFIG_FILE=/dev/null` on macOS or the exact pip sentinel `PIP_CONFIG_FILE=nul` on Windows and always
-runs with `--isolated`; failure to establish the platform null configuration stops
-installation. Acquisition binds destination, staging, cache, authenticated
-requirements/hashes, and the approved opaque source/auth interface to transaction
-roots. Offline pip installation additionally fixes `--no-index`, `--no-cache-dir`,
-`--find-links`, `--require-hashes`, and `--no-deps` and targets only the reserved
-venv. No ambient user/global configuration, source, cache, target, prefix, or
-credentials are inherited. All subsequent operations use absolute disposable-
-environment entrypoints while the phase-boundary checks continue to pass.
+`PIP_CONFIG_FILE=/dev/null` on macOS or the exact pip sentinel `PIP_CONFIG_FILE=nul` on
+Windows and always runs with `--isolated`; failure to establish the platform null
+configuration stops installation.
 
-Before echo/use, source metadata must be a canonical lowercase ASCII DNS hostname,
-canonical IP literal, and one finite class: `managed-policy`, `user-approved`,
-`default-public`, or `undisclosed`. Interface trust is independent, not self-attested.
-Invalid metadata is never echoed and becomes `undisclosed`, stopping installation.
-Full URLs, credentials, environment/config values, errors, output, and evidence are
-never read for disclosure; redaction after reading is forbidden.
+Candidate installation proves native host architecture, CPython minor version, and
+exactly one matching target manifest, then uses only that authenticated local
+wheelhouse with `--no-index`, `--no-cache-dir`, `--only-binary=:all:`, `--find-links`,
+`--require-hashes`, `--no-deps`, and `--force-reinstall`. It never requests or reads a
+package source, mirror, proxy, credential, configuration, cache, source tree, VCS
+checkout, sdist, editable input, or installed-distribution substitute after the exact
+Actions artifact is obtained. The public Release prompt retains its approved opaque
+source/auth acquisition before switching to the same offline installation policy. All
+subsequent operations use absolute disposable-environment entrypoints while the
+phase-boundary checks continue to pass.
+
+For public Release acquisition only, source metadata must be a canonical lowercase
+ASCII DNS hostname or canonical IP literal and one finite class: `managed-policy`,
+`user-approved`, `default-public`, or `undisclosed`. Interface trust is independent,
+not self-attested. Invalid metadata is never echoed and becomes `undisclosed`, stopping
+installation. Full URLs, credentials, environment/config values, errors, output, and
+evidence are never read for disclosure; redaction after reading is forbidden.
 
 ## Integrity and diagnostics
 

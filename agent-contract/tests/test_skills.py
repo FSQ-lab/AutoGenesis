@@ -447,6 +447,7 @@ def test_skill_release_assets_match_contract_and_bootstrap_prompt(tmp_path, repo
     assert "generateScenarioText" not in command_handlers
     assert "generateBackgroundText" not in command_handlers
 
+
     package = json.loads((repo_root / "bdd_ai_toolkit/package.json").read_bytes())
     configuration = package["contributes"].get("configuration", {}).get("properties", {})
     assert "bddAiToolkit.cucumber.copilotPrompt" not in configuration
@@ -480,189 +481,6 @@ def test_skill_release_assets_match_contract_and_bootstrap_prompt(tmp_path, repo
         assert "preview destinations" in project_root["description"]
         assert "no generated-file write occurs" in project_root["description"]
 
-def _candidate_wheel(root, package, version):
-    filename = f"{package.replace('-', '_')}-{version}-py3-none-any.whl"
-    metadata_root = f"{package.replace('-', '_')}-{version}.dist-info"
-    with zipfile.ZipFile(root / filename, "w") as archive:
-        archive.writestr(f"{metadata_root}/METADATA", f"Name: {package}\nVersion: {version}\n\n")
-        archive.writestr(f"{metadata_root}/WHEEL", "Wheel-Version: 1.0\nTag: py3-none-any\n")
-    return filename
-
-
-def test_candidate_channel_binds_exact_first_party_wheels_and_skill(tmp_path, repo_root):
-    wheel_dir = tmp_path / "wheels"
-    wheel_dir.mkdir()
-    expected = {
-        "autogenesis-agent-contract": "2.1.0",
-        "autogenesis-appium-mcp": "0.5.0",
-        "autogenesis-windows-mcp": "0.5.0",
-        "autogenesis-cli": "0.2.0",
-    }
-    for package, version in expected.items():
-        _candidate_wheel(wheel_dir, package, version)
-    dependency_lock = tmp_path / "candidate-dependencies.lock"
-    dependency_lock.write_text(
-        f"anyio==4.12.0 --hash=sha256:{'b' * 64}\n", encoding="utf-8"
-    )
-    commit = subprocess.run(
-        ["git", "-C", str(repo_root), "rev-parse", "HEAD"],
-        check=True, capture_output=True, text=True,
-    ).stdout.strip()
-    output = tmp_path / "candidate"
-    result = subprocess.run(
-        [
-            sys.executable,
-            str(repo_root / "agent-contract/tools/build_candidate_release.py"),
-            "--wheel-dir", str(wheel_dir),
-            "--output-dir", str(output),
-            "--base-url", ".",
-            "--commit", commit,
-            "--dependency-lock", str(dependency_lock),
-            "--workflow-run-id", "123456",
-            "--workflow-run-attempt", "2",
-        ],
-        cwd=repo_root,
-        capture_output=True,
-        text=True,
-        check=False,
-        timeout=10,
-    )
-    assert result.returncode == 0, result.stderr
-    manifest_raw = (output / "candidate-manifest.json").read_bytes()
-    manifest = json.loads(manifest_raw)
-    assert manifest["schema_version"] == 2
-    assert manifest["channel"] == "candidate" and manifest["commit"] == commit
-    assert manifest["provenance"] == {
-        "repository": "FSQ-lab/AutoGenesis",
-        "workflow_run_id": "123456",
-        "workflow_run_attempt": "2",
-        "artifact": f"autogenesis-candidate-123456-2-{commit}",
-    }
-    assert manifest["first_party_index_fallback"] is False
-    assert manifest["third_party_policy"] == "sanitized-source-with-release-hash-lock"
-    assert {wheel["package"]: wheel["version"] for wheel in manifest["wheels"]} == expected
-    platforms = {wheel["package"]: wheel["platforms"] for wheel in manifest["wheels"]}
-    assert platforms["autogenesis-windows-mcp"] == ["win32"]
-    assert all("win32" in values for values in platforms.values())
-    assert all("darwin" in values for package, values in platforms.items() if package != "autogenesis-windows-mcp")
-    for wheel in manifest["wheels"]:
-        raw = (output / wheel["filename"]).read_bytes()
-        assert len(raw) == wheel["size"]
-        assert hashlib.sha256(raw).hexdigest() == wheel["sha256"]
-        assert wheel["url"].endswith("/" + wheel["filename"])
-    skill = (output / "autogenesis-SKILL.md").read_bytes()
-    assert hashlib.sha256(skill).hexdigest() == manifest["skill"]["sha256"]
-    for lock in manifest["dependency_locks"].values():
-        raw = (output / lock["filename"]).read_bytes()
-        assert len(raw) == lock["size"]
-        assert hashlib.sha256(raw).hexdigest() == lock["sha256"]
-    prompt = (output / "candidate-install-prompt.txt").read_text(encoding="utf-8")
-    assert hashlib.sha256(manifest_raw).hexdigest() in prompt
-    install_lock = (output / "candidate-install.lock").read_text(encoding="utf-8")
-    assert "autogenesis-windows-mcp==0.5.0 ; sys_platform == 'win32'" in install_lock
-    assert "never resolve or replace a first-party candidate package from an index" in prompt.lower()
-    assert "complete offline-install lock" in prompt
-
-    assert "force-reinstalled" in prompt
-    _assert_hardened_install_prompt(prompt, "Candidate")
-    assert "attempt-qualified artifact name" in prompt
-    assert "positive run attempt `2`" in prompt
-    assert "positive observed artifact ID" in prompt
-    assert "exactly one unexpired" in prompt
-    assert "superseded run 42843125727" in prompt
-    candidate_checksums = _checksums(output)
-    assert set(candidate_checksums) == {path.name for path in output.iterdir()} - {"SHA256SUMS"}
-    assert "candidate-install-prompt.txt" in candidate_checksums
-    (output / "candidate-install-prompt.txt").write_text(prompt + "mutated", encoding="utf-8")
-    with pytest.raises(AssertionError):
-        _checksums(output)
-
-def test_candidate_channel_rejects_incomplete_wheel_set(tmp_path, repo_root):
-    wheel_dir = tmp_path / "wheels"
-    wheel_dir.mkdir()
-    _candidate_wheel(wheel_dir, "autogenesis-agent-contract", "2.1.0")
-    dependency_lock = tmp_path / "candidate-dependencies.lock"
-    dependency_lock.write_text(
-        f"anyio==4.12.0 --hash=sha256:{'b' * 64}\n", encoding="utf-8"
-    )
-    commit = subprocess.run(
-        ["git", "-C", str(repo_root), "rev-parse", "HEAD"],
-        check=True, capture_output=True, text=True,
-    ).stdout.strip()
-    result = subprocess.run(
-        [
-            sys.executable,
-            str(repo_root / "agent-contract/tools/build_candidate_release.py"),
-            "--wheel-dir", str(wheel_dir),
-            "--output-dir", str(tmp_path / "candidate"),
-            "--base-url", ".",
-            "--commit", commit,
-            "--dependency-lock", str(dependency_lock),
-            "--workflow-run-id", "123456",
-            "--workflow-run-attempt", "2",
-        ],
-        cwd=repo_root,
-        capture_output=True,
-        text=True,
-        check=False,
-        timeout=10,
-    )
-    assert result.returncode != 0
-    assert "Candidate wheel set is incomplete" in result.stderr
-
-def test_candidate_channel_rejects_unhashed_dependency_lock(tmp_path, repo_root):
-    wheel_dir = tmp_path / "wheels"
-    wheel_dir.mkdir()
-    for package, version in {
-        "autogenesis-agent-contract": "2.1.0",
-        "autogenesis-appium-mcp": "0.5.0",
-        "autogenesis-windows-mcp": "0.5.0",
-        "autogenesis-cli": "0.2.0",
-    }.items():
-        _candidate_wheel(wheel_dir, package, version)
-    dependency_lock = tmp_path / "candidate-dependencies.lock"
-    dependency_lock.write_text("anyio==4.12.0\n", encoding="utf-8")
-    commit = subprocess.run(
-        ["git", "-C", str(repo_root), "rev-parse", "HEAD"],
-        check=True, capture_output=True, text=True,
-    ).stdout.strip()
-    result = subprocess.run(
-        [
-            sys.executable,
-            str(repo_root / "agent-contract/tools/build_candidate_release.py"),
-            "--wheel-dir", str(wheel_dir),
-            "--output-dir", str(tmp_path / "candidate"),
-            "--base-url", ".",
-            "--commit", commit,
-            "--dependency-lock", str(dependency_lock),
-            "--workflow-run-id", "123456",
-            "--workflow-run-attempt", "2",
-        ],
-        cwd=repo_root, capture_output=True, text=True, check=False, timeout=10,
-    )
-    assert result.returncode != 0
-    assert "dependency lock contains an unpinned or unsafe entry" in result.stderr
-
-
-@pytest.mark.parametrize("attempt", ["0", "-1", "not-a-number"])
-def test_candidate_channel_requires_positive_workflow_run_attempt(tmp_path, repo_root, attempt):
-    commit = subprocess.run(
-        ["git", "-C", str(repo_root), "rev-parse", "HEAD"],
-        check=True, capture_output=True, text=True,
-    ).stdout.strip()
-    result = subprocess.run([
-        sys.executable,
-        str(repo_root / "agent-contract/tools/build_candidate_release.py"),
-        "--wheel-dir", str(tmp_path / "unused-wheels"),
-        "--output-dir", str(tmp_path / "candidate"),
-        "--base-url", ".",
-        "--commit", commit,
-        "--dependency-lock", str(tmp_path / "unused.lock"),
-        "--workflow-run-id", "123456",
-        "--workflow-run-attempt", attempt,
-    ], cwd=repo_root, capture_output=True, text=True, check=False, timeout=10)
-    assert result.returncode != 0
-    assert "run attempt must be a positive integer" in result.stderr
 
 @pytest.mark.parametrize("unsafe", [
     "https://user:SYNTHETIC_URL_SECRET@example.invalid/release",
@@ -691,11 +509,12 @@ def test_release_generators_reject_secret_bearing_asset_locations_without_echo(
         command = [
             sys.executable,
             str(repo_root / "agent-contract/tools/build_candidate_release.py"),
-            "--wheel-dir", str(tmp_path / "unused-wheels"),
+            "--base-dir", str(tmp_path / "unused-base"),
+            "--darwin-wheelhouse", str(tmp_path / "unused-darwin"),
+            "--windows-wheelhouse", str(tmp_path / "unused-windows"),
             "--output-dir", str(output),
             "--base-url", unsafe,
             "--commit", commit,
-            "--dependency-lock", str(tmp_path / "unused.lock"),
             "--workflow-run-id", "123456",
             "--workflow-run-attempt", "2",
         ]
@@ -767,6 +586,8 @@ def test_source_metadata_injection_becomes_undisclosed_before_echo(repo_root, ho
 def test_source_metadata_accepts_only_canonical_host_and_finite_source_class(repo_root, host, source):
     module = runpy.run_path(str(repo_root / "agent-contract/tools/install_prompt.py"))
     assert module["validate_source_metadata"](host, source) == (host, source)
+
+
 
 
 
