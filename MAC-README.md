@@ -35,7 +35,7 @@ uvx --from autogenesis-appium-mcp==0.5.0 autogenesis-appium-mcp --platform mac -
 ```
 
 Agent Contract is pinned to **2.1.0**, manifest SHA-256
-`c3c87437b140520e9e3d502e0ac52a1f11c532df8ac8f64847f775fec1fb533f`.
+`b287d423629d049a318eea6facc991cf50656d464c568fcf4d59d9746647c86b`.
 A mismatched or corrupt contract prevents startup.
 
 Standard MCP Registry metadata is `appium-mcp-server/server.json`. From a source
@@ -49,10 +49,13 @@ python tools/render_mcp_descriptor.py --server appium --platform mac --config /a
 
 Invoke `autogenesis` for local Mac2 preparation or execution. It loads the pinned
 internal official `setup-mac2` workflow, then the Coding Agent performs its
-environment and doctor steps through the normal terminal. Doctor/server-smoke
-completion is diagnostic evidence; Ready also requires matching MCP identity, a
-real Mac2 session, and observed UI. Grant Accessibility or Screen Recording only
-after reviewing the exact request.
+environment and doctor steps through the normal terminal. On Xcode 27.2 or newer
+with Appium 3.x, `appium-mac2-driver >= 4.6.1, < 5.0.0` (baseline `4.6.1`) is
+required (`< 4.6.1` aborts `WebDriverAgentRunner-Runner` on the first synthesized
+input event, and `5.0.0+` targets Appium 4 beta). Doctor/server-smoke completion
+is diagnostic evidence; Ready also requires matching MCP identity, a real Mac2
+session, and observed UI. Grant Accessibility or Screen Recording only after
+reviewing the exact request.
 
 Set the Mac profile in the business config, for example:
 

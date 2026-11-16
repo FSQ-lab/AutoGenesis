@@ -28,8 +28,8 @@ def cases(repo_root):
 def skill_cases(repo_root):
     data = json.loads((repo_root / "agent-contract/evals/skill_cases.json").read_bytes())
     assert data["schema_version"] == 1 and data["canaries_are_synthetic"] is True
-    assert len(data["cases"]) == 35
-    assert len({case["id"] for case in data["cases"]}) == 35
+    assert len(data["cases"]) == 36
+    assert len({case["id"] for case in data["cases"]}) == 36
     return data["cases"]
 
 
@@ -82,6 +82,7 @@ def test_skill_eval_covers_clean_room_behavior_contract(skill_cases):
         "android-studio-jbr-reuse",
         "setup-only-target-prepared",
         "doctor-without-session-not-live-ready",
+        "xcode-27-2-mac2-below-4-6-1-fails-before-wda",
         "explicit-calculator-resumes-after-readiness",
         "ambiguous-business-goal-one-confirmation",
         "exact-bdd-execution-does-not-generate",

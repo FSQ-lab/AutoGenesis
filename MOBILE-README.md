@@ -34,7 +34,7 @@ uvx --from autogenesis-appium-mcp==0.5.0 autogenesis-appium-mcp --platform ios -
 ```
 
 The runtime pins Agent Contract **2.1.0**, manifest SHA-256
-`c3c87437b140520e9e3d502e0ac52a1f11c532df8ac8f64847f775fec1fb533f`.
+`b287d423629d049a318eea6facc991cf50656d464c568fcf4d59d9746647c86b`.
 Mismatched or corrupt contract assets prevent startup.
 
 Standard MCP Registry metadata is `appium-mcp-server/server.json`. From a source

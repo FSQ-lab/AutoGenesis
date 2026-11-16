@@ -310,6 +310,7 @@ def test_guided_install_and_readiness_references_are_operational(repo_root):
     readiness = (references / "readiness-common.md").read_text(encoding="utf-8")
     appium = (references / "appium-environment.md").read_text(encoding="utf-8")
     android = (references / "android-readiness.md").read_text(encoding="utf-8")
+    macos = (references / "macos-readiness.md").read_text(encoding="utf-8")
 
     assert "install, activation, repair, or diagnosis" in policy
     assert "actual MCP initialize" not in policy  # detailed proof belongs to the reference
@@ -356,6 +357,16 @@ def test_guided_install_and_readiness_references_are_operational(repo_root):
     assert "Android Studio JBR" in android
     assert "incomplete configured root must not hide a complete conventional root" in android
     assert "physical route does not require emulator package" in android
+    assert all(value in macos for value in (
+        "Xcode 27.2 or newer",
+        "appium-mac2-driver >= 4.6.1, < 5.0.0",
+        "proven-incompatible",
+        "before starting WebDriverAgentMac",
+        "5.0.0+",
+        "private-framework embedding",
+        "runner binary patching",
+        "approved Xcode/Mac2 version combination",
+    ))
 
 
 def test_skill_release_assets_match_contract_and_bootstrap_prompt(tmp_path, repo_root):

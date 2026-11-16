@@ -230,6 +230,13 @@
       "expect": {"outcome_not": "Live Ready", "continue_agent_work": true, "doctor_is_business_success": false}
     },
     {
+      "id": "xcode-27-2-mac2-below-4-6-1-fails-before-wda",
+      "references": ["readiness-common", "appium-environment", "macos-readiness"],
+      "user_request": "Prepare Calculator automation on this Mac with Xcode 27.2.",
+      "stimuli": ["Active Xcode is 27.2 (27B52), Appium is 3.7.0, and installed mac2 driver is 4.3.1. Mac2 doctor reports 0 required fixes needed. No driver upgrade approval has been given."],
+      "expect": {"dependency_classification": "proven-incompatible", "outcome_not": "Target Prepared", "live_ready": false, "start_wda": false, "silent_driver_upgrade": false, "select_appium4_beta_5_0_0": false, "unsafe_workaround_recommended": false, "recommended_mac2_baseline": "4.6.1", "approval_requests": 1}
+    },
+    {
       "id": "explicit-calculator-resumes-after-readiness",
       "references": ["readiness-common", "appium-environment", "macos-readiness", "execution-common", "apple-execution"],
       "user_request": "Open Calculator, calculate 2 + 3, and verify the visible result is 5.",
