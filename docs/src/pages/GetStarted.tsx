@@ -269,8 +269,11 @@ cd AutoGenesis`}</CodeBlock>
       </Step>
 
       <Step number={3} title="Install Appium and Mac2 Driver">
-        <CodeBlock>{`npm install -g appium
-appium driver install mac2`}</CodeBlock>
+        <CodeBlock>{`npm install -g appium@^3
+appium driver install mac2@4.6.1`}</CodeBlock>
+        <p className="text-slate-600 mt-3 text-sm">
+          Xcode 27.2+ with Appium 3.x requires <code>appium-mac2-driver &gt;= 4.6.1, &lt; 5.0.0</code> (baseline <code>4.6.1</code>; <code>5.0.0+</code> targets Appium 4 beta).
+        </p>
       </Step>
     </section>
 
@@ -423,7 +426,7 @@ behave -v`}
           <ul className="list-disc list-inside space-y-1 text-slate-700">
             <li>Run <code>sudo xcodebuild -runFirstLaunch</code> for WebDriverAgentMac errors</li>
             <li>Check Accessibility permissions in System Settings</li>
-            <li>Verify Mac2 driver is installed with <code>appium driver install mac2</code></li>
+            <li>Verify an Appium 3-compatible Mac2 driver (<code>4.6.1</code> on Xcode 27.2+) is installed with <code>appium driver install mac2@4.6.1</code></li>
           </ul>
         </div>
 
