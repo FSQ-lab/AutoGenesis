@@ -1,223 +1,286 @@
-<!--=========================README TEMPLATE INSTRUCTIONS=============================
-======================================================================================
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/assets/autogenesis-logo-dark.svg">
+    <source media="(prefers-color-scheme: light)" srcset="docs/assets/autogenesis-logo-light.svg">
+    <img alt="AutoGenesis 1.1.1 Skills Preview" src="docs/assets/autogenesis-logo-light.svg" width="420">
+  </picture>
+</p>
 
-- THIS README TEMPLATE LARGELY CONSISTS OF COMMENTED OUT TEXT. THIS UNRENDERED TEXT IS MEANT TO BE LEFT IN AS A GUIDE 
-  THROUGHOUT THE REPOSITORY'S LIFE WHILE END USERS ONLY SEE THE RENDERED PAGE CONTENT. 
-- Any italicized text rendered in the initial template is intended to be replaced IMMEDIATELY upon repository creation.
+<h3 align="center">Describe the behavior. Let your Coding Agent run it on the real app.</h3>
 
-- This template is default but not mandatory. It was designed to compensate for typical gaps in Microsoft READMEs 
-  that slow the pace of work. You may delete it if you have a fully populated README to replace it with.
+<p align="center"><strong>AutoGenesis 1.1.1 Skills Preview</strong> gives an Agent one canonical Skill and standard stdio MCP Runtimes for direct natural-language testing, exact BDD execution, and read-only recording previews.</p>
 
-- Most README sections below are commented out as they are not known early in a repository's life. Others are commented 
-  out as they do not apply to every repository. If a section will be appropriate later but not known now, consider 
-  leaving it in commented out and adding an issue as a reminder.
-- There are additional optional README sections in the external instruction link below. These include; "citation",  
-  "built with", "acknowledgments", "folder structure", etc.
-- You can easily find the places to add content that will be rendered to the end user by searching 
-within the file for "TODO".
+<p align="center">An open-source project from <a href="https://github.com/FSQ-lab">FSQ Lab</a>.</p>
 
+<p align="center">
+  <a href="https://github.com/FSQ-lab/AutoGenesis/actions/workflows/quality-gates.yml"><img src="https://github.com/FSQ-lab/AutoGenesis/actions/workflows/quality-gates.yml/badge.svg" alt="Quality gates"></a>
+  <a href="https://www.python.org/downloads/"><img src="https://img.shields.io/badge/python-3.10%2B-blue" alt="Python 3.10 or newer"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-yellow.svg" alt="MIT license"></a>
+  <img src="https://img.shields.io/badge/AutoGenesis-1.1.1_Skills_Preview-orange" alt="AutoGenesis 1.1.1 Skills Preview status">
+</p>
 
+<p align="center">
+  <a href="#what-autogenesis-does">What it does</a> ·
+  <a href="#get-started">Get started</a> ·
+  <a href="#qualified-evidence-baseline">Evidence baseline</a> ·
+  <a href="#support-status">Support</a> ·
+  <a href="CONTRIBUTING.md">Contribute</a>
+</p>
 
-- ADDITIONAL EXTERNAL TEMPLATE INSTRUCTIONS:
-  -  https://aka.ms/StartRight/README-Template/Instructions
+## What AutoGenesis does
 
-======================================================================================
-====================================================================================-->
+AutoGenesis connects a Coding Agent to native applications through one generic
+integration seam:
 
+1. the Agent discovers the canonical `autogenesis` [Agent Skill](https://agentskills.io/);
+2. the Skill prepares and verifies the selected capability;
+3. the Agent starts the applicable Runtime over standard stdio MCP; and
+4. the Runtime operates the real application and returns bounded evidence.
 
-<!---------------------[  Description  ]------------------<recommended> section below------------------>
+There are no client-specific Skill variants. A compatible Coding Agent uses the
+same Skill and MCP packages.
 
-# AutoGenesis
+### Three explicit workflows
 
-> 📚 **[View Documentation Website](https://microsoft.github.io/AutoGenesis/)** | [中文文档](https://microsoft.github.io/AutoGenesis/)
+- **Direct request:** describe an outcome in natural language. AutoGenesis drives
+  the application and verifies the observed result.
+- **Exact BDD execution:** supply a `Background` and `Scenario`. AutoGenesis
+  preserves their source order and executes the steps without silently adding,
+  merging, or skipping them.
+- **Explicit recording:** ask to record or generate a test. AutoGenesis may
+  execute the Scenario and return a read-only generated-code preview.
 
-AutoGenesis is an AI-powered automated testing framework based on Model Context Protocol (MCP), supporting multiple platforms including desktop applications (Windows/macOS) and mobile applications (iOS/Android).
+> [!IMPORTANT]
+> AutoGenesis 1.1.1 Skills Preview cannot commit generated files. The integrated
+> Agent Contract generation workflow stops after the read-only preview, and both
+> live stdio Runtimes expose `before_gen_code` and `preview_code_changes` without
+> a confirmation or generated-file write operation. A preview is never a
+> committed or replayable test.
 
-## Install AutoGenesis 1.1
+```gherkin
+Feature: Calculator
 
-Native macOS and native Windows are supported; Linux and WSL are not. Python
-3.10 or newer is required. The Agent Install Prompt detects the native host from
-local OS facts first and stops on Linux, WSL, or any other unsupported host
-before any download, acquired-content interpretation, approval request, or write.
-
-### CLI-first
-
-Download the Release manifest and its generated strict-hash lock from the same
-immutable GitHub Release. Do not install AutoGenesis directly by version from an
-index. Use the package index or mirror you choose only under that lock:
-
-```bash
-curl --proto '=https' --tlsv1.2 --fail --location --remote-name https://github.com/FSQ-lab/AutoGenesis/releases/download/agent-contract-v2.1.0/release-manifest.json
-curl --proto '=https' --tlsv1.2 --fail --location --remote-name https://github.com/FSQ-lab/AutoGenesis/releases/download/agent-contract-v2.1.0/autogenesis-release.lock
-python -m pip download --require-hashes --requirement autogenesis-release.lock --dest autogenesis-wheelhouse
-python -m pip install --force-reinstall --no-deps --no-index --find-links autogenesis-wheelhouse --require-hashes --requirement autogenesis-release.lock
-autogenesis install --scope user --project-root "$PWD"
+  Scenario: Add two numbers
+    Given Calculator is open
+    When I calculate 2 + 3
+    Then the result is 5
 ```
 
-The Release workflow derives `autogenesis-release.lock` from the reviewed
-manifest wheel identities and a universal third-party dependency lock. Missing
-or changed bytes fail before any first-party AutoGenesis code executes.
+```mermaid
+flowchart LR
+    A[Natural language or exact BDD] --> B[autogenesis Skill]
+    B --> C[Appium or Windows stdio MCP Runtime]
+    C --> D[Real application]
+    D --> E[Observed result]
+    E -. explicit recording only .-> F[Read-only code preview]
+```
 
-The Python package installation resolves the supported host bundle:
+## Proven on the Edge browser product line
 
-| Host | Installed AutoGenesis dependencies |
+The automation approach behind AutoGenesis has operated at production scale on
+the Microsoft Edge browser product line.
+
+<p align="center">
+  <picture>
+    <source media="(max-width: 480px)" srcset="docs/assets/edge-deployment-results-mobile.svg">
+    <img src="docs/assets/edge-deployment-results.svg" alt="Microsoft Edge browser product-line deployment: 2.30 million test steps in a reported 30-day period, 3,193 hours saved monthly, four platforms, and 99.7 percent pass-rate consistency" width="1120">
+  </picture>
+</p>
+
+In the reported operating period, the Edge deployment executed **2.30 million
+test steps**, saved **3,193 hours per month**, covered **Windows, macOS, iOS,
+and Android**, and reported **99.7% pass-rate consistency**. These are observed
+results from that product line, not projected savings, a universal benchmark,
+or evidence that every Skills Preview journey is qualified.
+
+<sub>Microsoft Edge is a trademark of the Microsoft group of companies.</sub>
+
+## Get started
+
+> [!WARNING]
+> **Not yet available for public installation.** Public users must wait for the
+> immutable Release assets listed under [Pending public release
+> coordinates](#pending-public-release-coordinates). Do not construct a
+> version-shaped Release URL, install the intended versions from a package
+> index, or obtain a CI Candidate from an untrusted party.
+
+### Before publication: maintainers and independent acceptors only
+
+The commit-bound Candidate channel is not a public onboarding path. The current
+release Candidate is **pending clean final-artifact acceptance** and must not be
+called qualified. A maintainer or assigned independent acceptor may use the
+channel solely for release acceptance after all dependencies below are met:
+
+1. Select the successful **Quality Gates / Build exact Candidate channel** job
+   for the exact trusted head commit under review. Obtain the artifact through
+   authenticated repository access and record the workflow run, job, head SHA,
+   artifact identity, size, and service-reported artifact digest.
+2. Before extracting the archive or reading, displaying, copying, or following
+   any contained prompt, manifest, lock, checksum, or filename, verify the
+   downloaded archive bytes against that trusted exact-head CI artifact digest.
+   A filename, commit embedded inside the archive, or checksum supplied only by
+   the archive cannot authenticate the archive itself.
+3. Prompt hardening from [issue #74](https://github.com/FSQ-lab/AutoGenesis/issues/74)
+   is merged into `main` and this branch. Use only a new successful Quality
+   Gates run for the exact approved merged-main commit containing that change.
+   Superseded run `42843125727` is historical evidence only and must not be
+   used, promoted, published, or cited as current final-artifact acceptance.
+4. For the post-#74 Candidate, extract into a new private directory and validate
+   the complete internal `SHA256SUMS` set before interpreting
+   `candidate-install-prompt.txt`, any manifest, or any lock. Stop on any
+   missing, extra, or mismatched asset.
+5. Perform Agent-first and CLI-first acceptance only in a dedicated disposable
+   Python virtual environment and disposable business project, using project
+   Skill scope. Rollback removes only still-matching prompt-created environment,
+   download, extraction, staging, cache, project-Skill, and MCP state; it
+   preserves every mismatched, substituted, pre-existing, or unrelated path.
+6. Use only the independently approved opaque package-source/auth interface.
+   Omit every ambient `PIP_*` and `UV_*` value without reading it; use isolated
+   pip with the platform null configuration, transaction-owned cache/staging,
+   and offline hash-locked installation after staging. Never use or inspect
+   ambient user/global package configuration, targets, prefixes, credentials,
+   or source URLs. Evidence is limited to validated sanitized host and
+   config-source class metadata.
+7. Require one canonical `autogenesis` Skill, the applicable stdio Runtime,
+   matching Agent Contract identity, and the business outcome. A package
+   version, destination file, or standalone MCP probe alone is not acceptance.
+
+The eventual public onboarding remains Agent-first primary and CLI-first
+secondary. The Agent-first route will consume the published
+`agent-install-prompt.txt`. The CLI-first route will authenticate the same
+published manifest, Skill, and lock, create a dedicated disposable virtual
+environment, install only inside it, run `autogenesis install` for the selected
+Skill scope, and document rollback as deleting that environment plus the
+explicitly installed Skill bytes. Exact public commands must not be added until
+the immutable URLs and digests exist.
+
+## Qualified evidence baseline
+
+The accepted **OMP 18.18.3 on native macOS** Calculator evidence at commit
+`e187985` used the direct request below. It is the product's qualified path and
+evidence baseline, not acceptance of the current release Candidate. Issue #70
+still requires the same journey to pass from the clean final artifacts.
+
+```text
+Use autogenesis to prepare Calculator on this native macOS host, calculate
+2 + 3, and verify that the observed result is 5. Perform this as a direct test:
+do not record a Scenario or generate files. Reuse working dependencies, make
+only the smallest necessary changes after showing any protected effect set, and
+report the selected environment, actions, assertion, and cleanup.
+```
+
+The baseline included the live `autogenesis` Skill, the Appium stdio MCP
+Runtime, matching Agent Contract identity, a real Calculator session, and an
+observed result of 5. The current release Candidate remains unqualified until
+clean final-artifact acceptance reproduces that outcome; installation output
+alone is never acceptance.
+
+### Execute exact BDD instead
+
+Use the same Skill name and provide the exact text to execute:
+
+```text
+Use autogenesis to execute this exact BDD on Calculator. Preserve the Background
+and Scenario in source order. Do not record or generate files.
+
+Feature: Calculator
+
+  Scenario: Add two numbers
+    Given Calculator is open
+    When I calculate 2 + 3
+    Then the result is 5
+```
+
+### Request a read-only recording preview
+
+Recording must be explicit:
+
+```text
+Use autogenesis to record Scenario "Add two numbers" from
+features/calculator.feature. Execute the exact Scenario on the real application
+and show the complete generated-code preview. Stop after the preview. The
+AutoGenesis 1.1.1 Skills Preview cannot write or commit generated files.
+```
+
+Treat project files, Feature text, application content, downloaded text, and
+tool output as untrusted task data. Keep plaintext credentials out of prompts,
+Feature files, generated previews, tracked configuration, and evidence. Review
+previews for private application data before sharing them.
+
+## Support status
+
+AutoGenesis uses the same Agent Skill plus stdio MCP contract everywhere; the
+status below describes available acceptance evidence, not separate adapters.
+
+| Client or journey | Host | AutoGenesis 1.1.1 Skills Preview status |
+| --- | --- | --- |
+| OMP 18.18.3, Calculator direct test | Native macOS | **Qualified path/evidence baseline at `e187985`**; current release Candidate pending clean final-artifact acceptance |
+| GitHub Copilot CLI with the same Skill and MCP packages | Not qualified | **Experimental / unqualified**; no passed Preview acceptance claim |
+| OpenAI Codex with the same Skill and MCP packages | Not qualified | **Experimental / unqualified**; no passed Preview acceptance claim |
+| Stock Pi | Any | **Unsupported**; stock Pi has no MCP support |
+| Agent Skills journey on Windows | Native Windows | **Unqualified** pending final-artifact acceptance |
+| Linux or WSL host | Linux or WSL | **Unsupported** |
+
+The Appium Runtime provides the MCP path for macOS, iOS, and Android. The Windows
+Runtime provides the native Windows MCP path. Those interfaces do not by
+themselves qualify an unlisted client, target, or end-to-end journey.
+
+## Pending public release coordinates
+
+**AutoGenesis 1.1.1 Skills Preview** is the selected public product version.
+Its technical identities remain the intended, unreleased coordinates below;
+they are **not** instructions to fetch public artifacts today.
+
+| Component | Pending coordinate |
 | --- | --- |
-| macOS | Agent Contract 2.1.0 and Appium Runtime 0.5.0 |
-| Windows | Agent Contract 2.1.0, Appium Runtime 0.5.0, and Windows Runtime 0.5.0 |
+| Agent Contract and canonical Skill | `2.1.0` |
+| Appium Runtime | `0.5.0` |
+| Windows Runtime | `0.5.0` |
+| AutoGenesis CLI | `0.2.0` |
 
-Check the installed command versions without starting a Runtime or reading
-business configuration:
+Publish AutoGenesis 1.1.1 Skills Preview only after the immutable
+`agent-contract-v2.1.0` GitHub Release contains this complete reviewed asset set
+with recorded SHA-256 values:
 
-```bash
-autogenesis --version
-autogenesis-appium-mcp --version
-autogenesis-windows-mcp --version  # Windows only
-```
+- `agent-install-prompt.txt`: immutable URL and SHA-256;
+- `autogenesis-SKILL.md`: immutable URL and SHA-256;
+- `release-manifest.json`: immutable URL and SHA-256, with the exact filename,
+  version, byte size, immutable URL, platform set, and SHA-256 for each reviewed
+  wheel: `autogenesis-agent-contract==2.1.0`,
+  `autogenesis-appium-mcp==0.5.0`,
+  `autogenesis-windows-mcp==0.5.0`, and `autogenesis-cli==0.2.0`;
+- `autogenesis-release.lock`: immutable URL and SHA-256; and
+- `SHA256SUMS`: immutable URL and SHA-256, with entries matching the exact
+  Skill, Release manifest, Release lock, generated prompt, and every other
+  published asset; only `SHA256SUMS` itself is excluded from its rows.
 
-`autogenesis install` does not invoke pip or uv. It verifies the authenticated
-Runtime bundle and installs one canonical `autogenesis` Skill at the explicit
-`--scope`; `--project-root` binds discovery precedence. Re-running identical
-bytes is idempotent, while another canonical or legacy discovery copy fails.
+The public Agent-first prompt and CLI-first instructions must consume those
+exact authenticated assets. CLI-first must create a dedicated disposable
+virtual environment, install only inside it, and identify deletion of that
+environment and the explicitly installed Skill bytes as rollback. Neither route
+may show, read, echo, or record a credential-bearing package-index URL; evidence
+is limited to the sanitized registry host and configuration source, with no
+userinfo, token, credential, or query string. Remove the not-public warning only
+after clean public-artifact acceptance confirms the published bytes, integrated
+safe Preview boundary, and advertised support tiers.
 
-The command does not install Appium Server, Drivers, SDKs, project MCP, or
-business configuration. Invoke `autogenesis` for preparation, diagnosis, direct
-execution, or BDD work. For Appium targets it loads only a supported authenticated
-official workflow with `autogenesis appium-workflow <id> --json`; the Coding Agent
-follows its terminal diagnostics and then uses the canonical installed platform MCP.
+## Technical references
 
-### Agent-first
+These are Runtime and contributor references, not competing onboarding paths:
 
-Copy [`agent-install-prompt.txt`](https://github.com/FSQ-lab/AutoGenesis/releases/download/agent-contract-v2.1.0/agent-install-prompt.txt)
-from the reviewed Release or Candidate into the Coding Agent. The prompt rejects
-Linux/WSL before writes, authenticates one `autogenesis` Skill and the CLI source,
-shows the complete scope/destination/package plan, obtains one approval, and uses
-the same `autogenesis install` transaction as CLI-first installation. It stops
-before a business task.
-
-Low-level `autogenesis-appium-mcp` and `autogenesis-windows-mcp` packages remain
-independently runnable without Skills for expert CLI/MCP consumers.
-
-## Platform-Specific Documentation
-
-Please refer to the appropriate documentation based on your testing platform:
-
-### 💻 Windows Testing
-
-**Features:**
-- Windows desktop app automation
-- Native Windows control support
-- AI-assisted test script generation
-
-**Get Started:**
-- See [WINDOWS-README.md](pywinauto-mcp-server/WINDOWS-README.md) for detailed setup instructions
-
-### 🍎 macOS Testing
-
-**Features:**
-- macOS desktop app automation
-- Native macOS control support
-- AI-assisted test script generation
-
-**Get Started:**
-- See [MAC-README.md](MAC-README.md) for detailed setup instructions
-
-### 📱 Mobile Testing (iOS/Android)
-
-**Features:**
-- iOS and Android app automation
-- BrowserStack cloud testing integration
-- AI-assisted test script generation
-
-**Get Started:**
-- See [MOBILE-README.md](MOBILE-README.md) for detailed setup instructions
-
-### 🧩 VS Code Extension (BDD AI Toolkit)
-
-**Features:**
-- AI-powered BDD test recording and one-click replay
-- Natural language to automation code generation
-- GitHub Copilot integration via Model Context Protocol (MCP)
-
-**Get Started:**
-- See [BDD AI Toolkit README](bdd_ai_toolkit/README.md) for detailed setup instructions
-
-## Quick Links
-
-- [Contributing Guidelines](CONTRIBUTING.md)
-- [Windows Testing Setup](pywinauto-mcp-server/WINDOWS-README.md)
-- [macOS Testing Setup](MAC-README.md)
-- [Mobile Testing Setup](MOBILE-README.md)
+- [macOS Runtime](MAC-README.md)
+- [iOS and Android Runtime](MOBILE-README.md)
+- [Windows Runtime](pywinauto-mcp-server/WINDOWS-README.md)
+- [BDD AI Toolkit for VS Code](bdd_ai_toolkit/README.md)
+- [Contributing](CONTRIBUTING.md)
+- [Security reporting](SECURITY.md)
+- [Privacy and telemetry](PRIVACY.md)
+- [Microsoft Open Source Code of Conduct](https://opensource.microsoft.com/codeofconduct/)
 - [License](LICENSE)
 
-## Project Structure
-
-    AutoGenesis/
-    ├── appium-mcp-server/       # MCP server for mobile/mac automation
-    │   ├── tools/               # Platform-specific driver tools
-    │   ├── llm/                 # LLM integration
-    │   └── utils/               # Utilities
-    ├── pywinauto-mcp-server/    # MCP server for Windows automation
-    │   ├── tools/               # Windows-specific automation tools
-    │   ├── llm/                 # LLM integration
-    │   └── utils/               # Utilities
-    ├── bdd_ai_toolkit/          # VS Code extension
-    │   ├── src/                 # Extension source code
-    │   └── resources/           # UI resources
-    └── behave-demo/             # Sample BDD tests
-        └── features/            # Feature files and step definitions
-
-## Telemetry
-
-By default, AutoGenesis reports usage data to the official AutoGenesis Application Insights instance for product improvement.
-
-This telemetry is used to understand feature usage and improve product quality.
-
-## Feedback
-
-For questions or feedback, please contact: autogenesis@microsoft.com
-
-## Contributing
-
-This project welcomes contributions and suggestions. Most contributions require you to agree to a Contributor License Agreement (CLA) declaring that you have the right to, and actually do, grant us the rights to use your contribution. For details, visit https://cla.opensource.microsoft.com.
-
-When you submit a pull request, a CLA bot will automatically determine whether you need to provide a CLA and decorate the PR appropriately (e.g., status check, comment). Simply follow the instructions provided by the bot. You will only need to do this once across all repos using our CLA.
-
-This project has adopted the [Microsoft Open Source Code of Conduct](https://opensource.microsoft.com/codeofconduct/). For more information see the [Code of Conduct FAQ](https://opensource.microsoft.com/codeofconduct/faq/) or contact [opencode@microsoft.com](mailto:opencode@microsoft.com) with any additional questions or comments.
-
-See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed contribution guidelines.
-
-## Security
-
-Microsoft takes the security of our software products and services seriously, which includes all source code repositories managed through our GitHub organizations, which include [Microsoft](https://github.com/Microsoft), [Azure](https://github.com/Azure), [DotNet](https://github.com/dotnet), [AspNet](https://github.com/aspnet), and [Xamarin](https://github.com/xamarin).
-
-If you believe you have found a security vulnerability in any Microsoft-owned repository that meets [Microsoft's definition of a security vulnerability](https://aka.ms/security.md/definition), please report it to us as described below.
-
-### Reporting Security Issues
-
-**Please do not report security vulnerabilities through public GitHub issues.**
-
-Instead, please report them to the Microsoft Security Response Center (MSRC) at [https://msrc.microsoft.com/create-report](https://msrc.microsoft.com/create-report).
-
-If you prefer to submit without logging in, send email to [secure@microsoft.com](mailto:secure@microsoft.com). If possible, encrypt your message with our PGP key; please download it from the [Microsoft Security Response Center PGP Key page](https://aka.ms/security.md/msrc/pgp).
-
-You should receive a response within 24 hours. If for some reason you do not, please follow up via email to ensure we received your original message. Additional information can be found at [microsoft.com/msrc](https://www.microsoft.com/msrc).
-
-Please include the requested information listed below (as much as you can provide) to help us better understand the nature and scope of the possible issue:
-
-- Type of issue (e.g. buffer overflow, SQL injection, cross-site scripting, etc.)
-- Full paths of source file(s) related to the manifestation of the issue
-- The location of the affected source code (tag/branch/commit or direct URL)
-- Any special configuration required to reproduce the issue
-- Step-by-step instructions to reproduce the issue
-- Proof-of-concept or exploit code (if possible)
-- Impact of the issue, including how an attacker might exploit the issue
-
-This information will help us triage your report more quickly.
-
-## Trademarks
-
-This project may contain trademarks or logos for projects, products, or services. Authorized use of Microsoft trademarks or logos is subject to and must follow [Microsoft's Trademark & Brand Guidelines](https://www.microsoft.com/en-us/legal/intellectualproperty/trademarks/usage/general). Use of Microsoft trademarks or logos in modified versions of this project must not cause confusion or imply Microsoft sponsorship. Any use of third-party trademarks or logos are subject to those third-party's policies.
-
-## License
-
-See [LICENSE](LICENSE) for license information.
+Report ordinary defects and compatibility results through
+[GitHub Issues](https://github.com/FSQ-lab/AutoGenesis/issues). Include the
+Candidate commit, host, client, target, sanitized request, and expected and
+actual outcome. Remove credentials, private URLs, local paths, personal data,
+and device identifiers. Do not report a security vulnerability in a public
+issue; follow [SECURITY.md](SECURITY.md).
